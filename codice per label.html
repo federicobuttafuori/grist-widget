@@ -1,0 +1,1014 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<title>Product Label Widget - Dati Nutrizionali</title>
+<style>
+  /* === BASE STYLES === */
+  body {
+    margin: 0;
+    padding: 20px; 
+    font-family: system-ui, -apple-system, sans-serif;
+    background: #f0f0f0;
+  }
+  
+  @import url('https://fonts.googleapis.com/css2?family=Kalam:wght@700&display=swap');
+  
+  /* === LABEL CONTAINER: 100% altezza e larghezza === */
+  .label-container {
+    width: 7cm; 
+    height: 4cm;
+    box-sizing: border-box;
+    border: 3px solid transparent; 
+    position: relative;
+    background: white;
+    overflow: hidden; 
+    display: flex; 
+    flex-direction: column;
+    margin-top: 10px;
+    padding: 0;
+  }
+
+  /* Debug outlines for adjustable elements */
+  .label-container.debug-outline [data-adjustable] {
+    outline: 1px dashed rgba(200,0,0,0.65);
+    position: relative; /* keep relative for transforms */
+  }
+  .label-container.debug-outline [data-adjustable]::after{
+    content: attr(data-label);
+    position: absolute;
+    right: 2px;
+    top: 2px;
+    font-size: 8px;
+    background: rgba(255,255,255,0.8);
+    padding: 1px 3px;
+    border-radius: 2px;
+    color: rgba(0,0,0,0.7);
+  }
+
+  .label-container.with-border {
+    border: 3px solid #000; 
+  }
+
+  .label-container.size-8x5 {
+    width: 8cm; 
+    height: 5cm;
+  }
+
+  /* Allow per-element translate via CSS variable, and keep title scale separate */
+  .label-container [data-adjustable] {
+    --tx: 0%;
+    --ty: 0%;
+    transform: translate(var(--tx), var(--ty));
+    transition: transform 120ms linear, width 120ms linear, height 120ms linear;
+  }
+
+  .title {
+    font-family: 'Kalam', cursive;
+    font-weight: 700; 
+    font-size: 18px; 
+    line-height: 1; 
+    white-space: nowrap; 
+    margin: 0;
+    transform-origin: left center;
+    /* allow title scale via --sx variable while preserving translate */
+    transform: translate(var(--tx), var(--ty)) scaleX(var(--sx, 1));
+  }
+
+  .label-container.size-8x5 .title {
+    font-size: 24px; 
+  }
+
+  /* === BLOCCO SUPERIORE: default 50% altezza; adjustable via slider === */
+  .top-block {
+    height: 50%;
+    width: 100%;
+    padding: 0 1mm 0 1mm;
+    box-sizing: border-box;
+    display: flex;
+    flex-direction: column;
+    justify-content: space-between;
+  }
+  .top-block[data-label="top-block"] { /* keep data-label for debug */
+  }
+
+  /* === AREA TITOLO: 30% del blocco superiore === */
+  .title-area {
+    height: 30%;
+    width: 100%;
+    display: flex;
+    align-items: center;
+    overflow: hidden;
+  }
+
+  /* === AREA INGREDIENTI + RUID: 35% del blocco superiore === */
+  .ingredients-area {
+    height: 35%;
+    width: 100%;
+    display: flex;
+    align-items: flex-start;
+    gap: 2mm;
+  }
+
+  .ingredients-box {
+    flex: 1;
+    border: 1px solid #000; 
+    padding: 0.5mm 1.5mm; 
+    line-height: 1.1;
+    font-family: 'Consolas', 'Courier New', monospace;
+    font-size: 8.5px; 
+    text-align: left;
+    box-sizing: border-box;
+    overflow: hidden;
+  }
+
+  .label-container.size-8x5 .ingredients-box {
+    font-size: 10.5px; 
+  }
+
+  .version-ruid {
+    font-family: 'Palatino Linotype', 'Book Antiqua', Palatino, Georgia, serif; 
+    font-size: 9px; 
+    font-weight: normal; 
+    white-space: nowrap;
+    flex-shrink: 0;
+    padding-top: 1mm;
+  }
+
+  .label-container.size-8x5 .version-ruid {
+    font-size: 11px; 
+  }
+
+  /* === AREA DATA + EQUIVALENZA: 35% del blocco superiore === */
+  .date-meat-area {
+    height: 35%;
+    width: 100%;
+    display: flex;
+    align-items: flex-end;
+    gap: 2mm;
+  }
+
+  .production-date {
+    font-family: 'Consolas', 'Courier New', monospace;
+    font-size: 8.5px; 
+    margin: 0; 
+    font-weight: normal; 
+    line-height: 1.2;
+    white-space: nowrap;
+    flex-shrink: 0;
+  }
+
+  .label-container.size-8x5 .production-date {
+    font-size: 10.5px; 
+  }
+
+  .fresh-meat-equivalent {
+    font-family: 'Consolas', 'Courier New', monospace;
+    font-size: 6.5px;
+    font-weight: bold;
+    line-height: 1.1;
+    text-align: right;
+    margin: 0;
+    flex: 1;
+    word-wrap: break-word;
+    overflow-wrap: break-word;
+  }
+
+  .label-container.size-8x5 .fresh-meat-equivalent {
+    font-size: 8.5px; 
+  }
+
+  /* === BLOCCO INFERIORE: 50% altezza === */
+  .bottom-block {
+    height: 50%;
+    width: 100%;
+    padding: 0 1mm 1mm 1mm;
+    box-sizing: border-box;
+    display: flex;
+    gap: 2mm;
+  }
+
+  /* === AREA QR CODE: 45% larghezza blocco inferiore === */
+  .qr-area {
+    width: 45%;
+    height: 100%;
+    display: flex;
+    align-items: center;
+    gap: 1mm;
+  }
+
+  .qr-code {
+    height: 100%;
+    width: auto;
+    max-width: 85%;
+    object-fit: contain;
+  }
+
+  .scan-indicator {
+    writing-mode: vertical-rl; 
+    font-size: 10px; 
+    font-weight: bold; 
+    letter-spacing: 0.5px; 
+    line-height: 1;
+    text-align: center;
+    flex-shrink: 0;
+  }
+
+  .label-container.size-8x5 .scan-indicator {
+    font-size: 12px; 
+  }
+
+  /* === AREA TABELLA NUTRIZIONALE: 55% larghezza blocco inferiore === */
+  .nutrition-area {
+    width: 55%;
+    height: 100%;
+    display: flex;
+    flex-direction: column;
+    font-family: 'Consolas', 'Courier New', monospace;
+  }
+
+  .nutrition-table-header {
+    font-weight: bold;
+    font-size: 7.5px;
+    padding: 0.3mm 1mm 0.5mm 1mm;
+    white-space: nowrap;
+    flex-shrink: 0;
+  }
+
+  .nutrition-table-wrapper {
+    flex: 1;
+    display: flex;
+  }
+
+  .nutrition-table {
+    border-collapse: collapse;
+    width: 100%;
+    height: 100%;
+    font-size: 7.5px;
+  }
+
+  .label-container.size-8x5 .nutrition-table {
+    font-size: 9.5px;
+  }
+
+  .nutrition-table th, 
+  .nutrition-table td {
+    padding: 0.3mm 1mm; 
+    border: 1px solid #000;
+    text-align: right;
+    white-space: nowrap; 
+    height: 25%;
+  }
+
+  .nutrition-table th {
+    text-align: left;
+    background-color: #f0f0f0;
+    font-weight: bold;
+    border-right: none;
+    width: 60%; 
+  }
+
+  .nutrition-table td {
+    border-left: none;
+    font-weight: normal;
+    width: 40%; 
+  }
+
+  /* === INTERFACCIA CONTROLLI === */
+  .controls-wrapper {
+    display: flex;
+    gap: 12px;
+    align-items: center;
+    padding: 8px 12px;
+    background: white;
+    border-radius: 6px;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+    margin-bottom: 10px;
+    font-size: 12px;
+    flex-wrap: wrap;
+  }
+
+  .control-group {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+  }
+
+  .control-group label {
+    color: #555;
+    font-weight: 500;
+    margin: 0;
+  }
+
+  #size-selector {
+    padding: 4px 8px;
+    border: 1px solid #ddd;
+    border-radius: 4px;
+    background: white;
+    font-size: 12px;
+    cursor: pointer;
+  }
+
+  #border-option {
+    width: 16px;
+    height: 16px;
+    cursor: pointer;
+  }
+
+  .status-message {
+    padding: 8px 12px;
+    font-size: 12px;
+    color: #666;
+    background: white;
+    border-radius: 6px;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+  }
+
+  .error {
+    color: #d32f2f;
+  }
+
+  /* Slider controls layout */
+  .sliders-panel {
+    display: flex;
+    gap: 10px;
+    align-items: center;
+    padding: 6px 8px;
+    background: #fff;
+    border-radius: 6px;
+  }
+  .slider-group {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    min-width: 180px;
+  }
+  .slider-row {
+    display:flex;
+    gap:8px;
+    align-items:center;
+  }
+  .slider-row input[type="range"] {
+    width: 120px;
+  }
+  .small-input {
+    width: 44px;
+    padding: 3px 6px;
+    border: 1px solid #ddd;
+    border-radius: 4px;
+    font-size: 12px;
+  }
+  .btn {
+    padding: 6px 8px;
+    border-radius: 4px;
+    border: 1px solid #ccc;
+    background: #fafafa;
+    cursor: pointer;
+  }
+
+  /* === PRINT STYLES === */
+  @media print {
+    body {
+      margin: 0;
+      padding: 0;
+      background: none;
+    }
+    
+    .controls-wrapper,
+    #status {
+      display: none !important;
+    }
+    
+    .label-container {
+      margin: 0;
+      position: absolute;
+      top: 0;
+      left: 0;
+    }
+  }
+</style>
+</head>
+<body>
+
+<div class="controls-wrapper">
+
+    <div class="control-group">
+        <label for="size-selector">Dimensione:</label>
+        <select id="size-selector" onchange="changeLabelSize(this.value)">
+            <option value="7x4" selected>7×4 cm</option>
+            <option value="8x5">8×5 cm</option>
+        </select>
+    </div>
+    
+    <div class="control-group">
+        <input type="checkbox" id="border-option" onchange="toggleBorder(this.checked)">
+        <label for="border-option">Bordo</label>
+    </div>
+
+    <!-- Segmentation control: top block height -->
+    <div class="control-group">
+      <label for="top-height-slider">Altezza blocco superiore:</label>
+      <input id="top-height-slider" type="range" min="10" max="90" value="50" oninput="updateTopBlockHeight(this.value)">
+      <span id="top-height-value">50%</span>
+    </div>
+
+    <!-- Outline debug toggle -->
+    <div class="control-group">
+      <input type="checkbox" id="outline-toggle" onchange="toggleOutline(this.checked)">
+      <label for="outline-toggle">Mostra segmentazione</label>
+    </div>
+
+    <!-- Adjustable element selector -->
+    <div class="control-group">
+      <label for="adjustable-select">Elemento:</label>
+      <select id="adjustable-select" onchange="onAdjustableChange(this.value)">
+        <option value="label">Intera etichetta</option>
+        <option value="top-block">Blocco superiore</option>
+        <option value="title">Titolo</option>
+        <option value="ingredients-box">Ingredienti</option>
+        <option value="label-version">RUID</option>
+        <option value="date-meat-area">Data/Equiv. carne</option>
+        <option value="fresh-meat-equivalent">Equiv carne testo</option>
+        <option value="bottom-block">Blocco inferiore</option>
+        <option value="qr-area">Area QR</option>
+        <option value="label-qr">QR immagine</option>
+        <option value="scan-indicator">Testo INQUADRA</option>
+        <option value="nutrition-area">Area nutrizionale</option>
+        <option value="nutrition-data">Tabella nutrizionale</option>
+      </select>
+    </div>
+
+    <!-- Reset selection -->
+    <div class="control-group">
+      <button class="btn" onclick="resetSelected()">Reset selezione</button>
+    </div>
+
+</div>
+
+<!-- Sliders panel (position/size controls) -->
+<div class="controls-wrapper sliders-panel" id="sliders-panel">
+  <div class="slider-group">
+    <div class="slider-row">
+      <label style="min-width:45px">X</label>
+      <input id="slider-x" type="range" min="-50" max="50" value="0" oninput="applySlider('x', this.value)">
+      <input id="val-x" class="small-input" type="number" min="-100" max="100" value="0" oninput="applySlider('x', this.value)">
+    </div>
+    <div class="slider-row">
+      <label style="min-width:45px">Y</label>
+      <input id="slider-y" type="range" min="-50" max="50" value="0" oninput="applySlider('y', this.value)">
+      <input id="val-y" class="small-input" type="number" min="-100" max="100" value="0" oninput="applySlider('y', this.value)">
+    </div>
+  </div>
+
+  <div class="slider-group">
+    <div class="slider-row">
+      <label style="min-width:45px">W</label>
+      <input id="slider-w" type="range" min="10" max="200" value="100" oninput="applySlider('w', this.value)">
+      <input id="val-w" class="small-input" type="number" min="1" max="300" value="100" oninput="applySlider('w', this.value)">
+    </div>
+    <div class="slider-row">
+      <label style="min-width:45px">H</label>
+      <input id="slider-h" type="range" min="5" max="200" value="100" oninput="applySlider('h', this.value)">
+      <input id="val-h" class="small-input" type="number" min="1" max="300" value="100" oninput="applySlider('h', this.value)">
+    </div>
+  </div>
+
+  <div class="slider-group">
+    <div class="slider-row">
+      <label style="min-width:45px">Font</label>
+      <input id="slider-font" type="range" min="6" max="36" value="inherit" oninput="applyFont(this.value)">
+      <input id="val-font" class="small-input" type="number" min="6" max="72" value="" oninput="applyFont(this.value)">
+    </div>
+    <div class="slider-row">
+      <button class="btn" onclick="snapToParent()">Adatta a contenitore</button>
+      <button class="btn" onclick="storeState()">Salva</button>
+    </div>
+  </div>
+</div>
+
+<div id="status" class="status-message">Caricamento dati Grist...</div>
+
+<!-- === ETICHETTA STRUTTURATA A BLOCCHI === -->
+<div class="label-container" id="label" data-adjustable data-label="label">
+  
+  <!-- BLOCCO SUPERIORE: 50% altezza -->
+  <div class="top-block" id="top-block" data-adjustable data-label="top-block">
+    
+    <!-- Area Titolo: 30% -->
+    <div class="title-area" id="title-area" data-adjustable data-label="title-area">
+      <div class="title" id="label-title" data-adjustable data-label="title" style="--sx:1"></div>
+    </div>
+    
+    <!-- Area Ingredienti + RUID: 35% -->
+    <div class="ingredients-area" id="ingredients-area" data-adjustable data-label="ingredients-area">
+      <div class="ingredients-box" id="label-ingredients" data-adjustable data-label="ingredients-box"></div>
+      <div class="version-ruid" id="label-version" data-adjustable data-label="label-version"></div>
+    </div>
+    
+    <!-- Area Data + Equivalenza Carne: 35% -->
+    <div class="date-meat-area" id="date-meat-area" data-adjustable data-label="date-meat-area">
+      <div class="production-date" id="label-date" data-adjustable data-label="label-date"></div>
+      <div class="fresh-meat-equivalent" id="fresh-meat-equivalent" data-adjustable data-label="fresh-meat-equivalent"></div>
+    </div>
+    
+  </div>
+  
+  <!-- BLOCCO INFERIORE: 50% altezza -->
+  <div class="bottom-block" id="bottom-block" data-adjustable data-label="bottom-block">
+    
+    <!-- Area QR Code: 45% larghezza -->
+    <div class="qr-area" id="qr-area" data-adjustable data-label="qr-area">
+      <img class="qr-code" id="label-qr" data-adjustable data-label="label-qr" alt="Codice QR" src="https://i.imgur.com/80f5Lgm.jpg" />
+      <div class="scan-indicator" id="scan-indicator" data-adjustable data-label="scan-indicator">INQUADRA</div>
+    </div>
+    
+    <!-- Area Tabella Nutrizionale: 55% larghezza -->
+    <div class="nutrition-area" id="nutrition-area" data-adjustable data-label="nutrition-area">
+      <div class="nutrition-table-header">Valori nutrizionali 100g</div>
+      <div class="nutrition-table-wrapper" id="nutrition-table-wrapper" data-adjustable data-label="nutrition-table-wrapper">
+        <table class="nutrition-table" id="nutrition-data" data-adjustable data-label="nutrition-data"></table>
+      </div>
+    </div>
+    
+  </div>
+  
+</div>
+
+<script src="https://docs.getgrist.com/grist-plugin-api.js"></script>
+<script>
+
+// === CONFIGURAZIONE COLONNE ===
+const MACRO_COLUMNS = [
+    { name: 'Ricette_AVG_Proteine100g_Cooked', label: 'Proteine' },
+    { name: 'Ricette_AVG_Grassi100g_Cooked', label: 'Grassi' },
+    { name: 'Ricette_AVG_Carboidrati100g_Cooked', label: 'Carboidrati' },
+    { name: 'Ricette_AVG_Minerali100g_Cooked', label: 'Sale' },
+];
+
+const FRESH_MEAT_COLUMN = 'Equivalente_Carn_Fresca_GriglieMD';
+const QR_COVER_COLUMN = 'Ricette_QR_Code_Cover';
+
+const BASE_COLUMNS = [
+    'Ricette_Nome_Gusto',
+    'Ricette_R_UID',
+    'Ricette_Ingredeienti_semplificati',
+    'Numero_Lotto_GriglieMetaData_Date',
+    FRESH_MEAT_COLUMN,
+    QR_COVER_COLUMN,
+    'Ricette',
+    'Numero_Lotto_GriglieMetaData',
+];
+
+const columnNames = BASE_COLUMNS.concat(MACRO_COLUMNS.map(c => c.name));
+
+// === HELPERS PER LA UI DI PERSONALIZZAZIONE ===
+
+/**
+ * Map known element keys to DOM elements.
+ */
+function getAdjustableElement(key) {
+    switch (key) {
+        case 'label': return document.getElementById('label');
+        case 'top-block': return document.getElementById('top-block');
+        case 'title': return document.getElementById('label-title');
+        case 'ingredients-box': return document.getElementById('label-ingredients');
+        case 'label-version': return document.getElementById('label-version');
+        case 'date-meat-area': return document.getElementById('date-meat-area');
+        case 'label-date': return document.getElementById('label-date');
+        case 'fresh-meat-equivalent': return document.getElementById('fresh-meat-equivalent');
+        case 'bottom-block': return document.getElementById('bottom-block');
+        case 'qr-area': return document.getElementById('qr-area');
+        case 'label-qr': return document.getElementById('label-qr');
+        case 'scan-indicator': return document.getElementById('scan-indicator');
+        case 'nutrition-area': return document.getElementById('nutrition-area');
+        case 'nutrition-data': return document.getElementById('nutrition-data');
+        case 'nutrition-table-wrapper': return document.getElementById('nutrition-table-wrapper');
+        default: return null;
+    }
+}
+
+/**
+ * Apply slider values (x, y, w, h) to the currently selected element.
+ */
+let currentSelectionKey = 'label';
+function applySlider(type, rawValue) {
+    const el = getAdjustableElement(currentSelectionKey);
+    if (!el) return;
+
+    const value = Number(rawValue);
+
+    // Keep synced numeric inputs & ranges
+    if (type === 'x') {
+        document.getElementById('slider-x').value = value;
+        document.getElementById('val-x').value = value;
+        el.style.setProperty('--tx', `${value}%`);
+    } else if (type === 'y') {
+        document.getElementById('slider-y').value = value;
+        document.getElementById('val-y').value = value;
+        el.style.setProperty('--ty', `${value}%`);
+    } else if (type === 'w') {
+        document.getElementById('slider-w').value = value;
+        document.getElementById('val-w').value = value;
+        // For width we use percentage relative to parent when possible
+        try {
+            const parent = el.parentElement || el;
+            const parentWidth = parent.clientWidth || 1;
+            // apply percent width
+            el.style.width = `${value}%`;
+            // if element was flex and width ignored, set flex-basis as fallback
+            el.style.flexBasis = `${value}%`;
+        } catch (e) {
+            el.style.width = `${value}%`;
+        }
+    } else if (type === 'h') {
+        document.getElementById('slider-h').value = value;
+        document.getElementById('val-h').value = value;
+        el.style.height = `${value}%`;
+    }
+}
+
+/**
+ * Apply font-size slider. If 'inherit' ignore.
+ */
+function applyFont(rawValue) {
+    const el = getAdjustableElement(currentSelectionKey);
+    if (!el) return;
+    const valInput = document.getElementById('val-font');
+    const slider = document.getElementById('slider-font');
+
+    // allow numeric entry or slider; slider gives string "inherit" initially
+    let value = Number(rawValue);
+    if (isNaN(value) || value <= 0) {
+        // if invalid, keep as-is and clear numeric input
+        valInput.value = '';
+        slider.value = slider.value || '';
+        return;
+    }
+    valInput.value = value;
+    slider.value = value;
+    el.style.fontSize = `${value}px`;
+}
+
+/**
+ * Reset styles applied to the selected element.
+ */
+function resetSelected() {
+    const el = getAdjustableElement(currentSelectionKey);
+    if (!el) return;
+    // clear inline adjustments we manage
+    el.style.removeProperty('--tx');
+    el.style.removeProperty('--ty');
+    el.style.removeProperty('width');
+    el.style.removeProperty('height');
+    el.style.removeProperty('flex-basis');
+    el.style.removeProperty('font-size');
+    // If title, reset scale var
+    if (currentSelectionKey === 'title') {
+        el.style.setProperty('--sx', 1);
+        requestAnimationFrame(() => scaleTitleToFit(el));
+    }
+    // refresh UI sliders to reflect cleared state
+    loadValuesIntoSlidersForElement(currentSelectionKey);
+}
+
+/**
+ * Toggle outline debug
+ */
+function toggleOutline(enabled) {
+    const label = document.getElementById('label');
+    if (enabled) label.classList.add('debug-outline');
+    else label.classList.remove('debug-outline');
+}
+
+/**
+ * Snap selected element to full size of its parent (useful for quick fit)
+ */
+function snapToParent() {
+    const el = getAdjustableElement(currentSelectionKey);
+    if (!el || !el.parentElement) return;
+    el.style.width = '100%';
+    el.style.height = '100%';
+    el.style.removeProperty('--tx');
+    el.style.removeProperty('--ty');
+    // Update sliders
+    loadValuesIntoSlidersForElement(currentSelectionKey);
+}
+
+/**
+ * Store state: simple localStorage snapshot of inline styles for the label.
+ */
+function storeState() {
+    const label = document.getElementById('label');
+    if (!label) return;
+    // collect adjustable elements and their inline styles
+    const data = {};
+    label.querySelectorAll('[data-adjustable]').forEach(el => {
+        const key = el.id || el.getAttribute('data-label') || el.tagName;
+        if (!key) return;
+        data[key] = el.getAttribute('style') || '';
+    });
+    try {
+        localStorage.setItem('label_layout_state', JSON.stringify(data));
+        alert('Layout salvato localmente.');
+    } catch (e) {
+        console.error('Impossibile salvare stato:', e);
+    }
+}
+
+/**
+ * When the selected element changes in the UI, populate sliders with computed values.
+ */
+function onAdjustableChange(key) {
+    currentSelectionKey = key;
+    loadValuesIntoSlidersForElement(key);
+}
+
+/**
+ * Load current computed values for element into sliders and numeric inputs.
+ */
+function loadValuesIntoSlidersForElement(key) {
+    const el = getAdjustableElement(key);
+    if (!el) {
+        // reset sliders to defaults
+        document.getElementById('slider-x').value = 0;
+        document.getElementById('slider-y').value = 0;
+        document.getElementById('slider-w').value = 100;
+        document.getElementById('slider-h').value = 100;
+        document.getElementById('val-x').value = 0;
+        document.getElementById('val-y').value = 0;
+        document.getElementById('val-w').value = 100;
+        document.getElementById('val-h').value = 100;
+        document.getElementById('val-font').value = '';
+        document.getElementById('slider-font').value = '';
+        return;
+    }
+
+    // X/Y from CSS variables if present
+    const tx = getCssVarOrComputed(el, '--tx', 0);
+    const ty = getCssVarOrComputed(el, '--ty', 0);
+    document.getElementById('slider-x').value = parseFloat(tx);
+    document.getElementById('slider-y').value = parseFloat(ty);
+    document.getElementById('val-x').value = parseFloat(tx);
+    document.getElementById('val-y').value = parseFloat(ty);
+
+    // Width/Height as percent of parent where possible
+    const parent = el.parentElement || el;
+    const parentWidth = parent.clientWidth || 1;
+    const parentHeight = parent.clientHeight || 1;
+    const elWidth = el.clientWidth || 0;
+    const elHeight = el.clientHeight || 0;
+    const percentW = Math.round((elWidth / parentWidth) * 100);
+    const percentH = Math.round((elHeight / parentHeight) * 100);
+
+    document.getElementById('slider-w').value = (percentW > 0 && percentW <= 200) ? percentW : 100;
+    document.getElementById('slider-h').value = (percentH > 0 && percentH <= 200) ? percentH : 100;
+    document.getElementById('val-w').value = document.getElementById('slider-w').value;
+    document.getElementById('val-h').value = document.getElementById('slider-h').value;
+
+    // Font size (if set inline)
+    const fs = el.style.fontSize || '';
+    if (fs) {
+        const numeric = parseFloat(fs);
+        if (!isNaN(numeric)) {
+            document.getElementById('val-font').value = numeric;
+            document.getElementById('slider-font').value = numeric;
+        } else {
+            document.getElementById('val-font').value = '';
+            document.getElementById('slider-font').value = '';
+        }
+    } else {
+        // try computed
+        const cs = window.getComputedStyle(el).fontSize;
+        const num = parseFloat(cs);
+        if (!isNaN(num)) {
+            document.getElementById('val-font').value = Math.round(num);
+            document.getElementById('slider-font').value = Math.round(num);
+        } else {
+            document.getElementById('val-font').value = '';
+            document.getElementById('slider-font').value = '';
+        }
+    }
+}
+
+/**
+ * Helper: retrieve a CSS variable value or fallback to 0
+ */
+function getCssVarOrComputed(el, varName, fallback) {
+    const inline = el.style.getPropertyValue(varName);
+    if (inline && inline.trim().length) return parseFloat(inline);
+    const computed = getComputedStyle(el).getPropertyValue(varName);
+    if (computed && computed.trim().length) return parseFloat(computed);
+    return fallback;
+}
+
+/* === Segmentation slider for top-block height === */
+function updateTopBlockHeight(value) {
+    const top = document.getElementById('top-block');
+    const bottom = document.getElementById('bottom-block');
+    const label = document.getElementById('label');
+    const v = Number(value);
+    top.style.height = `${v}%`;
+    bottom.style.height = `${100 - v}%`;
+    document.getElementById('top-height-value').textContent = v + '%';
+    // if user changed segmentation, ensure slider values reflect new geometry
+    loadValuesIntoSlidersForElement(currentSelectionKey);
+}
+
+/* === Size & border toggles (existing features) === */
+function changeLabelSize(size) {
+    const label = document.getElementById('label');
+    label.classList.remove('size-8x5'); 
+    
+    if (size === '8x5') {
+        label.classList.add('size-8x5');
+    }
+    
+    const titleElement = document.getElementById('label-title');
+    requestAnimationFrame(() => scaleTitleToFit(titleElement));
+    // reload slider values because parent size may change
+    loadValuesIntoSlidersForElement(currentSelectionKey);
+}
+
+function toggleBorder(isChecked) {
+    const label = document.getElementById('label');
+    if (isChecked) {
+        label.classList.add('with-border');
+    } else {
+        label.classList.remove('with-border');
+    }
+}
+
+/* === Title scaling adapted to CSS variables === */
+function scaleTitleToFit(titleElement) {
+    const wrapper = titleElement.parentElement;
+    if (!wrapper) return;
+
+    // Reset scaling var
+    titleElement.style.setProperty('--sx', 1);
+
+    const contentWidth = titleElement.scrollWidth;
+    const wrapperWidth = wrapper.clientWidth;
+
+    if (contentWidth > wrapperWidth) {
+        const scaleFactor = wrapperWidth / contentWidth;
+        titleElement.style.setProperty('--sx', scaleFactor);
+    } else {
+        titleElement.style.setProperty('--sx', 1);
+    }
+}
+
+/* === Snap initial state from saved localStorage (if any) === */
+(function restoreState() {
+    try {
+        const saved = JSON.parse(localStorage.getItem('label_layout_state') || '{}');
+        Object.keys(saved).forEach(key => {
+            const styleString = saved[key];
+            // find the element with id or data-label matching key
+            const el = document.getElementById(key) || document.querySelector(`[data-label="${key}"]`);
+            if (el && styleString) {
+                el.setAttribute('style', styleString);
+            }
+        });
+    } catch (e) {
+        // ignore
+    }
+})();
+
+/* === UTIL: update sliders when numeric inputs changed directly === */
+document.getElementById('val-x').addEventListener('change', (e)=>applySlider('x', e.target.value));
+document.getElementById('val-y').addEventListener('change', (e)=>applySlider('y', e.target.value));
+document.getElementById('val-w').addEventListener('change', (e)=>applySlider('w', e.target.value));
+document.getElementById('val-h').addEventListener('change', (e)=>applySlider('h', e.target.value));
+document.getElementById('val-font').addEventListener('change', (e)=>applyFont(e.target.value));
+
+/* === Initialize sliders for default selection === */
+onAdjustableChange(currentSelectionKey);
+
+/* === FORMATTAZIONE DATI === */
+function formatValue(value, includeG = true, decimalPlaces = 2) {
+    if (value === null || value === undefined || value === '') {
+        return 'N/D';
+    }
+    
+    const num = Number(value);
+    
+    if (isNaN(num)) {
+        return 'N/D';
+    }
+    
+    let formatted = num.toLocaleString('it-IT', { 
+        minimumFractionDigits: decimalPlaces, 
+        maximumFractionDigits: decimalPlaces 
+    });
+
+    return includeG ? formatted + 'g' : formatted;
+}
+
+function findValue(record, columnName) {
+    let rawValue = record[columnName];
+
+    if (rawValue !== null && rawValue !== undefined) {
+        return rawValue;
+    }
+    
+    if (record.Ricette && typeof record.Ricette === 'object' && record.Ricette[columnName] !== undefined) {
+        return record.Ricette[columnName];
+    }
+    
+    if (record.Numero_Lotto_GriglieMetaData && typeof record.Numero_Lotto_GriglieMetaData === 'object' && record.Numero_Lotto_GriglieMetaData[columnName] !== undefined) {
+        return record.Numero_Lotto_GriglieMetaData[columnName];
+    }
+    
+    if (MACRO_COLUMNS.some(c => c.name === columnName)) {
+        if (record.Ricette && typeof record.Ricette === 'object') {
+             const baseNameMatch = columnName.match(/AVG_(\w+)/);
+             if (baseNameMatch) {
+                const shortName = baseNameMatch[0];
+                if (record.Ricette[shortName] !== undefined) {
+                    return record.Ricette[shortName];
+                }
+             }
+        }
+    }
+    
+    return null;
+}
+
+// === INIZIALIZZAZIONE GRIST ===
+grist.ready({ 
+    columns: columnNames.map(name => ({ 
+        name, 
+        optional: true
+    })),
+    requiredAccess: 'read table'
+});
+
+// === AGGIORNAMENTO ETICHETTA ===
+grist.onRecord(async function(record) {
+    const statusDiv = document.getElementById('status');
+    const labelDiv = document.getElementById('label');
+    const defaultQrUrl = 'https://i.imgur.com/80f5Lgm.jpg'; 
+    
+    try {
+        statusDiv.style.display = 'none';
+        labelDiv.style.display = 'flex'; 
+
+        // Recupero dati
+        const title = findValue(record, 'Ricette_Nome_Gusto') || 'DATI TITOLO MANCANTI';
+        const ruid = findValue(record, 'Ricette_R_UID') || '---';
+        const ingredients = findValue(record, 'Ricette_Ingredeienti_semplificati');
+        const dateRaw = findValue(record, 'Numero_Lotto_GriglieMetaData_Date');
+        const carneFrescaRaw = findValue(record, FRESH_MEAT_COLUMN);
+        const carneFrescaFormatted = formatValue(carneFrescaRaw, false, 0);
+        const qrCodeUrl = findValue(record, QR_COVER_COLUMN);
+        const finalQrUrl = (qrCodeUrl && typeof qrCodeUrl === 'string' && qrCodeUrl.startsWith('http')) ? qrCodeUrl : defaultQrUrl;
+        
+        // Formattazione testi
+        const dateText = dateRaw ? `prodotto il:<br>${dateRaw}` : 'prodotto il:<br>---';
+        const ingredientsText = ingredients ? `ingredienti: ${ingredients}` : 'ingredienti: Nessun dato';
+        const freshMeatText = `100g di carne secca = ${carneFrescaFormatted}g carne fresca`;
+
+        // Aggiornamento DOM
+        const titleElement = document.getElementById('label-title');
+        titleElement.textContent = title;
+        requestAnimationFrame(() => scaleTitleToFit(titleElement));
+
+        document.getElementById('label-version').textContent = ruid;
+        document.getElementById('label-ingredients').textContent = ingredientsText;
+        document.getElementById('label-date').innerHTML = dateText;
+        document.getElementById('fresh-meat-equivalent').textContent = freshMeatText;
+        document.getElementById('label-qr').src = finalQrUrl;
+
+        // Tabella nutrizionale
+        const nutritionTable = document.getElementById('nutrition-data');
+        let tableHTML = '';
+        
+        MACRO_COLUMNS.forEach(col => {
+            const rawValue = findValue(record, col.name);
+            const formattedValue = formatValue(rawValue, true, 2);
+            
+            tableHTML += `
+                <tr>
+                    <th>${col.label}</th>
+                    <td>${formattedValue}</td>
+                </tr>
+            `;
+        });
+
+        nutritionTable.innerHTML = tableHTML;
+
+        // After updating content, ensure sliders reflect actual computed sizes for current selection
+        loadValuesIntoSlidersForElement(currentSelectionKey);
+
+    } catch (error) {
+        console.error('Error updating label:', error);
+        labelDiv.style.display = 'none';
+        statusDiv.innerHTML = `<span class="error">Errore: ${error.message}</span>`;
+        statusDiv.style.display = 'block';
+    }
+});
+
+</script>
+
+</body>
+</html>
