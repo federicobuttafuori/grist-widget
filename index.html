@@ -1,4 +1,4 @@
-<!DOCTYPE html>
+<!DOCTYPE html> 
 <html>
 <head>
 <meta charset="utf-8">
@@ -40,10 +40,10 @@
     right: 2px;
     top: 2px;
     font-size: 8px;
-    background: rgba(255,255,255,0.8);
+    background: rgba(255,220,220,0.65); /* light reddish, a bit transparent */
     padding: 1px 3px;
     border-radius: 2px;
-    color: rgba(0,0,0,0.7);
+    color: rgba(140,20,20,0.85); /* slightly transparent light red text */
   }
 
   .label-container.with-border {
@@ -366,6 +366,16 @@
     cursor: pointer;
   }
 
+  /* UI toggle button style */
+  #ui-toggle-btn {
+    padding: 6px 8px;
+    border-radius: 4px;
+    border: 1px solid #888;
+    background: #fff;
+    cursor: pointer;
+    font-weight: 600;
+  }
+
   /* === PRINT STYLES === */
   @media print {
     body {
@@ -390,7 +400,12 @@
 </head>
 <body>
 
-<div class="controls-wrapper">
+<div style="display:flex; gap:10px; align-items:center; margin-bottom:8px;">
+  <button id="ui-toggle-btn" onclick="toggleUI()">Nascondi UI</button>
+  <div id="ui-status" style="font-size:12px; color:#444;">Interfaccia visibile</div>
+</div>
+
+<div class="controls-wrapper" id="controls-main">
 
     <div class="control-group">
         <label for="size-selector">Dimensione:</label>
@@ -450,13 +465,13 @@
   <div class="slider-group">
     <div class="slider-row">
       <label style="min-width:45px">X</label>
-      <input id="slider-x" type="range" min="-50" max="50" value="0" oninput="applySlider('x', this.value)">
-      <input id="val-x" class="small-input" type="number" min="-100" max="100" value="0" oninput="applySlider('x', this.value)">
+      <input id="slider-x" type="range" min="-200" max="200" value="0" oninput="applySlider('x', this.value)">
+      <input id="val-x" class="small-input" type="number" min="-500" max="500" value="0" oninput="applySlider('x', this.value)">
     </div>
     <div class="slider-row">
       <label style="min-width:45px">Y</label>
-      <input id="slider-y" type="range" min="-50" max="50" value="0" oninput="applySlider('y', this.value)">
-      <input id="val-y" class="small-input" type="number" min="-100" max="100" value="0" oninput="applySlider('y', this.value)">
+      <input id="slider-y" type="range" min="-200" max="200" value="0" oninput="applySlider('y', this.value)">
+      <input id="val-y" class="small-input" type="number" min="-500" max="500" value="0" oninput="applySlider('y', this.value)">
     </div>
   </div>
 
@@ -601,6 +616,7 @@ function applySlider(type, rawValue) {
     if (type === 'x') {
         document.getElementById('slider-x').value = value;
         document.getElementById('val-x').value = value;
+        // store percentage-like offset in CSS var (allows large ranges)
         el.style.setProperty('--tx', `${value}%`);
     } else if (type === 'y') {
         document.getElementById('slider-y').value = value;
@@ -612,7 +628,6 @@ function applySlider(type, rawValue) {
         // For width we use percentage relative to parent when possible
         try {
             const parent = el.parentElement || el;
-            const parentWidth = parent.clientWidth || 1;
             // apply percent width
             el.style.width = `${value}%`;
             // if element was flex and width ignored, set flex-basis as fallback
@@ -746,8 +761,9 @@ function loadValuesIntoSlidersForElement(key) {
     // X/Y from CSS variables if present
     const tx = getCssVarOrComputed(el, '--tx', 0);
     const ty = getCssVarOrComputed(el, '--ty', 0);
-    document.getElementById('slider-x').value = parseFloat(tx);
-    document.getElementById('slider-y').value = parseFloat(ty);
+    // clamp into visible control range just for UI
+    document.getElementById('slider-x').value = Math.max(-200, Math.min(200, parseFloat(tx)));
+    document.getElementById('slider-y').value = Math.max(-200, Math.min(200, parseFloat(ty)));
     document.getElementById('val-x').value = parseFloat(tx);
     document.getElementById('val-y').value = parseFloat(ty);
 
@@ -795,9 +811,16 @@ function loadValuesIntoSlidersForElement(key) {
  */
 function getCssVarOrComputed(el, varName, fallback) {
     const inline = el.style.getPropertyValue(varName);
-    if (inline && inline.trim().length) return parseFloat(inline);
+    if (inline && inline.trim().length) {
+        // strip trailing % if present
+        const cleaned = inline.trim().replace('%','');
+        return parseFloat(cleaned);
+    }
     const computed = getComputedStyle(el).getPropertyValue(varName);
-    if (computed && computed.trim().length) return parseFloat(computed);
+    if (computed && computed.trim().length) {
+        const cleaned = computed.trim().replace('%','');
+        return parseFloat(cleaned);
+    }
     return fallback;
 }
 
@@ -855,6 +878,18 @@ function scaleTitleToFit(titleElement) {
     } else {
         titleElement.style.setProperty('--sx', 1);
     }
+}
+
+/* === UI toggle implementation === */
+let uiVisible = true;
+function toggleUI() {
+    uiVisible = !uiVisible;
+    const controls = document.querySelectorAll('.controls-wrapper');
+    controls.forEach(c => c.style.display = uiVisible ? 'flex' : 'none');
+    document.getElementById('ui-toggle-btn').textContent = uiVisible ? 'Nascondi UI' : 'Mostra UI';
+    document.getElementById('ui-status').textContent = uiVisible ? 'Interfaccia visibile' : 'Interfaccia nascosta';
+    // keep status message visible even if controls hidden (user likely needs it)
+    document.getElementById('status').style.display = uiVisible ? (document.getElementById('status').dataset.hidden === 'true' ? 'none' : 'block') : document.getElementById('status').style.display;
 }
 
 /* === Snap initial state from saved localStorage (if any) === */
@@ -951,6 +986,7 @@ grist.onRecord(async function(record) {
     
     try {
         statusDiv.style.display = 'none';
+        statusDiv.dataset.hidden = 'false';
         labelDiv.style.display = 'flex'; 
 
         // Recupero dati
@@ -1005,6 +1041,7 @@ grist.onRecord(async function(record) {
         labelDiv.style.display = 'none';
         statusDiv.innerHTML = `<span class="error">Errore: ${error.message}</span>`;
         statusDiv.style.display = 'block';
+        statusDiv.dataset.hidden = 'false';
     }
 });
 
