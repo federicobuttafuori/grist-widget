@@ -257,7 +257,7 @@
     border: 1px solid #000;
     text-align: right;
     white-space: nowrap; 
-    height: 25%;
+    height: 12.5%; /* Reduced height to accommodate more rows */
   }
 
   .nutrition-table th {
@@ -272,6 +272,17 @@
     border-left: none;
     font-weight: normal;
     width: 40%; 
+  }
+
+  /* Indented sub-items for nutritional details */
+  .nutrition-table .sub-item {
+    padding-left: 2mm; /* Indent sub-items slightly */
+    font-weight: normal;
+    font-size: 7px; /* Slightly smaller font for sub-items */
+  }
+
+  .label-container.size-8x5 .nutrition-table .sub-item {
+    font-size: 8.5px;
   }
 
   /* === INTERFACCIA CONTROLLI === */
@@ -557,7 +568,10 @@ const MACRO_COLUMNS = [
     { name: 'Ricette_AVG_Proteine100g_Cooked', label: 'Proteine' },
     { name: 'Ricette_AVG_Grassi100g_Cooked', label: 'Grassi' },
     { name: 'Ricette_AVG_Carboidrati100g_Cooked', label: 'Carboidrati' },
+    { name: 'Ricette_AVG_Zuccheri100g_Cooked', label: 'Zuccheri', parent: 'Carboidrati' },
+    { name: 'Ricette_AVG_Fibre100g_Cooked', label: 'Fibre', parent: 'Carboidrati' },
     { name: 'Ricette_AVG_Minerali100g_Cooked', label: 'Sale' },
+    { name: 'Ricette_AVG_Sodio100g_Cooked', label: 'Sodio', parent: 'Sale' },
 ];
 
 const FRESH_MEAT_COLUMN = 'Equivalente_Carn_Fresca_GriglieMD';
@@ -575,6 +589,10 @@ const BASE_COLUMNS = [
 ];
 
 const columnNames = BASE_COLUMNS.concat(MACRO_COLUMNS.map(c => c.name));
+
+// === STATE MANAGEMENT ===
+let currentSelectionKey = 'label';
+let savedState = null;
 
 // === HELPERS PER LA UI DI PERSONALIZZAZIONE ===
 
@@ -605,40 +623,71 @@ function getAdjustableElement(key) {
 /**
  * Apply slider values (x, y, w, h) to the currently selected element.
  */
-let currentSelectionKey = 'label';
 function applySlider(type, rawValue) {
     const el = getAdjustableElement(currentSelectionKey);
     if (!el) return;
 
     const value = Number(rawValue);
+    let finalValue = value;
+
+    // Apply snapping for position and size adjustments
+    if (type === 'x' || type === 'y') {
+        // Snap position to 5% increments for better alignment
+        finalValue = Math.round(value / 5) * 5;
+    } else if (type === 'w' || type === 'h') {
+        // Snap size to parent container boundaries
+        const parent = el.parentElement;
+        if (parent) {
+            const parentSize = type === 'w' ? parent.clientWidth : parent.clientHeight;
+            const currentSize = (value / 100) * parentSize;
+            
+            // Snap to common fractions of parent size
+            const snapPoints = [0.25, 0.33, 0.5, 0.66, 0.75, 1.0];
+            let closestSnap = snapPoints[0];
+            let minDiff = Math.abs(currentSize - (parentSize * snapPoints[0]));
+            
+            for (const snap of snapPoints) {
+                const diff = Math.abs(currentSize - (parentSize * snap));
+                if (diff < minDiff) {
+                    minDiff = diff;
+                    closestSnap = snap;
+                }
+            }
+            
+            // If we're close to a snap point, use it
+            if (minDiff < 5) { // 5px threshold
+                finalValue = Math.round(closestSnap * 100);
+            }
+        }
+    }
 
     // Keep synced numeric inputs & ranges
     if (type === 'x') {
-        document.getElementById('slider-x').value = value;
-        document.getElementById('val-x').value = value;
+        document.getElementById('slider-x').value = finalValue;
+        document.getElementById('val-x').value = finalValue;
         // store percentage-like offset in CSS var (allows large ranges)
-        el.style.setProperty('--tx', `${value}%`);
+        el.style.setProperty('--tx', `${finalValue}%`);
     } else if (type === 'y') {
-        document.getElementById('slider-y').value = value;
-        document.getElementById('val-y').value = value;
-        el.style.setProperty('--ty', `${value}%`);
+        document.getElementById('slider-y').value = finalValue;
+        document.getElementById('val-y').value = finalValue;
+        el.style.setProperty('--ty', `${finalValue}%`);
     } else if (type === 'w') {
-        document.getElementById('slider-w').value = value;
-        document.getElementById('val-w').value = value;
+        document.getElementById('slider-w').value = finalValue;
+        document.getElementById('val-w').value = finalValue;
         // For width we use percentage relative to parent when possible
         try {
             const parent = el.parentElement || el;
             // apply percent width
-            el.style.width = `${value}%`;
+            el.style.width = `${finalValue}%`;
             // if element was flex and width ignored, set flex-basis as fallback
-            el.style.flexBasis = `${value}%`;
+            el.style.flexBasis = `${finalValue}%`;
         } catch (e) {
-            el.style.width = `${value}%`;
+            el.style.width = `${finalValue}%`;
         }
     } else if (type === 'h') {
-        document.getElementById('slider-h').value = value;
-        document.getElementById('val-h').value = value;
-        el.style.height = `${value}%`;
+        document.getElementById('slider-h').value = finalValue;
+        document.getElementById('val-h').value = finalValue;
+        el.style.height = `${finalValue}%`;
     }
 }
 
@@ -659,30 +708,55 @@ function applyFont(rawValue) {
         slider.value = slider.value || '';
         return;
     }
+    
+    // Snap font size to common values
+    const commonSizes = [6, 7, 8, 9, 10, 11, 12, 14, 16, 18, 20, 24, 28, 32, 36];
+    let closestSize = commonSizes[0];
+    let minDiff = Math.abs(value - commonSizes[0]);
+    
+    for (const size of commonSizes) {
+        const diff = Math.abs(value - size);
+        if (diff < minDiff) {
+            minDiff = diff;
+            closestSize = size;
+        }
+    }
+    
+    // Use snapped value if close enough
+    value = minDiff <= 1 ? closestSize : value;
+    
     valInput.value = value;
     slider.value = value;
     el.style.fontSize = `${value}px`;
 }
 
 /**
- * Reset styles applied to the selected element.
+ * Reset styles applied to the selected element to the last saved state.
  */
 function resetSelected() {
     const el = getAdjustableElement(currentSelectionKey);
     if (!el) return;
-    // clear inline adjustments we manage
-    el.style.removeProperty('--tx');
-    el.style.removeProperty('--ty');
-    el.style.removeProperty('width');
-    el.style.removeProperty('height');
-    el.style.removeProperty('flex-basis');
-    el.style.removeProperty('font-size');
+    
+    // If we have a saved state, restore from it
+    if (savedState && savedState[currentSelectionKey]) {
+        el.setAttribute('style', savedState[currentSelectionKey]);
+    } else {
+        // Otherwise reset to default styles
+        el.style.removeProperty('--tx');
+        el.style.removeProperty('--ty');
+        el.style.removeProperty('width');
+        el.style.removeProperty('height');
+        el.style.removeProperty('flex-basis');
+        el.style.removeProperty('font-size');
+    }
+    
     // If title, reset scale var
     if (currentSelectionKey === 'title') {
         el.style.setProperty('--sx', 1);
         requestAnimationFrame(() => scaleTitleToFit(el));
     }
-    // refresh UI sliders to reflect cleared state
+    
+    // refresh UI sliders to reflect current state
     loadValuesIntoSlidersForElement(currentSelectionKey);
 }
 
@@ -724,6 +798,7 @@ function storeState() {
     });
     try {
         localStorage.setItem('label_layout_state', JSON.stringify(data));
+        savedState = data; // Update the in-memory saved state
         alert('Layout salvato localmente.');
     } catch (e) {
         console.error('Impossibile salvare stato:', e);
@@ -896,6 +971,7 @@ function toggleUI() {
 (function restoreState() {
     try {
         const saved = JSON.parse(localStorage.getItem('label_layout_state') || '{}');
+        savedState = saved; // Store the saved state in memory
         Object.keys(saved).forEach(key => {
             const styleString = saved[key];
             // find the element with id or data-label matching key
@@ -906,6 +982,7 @@ function toggleUI() {
         });
     } catch (e) {
         // ignore
+        savedState = null;
     }
 })();
 
@@ -1019,7 +1096,11 @@ grist.onRecord(async function(record) {
         const nutritionTable = document.getElementById('nutrition-data');
         let tableHTML = '';
         
-        MACRO_COLUMNS.forEach(col => {
+        // Group items by parent to create hierarchical structure
+        const mainItems = MACRO_COLUMNS.filter(col => !col.parent);
+        const subItems = MACRO_COLUMNS.filter(col => col.parent);
+        
+        mainItems.forEach(col => {
             const rawValue = findValue(record, col.name);
             const formattedValue = formatValue(rawValue, true, 2);
             
@@ -1029,6 +1110,20 @@ grist.onRecord(async function(record) {
                     <td>${formattedValue}</td>
                 </tr>
             `;
+            
+            // Add sub-items for this main item if they exist
+            const children = subItems.filter(sub => sub.parent === col.label);
+            children.forEach(child => {
+                const childRawValue = findValue(record, child.name);
+                const childFormattedValue = formatValue(childRawValue, true, 2);
+                
+                tableHTML += `
+                    <tr>
+                        <th class="sub-item">${child.label}</th>
+                        <td>${childFormattedValue}</td>
+                    </tr>
+                `;
+            });
         });
 
         nutritionTable.innerHTML = tableHTML;
