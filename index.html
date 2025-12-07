@@ -7,7 +7,7 @@
     <script src="https://docs.getgrist.com/grist-plugin-api.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/jsbarcode@3.11.5/dist/JsBarcode.all.min.js"></script>
     <style>
-        *{box-sizing:border-box;margin:0;padding:0}html,body{height:100vh;width:100vw;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;display:flex;flex-direction:column;overflow:hidden;background:#f0f0f0;color:#333}button{padding:6px 10px;border:1px solid #ccc;background:#fff;border-radius:4px;cursor:pointer;font-size:14px;transition:all .2s}button:hover{background:#f9f9f9;border-color:#aaa}button:active{background:#e0e0e0}button:disabled{opacity:.5;cursor:not-allowed}input,select,textarea{width:100%;padding:6px;border:1px solid #ccc;border-radius:4px;font-size:14px}textarea{resize:vertical;min-height:60px}hr{border:none;border-top:1px solid #eee;margin:12px 0}#toolbar{flex-shrink:0;padding:8px;background:#fff;border-bottom:1px solid #e0e0e0;display:flex;gap:8px;align-items:center;flex-wrap:wrap}#toolbar .zoom-label{font-size:14px;margin-left:auto}#toolbar .divider{width:1px;height:24px;background:#e0e0e0;margin:0 4px}#main-content{display:flex;flex-grow:1;overflow:hidden}#sidebar{width:280px;flex-shrink:0;background:#fdfdfd;border-right:1px solid #e0e0e0;padding:12px;overflow-y:auto;display:flex;flex-direction:column;gap:16px}#sidebar h3{font-size:16px;font-weight:600;border-bottom:1px solid #eee;padding-bottom:6px;margin-bottom:4px}.sidebar-section{display:flex;flex-direction:column;gap:8px}.sidebar-section .add-buttons{display:grid;grid-template-columns:1fr 1fr;gap:8px}.prop-grid{display:grid;grid-template-columns:70px 1fr;gap:8px;align-items:center}.prop-grid label{font-size:14px;font-weight:500}.prop-full{grid-column:1/-1}#properties-panel{font-size:14px}#btn-delete{background:#fbebeb;border-color:#d9a0a0;color:#c00;margin-top:12px}#btn-delete:hover{background:#f7dada}.button-group{display:flex;gap:4px}#canvas-container{flex-grow:1;display:flex;justify-content:center;align-items:center;overflow:auto;background:#e0e0e0;padding:20px}#canvas-wrapper{display:inline-block;transform-origin:center center}#label-canvas{width:8cm;height:5cm;background:#fff;box-shadow:0 4px 12px rgba(0,0,0,.15);position:relative;overflow:hidden}@media print{@page{size:8cm 5cm;margin:0}html,body{margin:0!important;padding:0!important;width:8cm!important;height:5cm!important;overflow:hidden!important}body *{visibility:hidden!important}#canvas-wrapper,#canvas-wrapper *{visibility:visible!important}#canvas-wrapper{position:absolute!important;left:0!important;top:0!important;width:8cm!important;height:5cm!important;margin:0!important;padding:0!important;transform:none!important}#label-canvas{position:absolute!important;left:0!important;top:0!important;width:8cm!important;height:5cm!important;transform:none!important;box-shadow:none!important}.label-element.selected{border:none!important;box-shadow:none!important}.resize-handle{display:none!important}}.label-element{position:absolute;cursor:move;border:1px solid transparent;font-size:16px;line-height:1.2;overflow:hidden;word-wrap:break-word;user-select:none}.label-element.selected{border:2px dashed #007aff;box-shadow:0 0 0 1px rgba(0,122,255,.1)}.resize-handle{position:absolute;width:12px;height:12px;background:#007aff;border:2px solid #fff;border-radius:50%;bottom:-6px;right:-6px;cursor:nwse-resize;display:none;box-shadow:0 2px 4px rgba(0,0,0,.2)}.label-element.selected .resize-handle{display:block}.label-element img,.label-element svg{width:100%;height:100%;object-fit:contain;pointer-events:none}.status-message{position:fixed;top:60px;right:20px;padding:12px 16px;background:#4CAF50;color:#fff;border-radius:4px;box-shadow:0 2px 8px rgba(0,0,0,.2);z-index:1000;animation:slideIn .3s ease-out}@keyframes slideIn{from{transform:translateX(400px);opacity:0}to{transform:translateX(0);opacity:1}}.status-message.error{background:#f44336}
+        *{box-sizing:border-box;margin:0;padding:0}html,body{height:100vh;width:100vw;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;display:flex;flex-direction:column;overflow:hidden;background:#f0f0f0;color:#333}button{padding:6px 10px;border:1px solid #ccc;background:#fff;border-radius:4px;cursor:pointer;font-size:14px;transition:all .2s}button:hover{background:#f9f9f9;border-color:#aaa}button:active{background:#e0e0e0}button:disabled{opacity:.5;cursor:not-allowed}input,select,textarea{width:100%;padding:6px;border:1px solid #ccc;border-radius:4px;font-size:14px}textarea{resize:vertical;min-height:60px}hr{border:none;border-top:1px solid #eee;margin:12px 0}#toolbar{flex-shrink:0;padding:8px;background:#fff;border-bottom:1px solid #e0e0e0;display:flex;gap:8px;align-items:center;flex-wrap:wrap}#toolbar .zoom-label{font-size:14px;margin-left:auto}#toolbar .divider{width:1px;height:24px;background:#e0e0e0;margin:0 4px}#main-content{display:flex;flex-grow:1;overflow:hidden}#sidebar{width:320px;flex-shrink:0;background:#fdfdfd;border-right:1px solid #e0e0e0;padding:12px;overflow-y:auto;display:flex;flex-direction:column;gap:16px}#sidebar h3{font-size:16px;font-weight:600;border-bottom:1px solid #eee;padding-bottom:6px;margin-bottom:4px}.sidebar-section{display:flex;flex-direction:column;gap:8px}.sidebar-section .add-buttons{display:grid;grid-template-columns:1fr 1fr;gap:8px}.prop-grid{display:grid;grid-template-columns:90px 1fr;gap:8px;align-items:center}.prop-grid label{font-size:14px;font-weight:500}.prop-full{grid-column:1/-1}#properties-panel{font-size:14px}#btn-delete{background:#fbebeb;border-color:#d9a0a0;color:#c00;margin-top:12px}#btn-delete:hover{background:#f7dada}.button-group{display:flex;gap:4px}#canvas-container{flex-grow:1;display:flex;justify-content:center;align-items:center;overflow:auto;background:#e0e0e0;padding:20px}#canvas-wrapper{display:inline-block;transform-origin:center center}#label-canvas{width:8cm;height:5cm;background:#fff;box-shadow:0 4px 12px rgba(0,0,0,.15);position:relative;overflow:hidden}@media print{@page{size:8cm 5cm;margin:0}html,body{margin:0!important;padding:0!important;width:8cm!important;height:5cm!important;overflow:hidden!important}body *{visibility:hidden!important}#canvas-wrapper,#canvas-wrapper *{visibility:visible!important}#canvas-wrapper{position:absolute!important;left:0!important;top:0!important;width:8cm!important;height:5cm!important;margin:0!important;padding:0!important;transform:none!important}#label-canvas{position:absolute!important;left:0!important;top:0!important;width:8cm!important;height:5cm!important;transform:none!important;box-shadow:none!important}.label-element.selected{border:none!important;box-shadow:none!important}.resize-handle{display:none!important}}.label-element{position:absolute;cursor:move;border:1px solid transparent;font-size:16px;line-height:1.2;overflow:hidden;word-wrap:break-word;user-select:none;transform-origin:center center}.label-element.selected{border:2px dashed #007aff;box-shadow:0 0 0 1px rgba(0,122,255,.1)}.resize-handle{position:absolute;width:12px;height:12px;background:#007aff;border:2px solid #fff;border-radius:50%;bottom:-6px;right:-6px;cursor:nwse-resize;display:none;box-shadow:0 2px 4px rgba(0,0,0,.2)}.label-element.selected .resize-handle{display:block}.label-element img,.label-element svg{width:100%;height:100%;object-fit:contain;pointer-events:none}.status-message{position:fixed;top:60px;right:20px;padding:12px 16px;background:#4CAF50;color:#fff;border-radius:4px;box-shadow:0 2px 8px rgba(0,0,0,.2);z-index:1000;animation:slideIn .3s ease-out}@keyframes slideIn{from{transform:translateX(400px);opacity:0}to{transform:translateX(0);opacity:1}}.status-message.error{background:#f44336}
     </style>
 </head>
 <body>
@@ -34,8 +34,8 @@
             <div class="sidebar-section">
                 <h3>Add Element</h3>
                 <div class="add-buttons">
-                    <button class="add-element" data-type="text">📝🎃 Text</button>
-                    <button class="add-element" data-type="data">🔗 Data Field</button>
+                    <button class="add-element" data-type="text">📝 Text</button>
+                    <button class="add-element" data-type="data">🔗🧵 Data Field</button>
                     <button class="add-element" data-type="qr">📱 QR Code</button>
                     <button class="add-element" data-type="barcode">📊 Barcode</button>
                     <button class="add-element" data-type="line">➖ Line</button>
@@ -46,6 +46,15 @@
             <div class="sidebar-section">
                 <h3>Properties</h3>
                 <div id="properties-panel">Select an element to edit its properties.</div>
+            </div>
+            <hr>
+            <div class="sidebar-section">
+                <h3>Import/Export</h3>
+                <div style="display:flex;gap:8px">
+                    <button id="btn-export">⬇️ Export</button>
+                    <button id="btn-import">⬆️ Import</button>
+                </div>
+                <small>Tip: Ctrl/Cmd+E exports layout.</small>
             </div>
         </div>
         <div id="canvas-container">
@@ -73,6 +82,8 @@
             const bf = document.getElementById('btn-bring-front');
             const bs = document.getElementById('btn-send-back');
             const fileInput = document.getElementById('file-import');
+            const btnExport = document.getElementById('btn-export');
+            const btnImport = document.getElementById('btn-import');
 
             // Utility: show messages
             function msg(m, e = false, timeout = 3000) {
@@ -97,36 +108,58 @@
             // Normalize incoming element to ensure required fields and types exist
             function normalizeElement(el) {
                 if (!el) return null;
-                const base = {
-                    id: el.id || (`el_${Date.now()}`),
-                    type: el.type || 'text',
-                    x: Number.isFinite(Number(el.x)) ? Number(el.x) : 0.5,
-                    y: Number.isFinite(Number(el.y)) ? Number(el.y) : 0.5,
-                    width: Number.isFinite(Number(el.width)) ? Number(el.width) : (el.type === 'barcode' ? 2 : 1.5),
-                    height: Number.isFinite(Number(el.height)) ? Number(el.height) : (el.type === 'qr' ? 1 : 0.5),
-                    zIndex: Number.isFinite(Number(el.zIndex)) ? Number(el.zIndex) : 0,
-                    props: Object.assign({}, {
+                const defaults = {
+                    id: `el_${Date.now()}`,
+                    type: 'text',
+                    x: 0.5,
+                    y: 0.5,
+                    width: 1.5,
+                    height: 0.5,
+                    zIndex: 0,
+                    props: {
                         text: 'Sample Text',
                         fontSize: 16,
                         fontWeight: 'normal',
                         fontFamily: 'Arial, sans-serif',
                         textAlign: 'left',
+                        valign: 'top',           // new: vertical alignment: top|middle|bottom
                         color: '#000000',
                         boundColumn: '',
+                        prefix: '',             // new: prefix for data fields
+                        suffix: '',             // new: suffix for data fields
+                        rotation: 0,            // new: rotation degrees
+                        showBorder: false,      // new: show border around element
+                        borderColor: '#000000', // new: border color
+                        borderWidth: 1,         // new: border width (px)
                         thickness: 2,
                         format: 'CODE128',
                         displayValue: true,
                         fillColor: '#ffffff',
                         decimals: 2,
                         asPercent: false
-                    }, el.props || {})
+                    }
                 };
-                // Ensure boolean and numeric conversions for common props
+                // Merge
+                const base = Object.assign({}, defaults, el);
+                base.props = Object.assign({}, defaults.props, el && el.props ? el.props : {});
+                // Convert numeric/boolean fields
+                base.x = Number(base.x) || 0;
+                base.y = Number(base.y) || 0;
+                base.width = Number(base.width) || 1;
+                base.height = Number(base.height) || 1;
+                base.zIndex = Number(base.zIndex) || 0;
                 base.props.fontSize = Number(base.props.fontSize) || 16;
                 base.props.decimals = Number(base.props.decimals) || 0;
                 base.props.thickness = Number(base.props.thickness) || 2;
+                base.props.borderWidth = Number(base.props.borderWidth) || 1;
                 base.props.displayValue = (base.props.displayValue !== false);
                 base.props.asPercent = !!base.props.asPercent;
+                base.props.rotation = Number(base.props.rotation) || 0;
+                base.props.valign = base.props.valign || 'top';
+                base.props.prefix = base.props.prefix || '';
+                base.props.suffix = base.props.suffix || '';
+                base.props.showBorder = !!base.props.showBorder;
+                base.props.borderColor = base.props.borderColor || '#000000';
                 return base;
             }
 
@@ -163,19 +196,63 @@
                     d.style.fontSize = `${el.props.fontSize || 16}px`;
                     d.style.fontWeight = el.props.fontWeight || 'normal';
                     d.style.fontFamily = el.props.fontFamily || 'Arial, sans-serif';
+                    // Horizontal alignment via flex justify
+                    const justifyMap = { left: 'flex-start', center: 'center', right: 'flex-end' };
+                    const alignMap = { top: 'flex-start', middle: 'center', bottom: 'flex-end' };
+                    // default display flex for content alignment (except line)
+                    if (el.type !== 'line') {
+                        d.style.display = 'flex';
+                        d.style.alignItems = alignMap[el.props.valign] || 'flex-start';
+                        d.style.justifyContent = justifyMap[el.props.textAlign] || 'flex-start';
+                        // ensure text lines wrap and don't overflow
+                        d.style.whiteSpace = 'normal';
+                    } else {
+                        d.style.display = '';
+                        d.style.whiteSpace = '';
+                    }
                     d.style.textAlign = el.props.textAlign || 'left';
                     d.style.color = el.props.color || '#000000';
                     d.style.boxSizing = 'border-box';
+                    // Rotation (applies to whole element)
+                    const rotation = Number(el.props.rotation) || 0;
+                    d.style.transform = `rotate(${rotation}deg)`;
+                    d.style.transformOrigin = 'center center';
+
+                    // Border if requested (non-box elements will show around element)
+                    if (el.props.showBorder && el.type !== 'box') {
+                        d.style.border = `${Number(el.props.borderWidth)||1}px solid ${el.props.borderColor||'#000'}`;
+                    } else {
+                        // For non-box, if not showBorder, keep transparent (CSS default)
+                        if (el.type !== 'box') d.style.border = '1px solid transparent';
+                    }
+
                     // content
                     switch (el.type) {
-                        case 'text':
-                            d.innerText = el.props.text || 'Static Text';
+                        case 'text': {
+                            const span = document.createElement('div');
+                            span.style.display = 'block';
+                            span.style.width = '100%';
+                            span.style.pointerEvents = 'none';
+                            span.style.overflow = 'hidden';
+                            span.style.wordWrap = 'break-word';
+                            span.textContent = el.props.text || 'Static Text';
+                            d.appendChild(span);
                             break;
-                        case 'data':
-                            d.innerText = getData(el);
+                        }
+                        case 'data': {
+                            const span = document.createElement('div');
+                            span.style.display = 'block';
+                            span.style.width = '100%';
+                            span.style.pointerEvents = 'none';
+                            span.style.overflow = 'hidden';
+                            span.style.wordWrap = 'break-word';
+                            span.textContent = getData(el);
+                            d.appendChild(span);
                             break;
+                        }
                         case 'line':
                             d.style.backgroundColor = el.props.color || '#000000';
+                            // thickness in px, but element height is in cm - convert if given small value
                             d.style.height = `${el.props.thickness || 2}px`;
                             d.style.width = `${el.width}cm`;
                             break;
@@ -233,16 +310,20 @@
             }
 
             function getData(el) {
+                // Support prefix/suffix for data fields
+                const prefix = el.props.prefix || '';
+                const suffix = el.props.suffix || '';
                 if (el.props.boundColumn && R && Object.prototype.hasOwnProperty.call(R, el.props.boundColumn)) {
                     let v = R[el.props.boundColumn];
                     if (el.type === 'data' && typeof v === 'number') {
                         const dec = (el.props.decimals !== undefined) ? Number(el.props.decimals) : 2;
                         const pct = !!el.props.asPercent;
-                        return fmt(v, dec, pct);
+                        return prefix + fmt(v, dec, pct) + suffix;
                     }
-                    return String(v);
+                    return prefix + String(v) + suffix;
                 }
-                return el.props.text || 'SAMPLE';
+                // fallback text if not bound
+                return prefix + (el.props.text || 'SAMPLE') + suffix;
             }
 
             function select(id) {
@@ -263,22 +344,63 @@
                     pp.innerHTML = 'Error: Element not found.';
                     return;
                 }
+                // Common top/grid fields
                 let h = `<div class="prop-grid"><label>X (cm)</label><input type="number" step="0.1" data-prop="x" value="${(Number(el.x)||0).toFixed(2)}"><label>Y (cm)</label><input type="number" step="0.1" data-prop="y" value="${(Number(el.y)||0).toFixed(2)}"><label>Width (cm)</label><input type="number" step="0.1" data-prop="width" value="${(Number(el.width)||0).toFixed(2)}"><label>Height (cm)</label><input type="number" step="0.1" data-prop="height" value="${(Number(el.height)||0).toFixed(2)}"></div><hr>`;
 
-                if (el.type === 'text') h += `<label>Text</label><textarea data-prop="props.text">${el.props.text || ''}</textarea>`;
+                // Text content
+                if (el.type === 'text') {
+                    h += `<label>Text</label><textarea data-prop="props.text">${escapeHtml(el.props.text || '')}</textarea>`;
+                }
+
+                // Data / QR / Barcode binding + prefix/suffix for data
                 if (el.type === 'data' || el.type === 'qr' || el.type === 'barcode') {
                     let opts = C.map(col => `<option value="${col}" ${el.props.boundColumn === col ? 'selected' : ''}>${col}</option>`).join('');
                     h += `<label>Bound Column</label><select data-prop="props.boundColumn"><option value="">-- Select Column --</option>${opts}</select>`;
                 }
-                if (el.type === 'data') h += `<hr><div class="prop-grid"><label>Decimals</label><input type="number" data-prop="props.decimals" value="${el.props.decimals !== undefined ? el.props.decimals : 2}" min="0" max="10"><label>As Percent</label><input type="checkbox" data-prop="props.asPercent" ${el.props.asPercent ? 'checked' : ''}></div>`;
-                if (el.type === 'qr' || el.type === 'barcode') h += `<label>Fallback Text</label><input type="text" data-prop="props.text" value="${el.props.text || ''}">`;
-                if (el.type === 'barcode') h += `<label>Format</label><select data-prop="props.format"><option value="CODE128" ${el.props.format === 'CODE128' ? 'selected' : ''}>CODE128</option><option value="CODE39" ${el.props.format === 'CODE39' ? 'selected' : ''}>CODE39</option><option value="EAN13" ${el.props.format === 'EAN13' ? 'selected' : ''}>EAN13</option><option value="UPC" ${el.props.format === 'UPC' ? 'selected' : ''}>UPC</option></select><label>Show Text</label><input type="checkbox" data-prop="props.displayValue" ${el.props.displayValue !== false ? 'checked' : ''}>`;
-                if (el.type === 'line') h += `<label>Thickness</label><input type="number" data-prop="props.thickness" value="${el.props.thickness || 2}" min="1">`;
-                if (el.type === 'box') h += `<label>Border</label><input type="number" data-prop="props.thickness" value="${el.props.thickness || 2}" min="1"><label>Fill Color</label><input type="color" data-prop="props.fillColor" value="${el.props.fillColor || '#ffffff'}">`;
-                if (el.type === 'text' || el.type === 'data') h += `<hr><div class="prop-grid"><label>Font Size</label><input type="number" data-prop="props.fontSize" value="${el.props.fontSize || 16}" min="6" max="200"><label>Font Family</label><select data-prop="props.fontFamily"><option value="Arial, sans-serif" ${(el.props.fontFamily || 'Arial, sans-serif') === 'Arial, sans-serif' ? 'selected' : ''}>Arial</option><option value="'Courier New', monospace" ${el.props.fontFamily === "'Courier New', monospace" ? 'selected' : ''}>Courier New</option><option value="Consolas, monospace" ${el.props.fontFamily === 'Consolas, monospace' ? 'selected' : ''}>Consolas</option><option value="Georgia, serif" ${el.props.fontFamily === 'Georgia, serif' ? 'selected' : ''}>Georgia</option><option value="'Times New Roman', serif" ${el.props.fontFamily === "'Times New Roman', serif" ? 'selected' : ''}>Times New Roman</option><option value="Verdana, sans-serif" ${el.props.fontFamily === 'Verdana, sans-serif' ? 'selected' : ''}>Verdana</option><option value="'Trebuchet MS', sans-serif" ${el.props.fontFamily === "'Trebuchet MS', sans-serif" ? 'selected' : ''}>Trebuchet MS</option><option value="Impact, sans-serif" ${el.props.fontFamily === 'Impact, sans-serif' ? 'selected' : ''}>Impact</option><option value="'Comic Sans MS', cursive" ${el.props.fontFamily === "'Comic Sans MS', cursive" ? 'selected' : ''}>Comic Sans MS</option></select><label>Weight</label><select data-prop="props.fontWeight"><option value="normal" ${el.props.fontWeight === 'normal' ? 'selected' : ''}>Normal</option><option value="bold" ${el.props.fontWeight === 'bold' ? 'selected' : ''}>Bold</option></select><label>Align</label><select data-prop="props.textAlign"><option value="left" ${el.props.textAlign === 'left' ? 'selected' : ''}>Left</option><option value="center" ${el.props.textAlign === 'center' ? 'selected' : ''}>Center</option><option value="right" ${el.props.textAlign === 'right' ? 'selected' : ''}>Right</option></select></div>`;
+
+                if (el.type === 'data') {
+                    h += `<label>Prefix</label><input type="text" data-prop="props.prefix" value="${escapeHtml(el.props.prefix||'')}">`;
+                    h += `<label>Suffix</label><input type="text" data-prop="props.suffix" value="${escapeHtml(el.props.suffix||'')}">`;
+                    h += `<hr><div class="prop-grid"><label>Decimals</label><input type="number" data-prop="props.decimals" value="${el.props.decimals !== undefined ? el.props.decimals : 2}" min="0" max="10"><label>As Percent</label><input type="checkbox" data-prop="props.asPercent" ${el.props.asPercent ? 'checked' : ''}></div>`;
+                }
+
+                if (el.type === 'qr' || el.type === 'barcode') {
+                    h += `<label>Fallback Text</label><input type="text" data-prop="props.text" value="${escapeHtml(el.props.text||'')}">`;
+                }
+
+                if (el.type === 'barcode') {
+                    h += `<label>Format</label><select data-prop="props.format"><option value="CODE128" ${el.props.format === 'CODE128' ? 'selected' : ''}>CODE128</option><option value="CODE39" ${el.props.format === 'CODE39' ? 'selected' : ''}>CODE39</option><option value="EAN13" ${el.props.format === 'EAN13' ? 'selected' : ''}>EAN13</option><option value="UPC" ${el.props.format === 'UPC' ? 'selected' : ''}>UPC</option></select><label>Show Text</label><input type="checkbox" data-prop="props.displayValue" ${el.props.displayValue !== false ? 'checked' : ''}>`;
+                }
+
+                if (el.type === 'line') {
+                    h += `<label>Thickness (px)</label><input type="number" data-prop="props.thickness" value="${el.props.thickness || 2}" min="1">`;
+                }
+
+                if (el.type === 'box') {
+                    h += `<label>Border (px)</label><input type="number" data-prop="props.thickness" value="${el.props.thickness || 2}" min="1"><label>Fill Color</label><input type="color" data-prop="props.fillColor" value="${el.props.fillColor || '#ffffff'}">`;
+                }
+
+                // Font and alignment for text/data
+                if (el.type === 'text' || el.type === 'data') {
+                    h += `<hr><div class="prop-grid"><label>Font Size</label><input type="number" data-prop="props.fontSize" value="${el.props.fontSize || 16}" min="6" max="200"><label>Font Family</label><select data-prop="props.fontFamily"><option value="Arial, sans-serif" ${(el.props.fontFamily || 'Arial, sans-serif') === 'Arial, sans-serif' ? 'selected' : ''}>Arial</option><option value="'Courier New', monospace" ${el.props.fontFamily === "'Courier New', monospace" ? 'selected' : ''}>Courier New</option><option value="Consolas, monospace" ${el.props.fontFamily === 'Consolas, monospace' ? 'selected' : ''}>Consolas</option><option value="Georgia, serif" ${el.props.fontFamily === 'Georgia, serif' ? 'selected' : ''}>Georgia</option><option value="'Times New Roman', serif" ${el.props.fontFamily === "'Times New Roman', serif" ? 'selected' : ''}>Times New Roman</option><option value="Verdana, sans-serif" ${el.props.fontFamily === 'Verdana, sans-serif' ? 'selected' : ''}>Verdana</option><option value="'Trebuchet MS', sans-serif" ${el.props.fontFamily === "'Trebuchet MS', sans-serif" ? 'selected' : ''}>Trebuchet MS</option><option value="Impact, sans-serif" ${el.props.fontFamily === 'Impact, sans-serif' ? 'selected' : ''}>Impact</option><option value="'Comic Sans MS', cursive" ${el.props.fontFamily === "'Comic Sans MS', cursive" ? 'selected' : ''}>Comic Sans MS</option></select><label>Weight</label><select data-prop="props.fontWeight"><option value="normal" ${el.props.fontWeight === 'normal' ? 'selected' : ''}>Normal</option><option value="bold" ${el.props.fontWeight === 'bold' ? 'selected' : ''}>Bold</option></select><label>Align</label><select data-prop="props.textAlign"><option value="left" ${el.props.textAlign === 'left' ? 'selected' : ''}>Left</option><option value="center" ${el.props.textAlign === 'center' ? 'selected' : ''}>Center</option><option value="right" ${el.props.textAlign === 'right' ? 'selected' : ''}>Right</option></select></div>`;
+                    // vertical alignment
+                    h += `<label>Vertical Align</label><select data-prop="props.valign"><option value="top" ${el.props.valign==='top'?'selected':''}>Top</option><option value="middle" ${el.props.valign==='middle'?'selected':''}>Middle</option><option value="bottom" ${el.props.valign==='bottom'?'selected':''}>Bottom</option></select>`;
+                }
+
+                // Border and rotation controls (for most types)
+                h += `<hr><div class="prop-grid"><label>Show Border</label><input type="checkbox" data-prop="props.showBorder" ${el.props.showBorder ? 'checked' : ''}><label>Border Color</label><input type="color" data-prop="props.borderColor" value="${el.props.borderColor||'#000000'}"></div>`;
+                h += `<div class="prop-grid"><label>Border Width</label><input type="number" data-prop="props.borderWidth" value="${el.props.borderWidth||1}" min="0"><label>Rotation°</label><input type="number" step="1" data-prop="props.rotation" value="${el.props.rotation||0}"></div>`;
+
+                // Color for non-box elements
                 if (el.type !== 'box') h += `<hr><label>Color</label><input type="color" data-prop="props.color" value="${el.props.color || '#000000'}">`;
-                h += `<button id="btn-delete">Delete Element</button>`;
+
+                h += `<hr><button id="btn-delete">Delete Element</button>`;
                 pp.innerHTML = h;
+            }
+
+            function escapeHtml(str) {
+                if (str === null || str === undefined) return '';
+                return String(str).replaceAll('&', '&amp;').replaceAll('<', '&lt;').replaceAll('>', '&gt;').replaceAll('"', '&quot;');
             }
 
             function add(t) {
@@ -297,8 +419,15 @@
                         fontWeight: 'normal',
                         fontFamily: 'Arial, sans-serif',
                         textAlign: 'left',
+                        valign: 'top',
                         color: '#000000',
                         boundColumn: '',
+                        prefix: '',
+                        suffix: '',
+                        rotation: 0,
+                        showBorder: false,
+                        borderColor: '#000000',
+                        borderWidth: 1,
                         thickness: 2,
                         format: 'CODE128',
                         displayValue: true,
@@ -390,7 +519,6 @@
 
                 if (isGristAvailable()) {
                     try {
-                        // grist.setOption may accept string; wrap in try/catch
                         await window.grist.setOption(KEY, payload);
                         msg('Layout saved successfully!');
                         return true;
@@ -400,7 +528,6 @@
                         return false;
                     }
                 } else {
-                    // No grist available, persist locally and offer download fallback
                     msg('Layout saved locally (no Grist detected).', false, 2500);
                     return false;
                 }
@@ -411,14 +538,12 @@
                 // 1) If fromFileContent provided (string) -> try parse
                 // 2) If Grist available -> try grist.getOption
                 // 3) localStorage
-                // 4) Nothing found -> return false
                 let raw = null;
                 if (fromFileContent) {
                     raw = fromFileContent;
                 } else if (isGristAvailable()) {
                     try {
                         raw = await window.grist.getOption(KEY);
-                        // grist.getOption might return wrapper {value: string} or raw string
                         if (raw && typeof raw === 'object' && raw.value !== undefined) {
                             raw = raw.value;
                         }
@@ -439,10 +564,8 @@
 
                 if (!raw) {
                     msg('No saved layout found. You may import a JSON file.', true, 3500);
-                    // Offer file import to user
-                    // Trigger file input so user can import
-                    fileInput.value = '';
-                    fileInput.click();
+                    // Prompt user to import file
+                    // Do not auto click here to avoid annoyances
                     return false;
                 }
 
@@ -454,14 +577,12 @@
                     } else if (Array.isArray(parsed)) {
                         S = parsed.map(normalizeElement);
                     } else {
-                        // Unexpected structure; try to extract data property
                         if (parsed && parsed.layout && Array.isArray(parsed.layout)) {
                             S = parsed.layout.map(normalizeElement);
                         } else {
                             throw new Error('Unknown layout structure');
                         }
                     }
-                    // Ensure selection cleared and UI updated
                     E = null;
                     render();
                     updateProps();
@@ -471,9 +592,6 @@
                 } catch (err) {
                     console.error('Parse error while loading layout:', err);
                     msg('Error loading layout: invalid JSON', true, 4000);
-                    // Offer file import as next option
-                    fileInput.value = '';
-                    fileInput.click();
                     return false;
                 }
             }
@@ -500,11 +618,20 @@
             document.getElementById('btn-load').addEventListener('click', async () => {
                 const ok = await load();
                 if (!ok) {
-                    // nothing found or parse error — allow user to import file manually
-                    // file input click already triggered by load; if user prefers export existing file,
-                    // we also allow them to export current layout (for manual upload/reuse).
-                    // Here do nothing further.
+                    // If nothing loaded, allow user to import file manually
+                    fileInput.value = '';
+                    fileInput.click();
                 }
+            });
+
+            btnExport.addEventListener('click', () => {
+                exportToFile();
+                msg('Layout exported to file.');
+            });
+
+            btnImport.addEventListener('click', () => {
+                fileInput.value = '';
+                fileInput.click();
             });
 
             // Allow user to import a file via hidden input
@@ -519,7 +646,7 @@
                 reader.readAsText(f);
             });
 
-            // Also allow export by ctrl+e or right-click? Provide simple shortcut:
+            // Also allow export by ctrl+e or cmd+e
             window.addEventListener('keydown', (e) => {
                 if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'e') {
                     e.preventDefault();
@@ -587,12 +714,15 @@
                 if (p.includes('.')) {
                     const [o, k] = p.split('.');
                     if (!el[o]) el[o] = {};
-                    // for boolean/numeric props, ensure correct type
-                    if (typeof el[o][k] === 'number') el[o][k] = Number(v);
-                    else if (typeof el[o][k] === 'boolean') el[o][k] = !!v;
-                    else el[o][k] = v;
+                    // coerce numeric/bool where appropriate
+                    if (['fontSize','decimals','thickness','borderWidth','rotation'].includes(k)) {
+                        el[o][k] = Number(v);
+                    } else if (['showBorder','displayValue','asPercent'].includes(k)) {
+                        el[o][k] = !!v;
+                    } else {
+                        el[o][k] = v;
+                    }
                 } else {
-                    // top-level numeric fields
                     if (['x', 'y', 'width', 'height', 'zIndex'].includes(p)) {
                         el[p] = Number(v);
                     } else {
@@ -664,7 +794,7 @@
             // Keyboard interactions
             window.addEventListener('keydown', e => {
                 if (!E) {
-                    // allow quick export on ctrl+e handled earlier
+                    // allow quick export handled earlier
                 }
                 if (!E) return;
                 if (e.key === 'Delete' || e.key === 'Backspace') {
@@ -718,7 +848,7 @@
                 try {
                     if (typeof window.grist.onOptions === 'function') {
                         window.grist.onOptions(function (options) {
-                            // no-op but keep for compatibility
+                            // no-op
                         });
                     }
                 } catch (err) {
