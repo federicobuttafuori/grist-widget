@@ -1,8 +1,8 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
     <title>Grist Label Designer</title>
     <script src="https://docs.getgrist.com/grist-plugin-api.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/jsbarcode@3.11.5/dist/JsBarcode.all.min.js"></script>
@@ -54,8 +54,689 @@
             </div>
         </div>
     </div>
+
+    <!-- Hidden file input for import -->
+    <input id="file-import" type="file" accept="application/json" style="display:none" />
+
     <script>
-        document.addEventListener('DOMContentLoaded',()=>{let S=[],E=null,z=1,R={},C=[],drag=false,resize=false,ctx={};const W=8,H=5,KEY='grist_label_layout',cc=document.getElementById('canvas-container'),cw=document.getElementById('canvas-wrapper'),lc=document.getElementById('label-canvas'),pp=document.getElementById('properties-panel'),zd=document.getElementById('zoom-display'),bd=document.getElementById('btn-duplicate'),bf=document.getElementById('btn-bring-front'),bs=document.getElementById('btn-send-back');function msg(m,e=false){const x=document.querySelector('.status-message');if(x)x.remove();const s=document.createElement('div');s.className='status-message'+(e?' error':'');s.textContent=m;document.body.appendChild(s);setTimeout(()=>s.remove(),3000)}function updateBtns(){const h=E!==null;bd.disabled=!h;bf.disabled=!h;bs.disabled=!h}function fmt(v,d,p){if(v===null||v===undefined||v==='')return '';let n=parseFloat(v);if(isNaN(n))return String(v);if(p)n=n*100;n=n.toFixed(d);return p?n+'%':n}function render(){lc.innerHTML='';S.forEach(el=>{const d=document.createElement('div');d.classList.add('label-element');d.dataset.id=el.id;d.style.left=`${el.x}cm`;d.style.top=`${el.y}cm`;d.style.width=`${el.width}cm`;d.style.height=`${el.height}cm`;d.style.zIndex=el.zIndex||0;d.style.fontSize=`${el.props.fontSize||16}px`;d.style.fontWeight=el.props.fontWeight||'normal';d.style.fontFamily=el.props.fontFamily||'Arial, sans-serif';d.style.textAlign=el.props.textAlign||'left';d.style.color=el.props.color||'#000000';let c='';switch(el.type){case 'text':c=el.props.text||'Static Text';d.innerText=c;break;case 'data':c=getData(el);d.innerText=c;break;case 'line':d.style.backgroundColor=el.props.color||'#000000';d.style.height=`${el.props.thickness||2}px`;d.style.width=`${el.width}cm`;break;case 'box':d.style.border=`${el.props.thickness||2}px solid ${el.props.color||'#000000'}`;d.style.backgroundColor=el.props.fillColor||'transparent';break;case 'qr':c=getData(el);const q=document.createElement('img');const qs=Math.min(el.width,el.height)*37.795276;q.src=`https://api.qrserver.com/v1/create-qr-code/?size=${Math.round(qs)}x${Math.round(qs)}&data=${encodeURIComponent(c)}`;q.style.pointerEvents='none';q.style.width='100%';q.style.height='100%';q.style.objectFit='contain';d.appendChild(q);break;case 'barcode':c=getData(el);const sv=document.createElementNS('http://www.w3.org/2000/svg','svg');sv.style.pointerEvents='none';d.appendChild(sv);try{JsBarcode(sv,c,{format:el.props.format||"CODE128",displayValue:el.props.displayValue!==false,width:2,height:Math.max(30,el.height*37.795276-10),margin:0})}catch(e){sv.innerHTML=`<text x="10" y="20" fill="red" font-size="12">Invalid barcode</text>`;console.error("Barcode Error:",e)}break}if(el.id===E){d.classList.add('selected');const h=document.createElement('div');h.classList.add('resize-handle');d.appendChild(h)}lc.appendChild(d)})}function getData(el){if(el.props.boundColumn&&R[el.props.boundColumn]){let v=R[el.props.boundColumn];if(el.type==='data'&&typeof v==='number'){const dec=el.props.decimals!==undefined?el.props.decimals:2;const pct=el.props.asPercent||false;return fmt(v,dec,pct)}return String(v)}return el.props.text||'SAMPLE'}function select(id){if(E===id)return;E=id;render();updateProps();updateBtns()}function updateProps(){if(!E){pp.innerHTML='Select an element to edit its properties.';return}const el=S.find(e=>e.id===E);if(!el){pp.innerHTML='Error: Element not found.';return}let h=`<div class="prop-grid"><label>X (cm)</label><input type="number" step="0.1" data-prop="x" value="${el.x.toFixed(2)}"><label>Y (cm)</label><input type="number" step="0.1" data-prop="y" value="${el.y.toFixed(2)}"><label>Width (cm)</label><input type="number" step="0.1" data-prop="width" value="${el.width.toFixed(2)}"><label>Height (cm)</label><input type="number" step="0.1" data-prop="height" value="${el.height.toFixed(2)}"></div><hr>`;if(el.type==='text')h+=`<label>Text</label><textarea data-prop="props.text">${el.props.text||''}</textarea>`;if(el.type==='data'||el.type==='qr'||el.type==='barcode'){let opts=C.map(col=>`<option value="${col}" ${el.props.boundColumn===col?'selected':''}>${col}</option>`).join('');h+=`<label>Bound Column</label><select data-prop="props.boundColumn"><option value="">-- Select Column --</option>${opts}</select>`}if(el.type==='data')h+=`<hr><div class="prop-grid"><label>Decimals</label><input type="number" data-prop="props.decimals" value="${el.props.decimals!==undefined?el.props.decimals:2}" min="0" max="10"><label>As Percent</label><input type="checkbox" data-prop="props.asPercent" ${el.props.asPercent?'checked':''}></div>`;if(el.type==='qr'||el.type==='barcode')h+=`<label>Fallback Text</label><input type="text" data-prop="props.text" value="${el.props.text||''}">`;if(el.type==='barcode')h+=`<label>Format</label><select data-prop="props.format"><option value="CODE128" ${el.props.format==='CODE128'?'selected':''}>CODE128</option><option value="CODE39" ${el.props.format==='CODE39'?'selected':''}>CODE39</option><option value="EAN13" ${el.props.format==='EAN13'?'selected':''}>EAN13</option><option value="UPC" ${el.props.format==='UPC'?'selected':''}>UPC</option></select><label>Show Text</label><input type="checkbox" data-prop="props.displayValue" ${el.props.displayValue!==false?'checked':''}>`;if(el.type==='line')h+=`<label>Thickness</label><input type="number" data-prop="props.thickness" value="${el.props.thickness||2}" min="1">`;if(el.type==='box')h+=`<label>Border</label><input type="number" data-prop="props.thickness" value="${el.props.thickness||2}" min="1"><label>Fill Color</label><input type="color" data-prop="props.fillColor" value="${el.props.fillColor||'#ffffff'}">`;if(el.type==='text'||el.type==='data')h+=`<hr><div class="prop-grid"><label>Font Size</label><input type="number" data-prop="props.fontSize" value="${el.props.fontSize||16}" min="6" max="200"><label>Font Family</label><select data-prop="props.fontFamily"><option value="Arial, sans-serif" ${(el.props.fontFamily||'Arial, sans-serif')==='Arial, sans-serif'?'selected':''}>Arial</option><option value="'Courier New', monospace" ${el.props.fontFamily==="'Courier New', monospace"?'selected':''}>Courier New</option><option value="Consolas, monospace" ${el.props.fontFamily==='Consolas, monospace'?'selected':''}>Consolas</option><option value="Georgia, serif" ${el.props.fontFamily==='Georgia, serif'?'selected':''}>Georgia</option><option value="'Times New Roman', serif" ${el.props.fontFamily==="'Times New Roman', serif"?'selected':''}>Times New Roman</option><option value="Verdana, sans-serif" ${el.props.fontFamily==='Verdana, sans-serif'?'selected':''}>Verdana</option><option value="'Trebuchet MS', sans-serif" ${el.props.fontFamily==="'Trebuchet MS', sans-serif"?'selected':''}>Trebuchet MS</option><option value="Impact, sans-serif" ${el.props.fontFamily==='Impact, sans-serif'?'selected':''}>Impact</option><option value="'Comic Sans MS', cursive" ${el.props.fontFamily==="'Comic Sans MS', cursive"?'selected':''}>Comic Sans MS</option></select><label>Weight</label><select data-prop="props.fontWeight"><option value="normal" ${el.props.fontWeight==='normal'?'selected':''}>Normal</option><option value="bold" ${el.props.fontWeight==='bold'?'selected':''}>Bold</option></select><label>Align</label><select data-prop="props.textAlign"><option value="left" ${el.props.textAlign==='left'?'selected':''}>Left</option><option value="center" ${el.props.textAlign==='center'?'selected':''}>Center</option><option value="right" ${el.props.textAlign==='right'?'selected':''}>Right</option></select></div>`;if(el.type!=='box')h+=`<hr><label>Color</label><input type="color" data-prop="props.color" value="${el.props.color||'#000000'}">`;h+=`<button id="btn-delete">Delete Element</button>`;pp.innerHTML=h}function add(t){const mz=S.length>0?Math.max(...S.map(e=>e.zIndex||0)):0;const n={id:`el_${Date.now()}`,type:t,x:.5,y:.5,width:1.5,height:.5,zIndex:mz+1,props:{text:'Sample Text',fontSize:16,fontWeight:'normal',fontFamily:'Arial, sans-serif',textAlign:'left',color:'#000000',boundColumn:'',thickness:2,format:'CODE128',displayValue:true,fillColor:'#ffffff',decimals:2,asPercent:false}};if(t==='qr'){n.width=1;n.height=1}if(t==='barcode'){n.width=2;n.height=.8}if(t==='line'){n.height=.02;n.width=2}if(t==='box'){n.width=1.5;n.height=1}S.push(n);select(n.id);render()}function dup(){if(!E)return;const el=S.find(e=>e.id===E);if(!el)return;const mz=Math.max(...S.map(e=>e.zIndex||0));const n=JSON.parse(JSON.stringify(el));n.id=`el_${Date.now()}`;n.x=Math.min(el.x+.2,W-el.width);n.y=Math.min(el.y+.2,H-el.height);n.zIndex=mz+1;S.push(n);select(n.id);save()}function front(){if(!E)return;const el=S.find(e=>e.id===E);if(!el)return;const mz=Math.max(...S.map(e=>e.zIndex||0));el.zIndex=mz+1;render();save()}function back(){if(!E)return;const el=S.find(e=>e.id===E);if(!el)return;const mz=Math.min(...S.map(e=>e.zIndex||0));el.zIndex=mz-1;render();save()}function del(){if(!E)return;S=S.filter(el=>el.id!==E);E=null;render();updateProps();updateBtns();save()}function setZoom(nz){z=Math.max(.1,Math.min(3,nz));cw.style.transform=`scale(${z})`;zd.textContent=`${Math.round(z*100)}%`}function fit(){const cr=cc.getBoundingClientRect();const hw=(cr.width-40)/(W*37.795276);const vw=(cr.height-40)/(H*37.795276);setZoom(Math.min(hw,vw,1.5))}async function save(){const d=JSON.stringify(S);try{await grist.setOption(KEY,d);msg('Layout saved successfully!')}catch(e){console.warn("Grist.setOption failed, using localStorage fallback.",e);localStorage.setItem(KEY,d);msg('Layout saved (locally)')}}async function load(){let d=null;try{d=await grist.getOption(KEY)}catch(e){console.warn("Grist.getOption failed, using localStorage fallback.",e);d=localStorage.getItem(KEY)}if(d){try{S=JSON.parse(d);render();msg('Layout loaded successfully!')}catch(e){msg('Error loading layout',true);console.error('Parse error:',e)}}}document.getElementById('btn-save').addEventListener('click',save);document.getElementById('btn-load').addEventListener('click',load);document.getElementById('btn-print').addEventListener('click',()=>{const ws=E;E=null;render();window.print();setTimeout(()=>{E=ws;render()},100)});document.getElementById('btn-clear').addEventListener('click',()=>{if(confirm('Are you sure you want to clear the layout?')){S=[];E=null;render();updateProps();updateBtns();save()}});bd.addEventListener('click',dup);bf.addEventListener('click',front);bs.addEventListener('click',back);document.getElementById('btn-zoom-in').addEventListener('click',()=>setZoom(z*1.25));document.getElementById('btn-zoom-out').addEventListener('click',()=>setZoom(z/1.25));document.getElementById('btn-zoom-fit').addEventListener('click',fit);document.querySelectorAll('.add-element').forEach(b=>{b.addEventListener('click',e=>{add(e.target.dataset.type)})});pp.addEventListener('input',e=>{if(!E)return;const el=S.find(e=>e.id===E);if(!el)return;const t=e.target;const p=t.dataset.prop;let v=t.type==='number'?parseFloat(t.value):t.type==='checkbox'?t.checked:t.value;if(p.includes('.')){const[o,k]=p.split('.');el[o][k]=v}else{el[p]=v}render();save()});pp.addEventListener('click',e=>{if(e.target.id==='btn-delete')del()});lc.addEventListener('mousedown',e=>{const t=e.target;if(t===lc){select(null);return}const te=t.closest('.label-element');if(!te)return;const id=te.dataset.id;select(id);e.preventDefault();const el=S.find(e=>e.id===id);const cr=lc.getBoundingClientRect();const smx=(e.clientX-cr.left)/cr.width*W;const smy=(e.clientY-cr.top)/cr.height*H;if(t.classList.contains('resize-handle')){resize=true;ctx={el,startWidth:el.width,startHeight:el.height,startMouseX:smx,startMouseY:smy}}else{drag=true;ctx={el,offsetX:smx-el.x,offsetY:smy-el.y}}});window.addEventListener('mousemove',e=>{if(!drag&&!resize)return;const cr=lc.getBoundingClientRect();const mx=(e.clientX-cr.left)/cr.width*W;const my=(e.clientY-cr.top)/cr.height*H;const el=ctx.el;if(drag){let nx=mx-ctx.offsetX;let ny=my-ctx.offsetY;el.x=Math.max(0,Math.min(nx,W-el.width));el.y=Math.max(0,Math.min(ny,H-el.height))}else if(resize){const dx=mx-ctx.startMouseX;const dy=my-ctx.startMouseY;let nw=ctx.startWidth+dx;let nh=ctx.startHeight+dy;el.width=Math.max(.2,Math.min(nw,W-el.x));el.height=Math.max(.2,Math.min(nh,H-el.y))}render();updateProps()});window.addEventListener('mouseup',e=>{if(drag||resize)save();drag=false;resize=false;ctx={}});window.addEventListener('keydown',e=>{if(!E)return;if(e.key==='Delete'||e.key==='Backspace'){if(e.target.tagName!=='INPUT'&&e.target.tagName!=='TEXTAREA'){e.preventDefault();del()}}if(['ArrowUp','ArrowDown','ArrowLeft','ArrowRight'].includes(e.key)){if(e.target.tagName!=='INPUT'&&e.target.tagName!=='TEXTAREA'){e.preventDefault();const el=S.find(e=>e.id===E);if(!el)return;const st=e.shiftKey?.1:.01;switch(e.key){case 'ArrowUp':el.y=Math.max(0,el.y-st);break;case 'ArrowDown':el.y=Math.min(H-el.height,el.y+st);break;case 'ArrowLeft':el.x=Math.max(0,el.x-st);break;case 'ArrowRight':el.x=Math.min(W-el.width,el.x+st);break}render();updateProps();save()}}if((e.ctrlKey||e.metaKey)&&e.key==='d'){e.preventDefault();dup()}});grist.ready({requiredAccess:'full'});grist.onRecord(function(record,mappings){console.log('onRecord:',record);R=record||{};C=Object.keys(R);if(E)updateProps();render()});grist.onOptions(function(options){console.log('onOptions:',options)});setTimeout(()=>{load().then(fit)},100);updateBtns()})
+        document.addEventListener('DOMContentLoaded', () => {
+            // Core state
+            let S = [], E = null, z = 1, R = {}, C = [], drag = false, resize = false, ctx = {};
+            const W = 8, H = 5;
+            const KEY = 'grist_label_layout_v1';
+            const cc = document.getElementById('canvas-container');
+            const cw = document.getElementById('canvas-wrapper');
+            const lc = document.getElementById('label-canvas');
+            const pp = document.getElementById('properties-panel');
+            const zd = document.getElementById('zoom-display');
+            const bd = document.getElementById('btn-duplicate');
+            const bf = document.getElementById('btn-bring-front');
+            const bs = document.getElementById('btn-send-back');
+            const fileInput = document.getElementById('file-import');
+
+            // Utility: show messages
+            function msg(m, e = false, timeout = 3000) {
+                const x = document.querySelector('.status-message');
+                if (x) x.remove();
+                const s = document.createElement('div');
+                s.className = 'status-message' + (e ? ' error' : '');
+                s.textContent = m;
+                document.body.appendChild(s);
+                setTimeout(() => {
+                    if (s && s.parentNode) s.parentNode.removeChild(s);
+                }, timeout);
+            }
+
+            function isGristAvailable() {
+                return (typeof window.grist !== 'undefined'
+                    && window.grist
+                    && typeof window.grist.getOption === 'function'
+                    && typeof window.grist.setOption === 'function');
+            }
+
+            // Normalize incoming element to ensure required fields and types exist
+            function normalizeElement(el) {
+                if (!el) return null;
+                const base = {
+                    id: el.id || (`el_${Date.now()}`),
+                    type: el.type || 'text',
+                    x: Number.isFinite(Number(el.x)) ? Number(el.x) : 0.5,
+                    y: Number.isFinite(Number(el.y)) ? Number(el.y) : 0.5,
+                    width: Number.isFinite(Number(el.width)) ? Number(el.width) : (el.type === 'barcode' ? 2 : 1.5),
+                    height: Number.isFinite(Number(el.height)) ? Number(el.height) : (el.type === 'qr' ? 1 : 0.5),
+                    zIndex: Number.isFinite(Number(el.zIndex)) ? Number(el.zIndex) : 0,
+                    props: Object.assign({}, {
+                        text: 'Sample Text',
+                        fontSize: 16,
+                        fontWeight: 'normal',
+                        fontFamily: 'Arial, sans-serif',
+                        textAlign: 'left',
+                        color: '#000000',
+                        boundColumn: '',
+                        thickness: 2,
+                        format: 'CODE128',
+                        displayValue: true,
+                        fillColor: '#ffffff',
+                        decimals: 2,
+                        asPercent: false
+                    }, el.props || {})
+                };
+                // Ensure boolean and numeric conversions for common props
+                base.props.fontSize = Number(base.props.fontSize) || 16;
+                base.props.decimals = Number(base.props.decimals) || 0;
+                base.props.thickness = Number(base.props.thickness) || 2;
+                base.props.displayValue = (base.props.displayValue !== false);
+                base.props.asPercent = !!base.props.asPercent;
+                return base;
+            }
+
+            function updateBtns() {
+                const h = E !== null;
+                bd.disabled = !h;
+                bf.disabled = !h;
+                bs.disabled = !h;
+            }
+
+            function fmt(v, d, p) {
+                if (v === null || v === undefined || v === '') return '';
+                let n = parseFloat(v);
+                if (isNaN(n)) return String(v);
+                if (p) n = n * 100;
+                n = n.toFixed(d);
+                return p ? n + '%' : n;
+            }
+
+            // Rendering
+            function render() {
+                lc.innerHTML = '';
+                // Sort by zIndex to render in order
+                const sorted = S.slice().sort((a, b) => (a.zIndex || 0) - (b.zIndex || 0));
+                sorted.forEach(el => {
+                    const d = document.createElement('div');
+                    d.classList.add('label-element');
+                    d.dataset.id = el.id;
+                    d.style.left = `${el.x}cm`;
+                    d.style.top = `${el.y}cm`;
+                    d.style.width = `${el.width}cm`;
+                    d.style.height = `${el.height}cm`;
+                    d.style.zIndex = el.zIndex || 0;
+                    d.style.fontSize = `${el.props.fontSize || 16}px`;
+                    d.style.fontWeight = el.props.fontWeight || 'normal';
+                    d.style.fontFamily = el.props.fontFamily || 'Arial, sans-serif';
+                    d.style.textAlign = el.props.textAlign || 'left';
+                    d.style.color = el.props.color || '#000000';
+                    d.style.boxSizing = 'border-box';
+                    // content
+                    switch (el.type) {
+                        case 'text':
+                            d.innerText = el.props.text || 'Static Text';
+                            break;
+                        case 'data':
+                            d.innerText = getData(el);
+                            break;
+                        case 'line':
+                            d.style.backgroundColor = el.props.color || '#000000';
+                            d.style.height = `${el.props.thickness || 2}px`;
+                            d.style.width = `${el.width}cm`;
+                            break;
+                        case 'box':
+                            d.style.border = `${el.props.thickness || 2}px solid ${el.props.color || '#000000'}`;
+                            d.style.backgroundColor = el.props.fillColor || 'transparent';
+                            break;
+                        case 'qr': {
+                            const c = getData(el);
+                            const q = document.createElement('img');
+                            const dpi = 37.795276; // px per cm
+                            const qs = Math.min(el.width, el.height) * dpi;
+                            q.src = `https://api.qrserver.com/v1/create-qr-code/?size=${Math.round(qs)}x${Math.round(qs)}&data=${encodeURIComponent(c)}`;
+                            q.style.pointerEvents = 'none';
+                            q.style.width = '100%';
+                            q.style.height = '100%';
+                            q.style.objectFit = 'contain';
+                            d.appendChild(q);
+                            break;
+                        }
+                        case 'barcode': {
+                            const c = getData(el) || '';
+                            const sv = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+                            sv.style.pointerEvents = 'none';
+                            sv.setAttribute('width', '100%');
+                            sv.setAttribute('height', '100%');
+                            d.appendChild(sv);
+                            try {
+                                const pxHeight = Math.max(30, (el.height * 37.795276) - 10);
+                                JsBarcode(sv, String(c), {
+                                    format: el.props.format || "CODE128",
+                                    displayValue: el.props.displayValue !== false,
+                                    width: 2,
+                                    height: pxHeight,
+                                    margin: 0
+                                });
+                            } catch (err) {
+                                sv.innerHTML = `<text x="10" y="20" fill="red" font-size="12">Invalid barcode</text>`;
+                                console.error("Barcode Error:", err);
+                            }
+                            break;
+                        }
+                        default:
+                            d.innerText = el.props.text || '';
+                    }
+
+                    if (el.id === E) {
+                        d.classList.add('selected');
+                        const h = document.createElement('div');
+                        h.classList.add('resize-handle');
+                        d.appendChild(h);
+                    }
+                    lc.appendChild(d);
+                });
+            }
+
+            function getData(el) {
+                if (el.props.boundColumn && R && Object.prototype.hasOwnProperty.call(R, el.props.boundColumn)) {
+                    let v = R[el.props.boundColumn];
+                    if (el.type === 'data' && typeof v === 'number') {
+                        const dec = (el.props.decimals !== undefined) ? Number(el.props.decimals) : 2;
+                        const pct = !!el.props.asPercent;
+                        return fmt(v, dec, pct);
+                    }
+                    return String(v);
+                }
+                return el.props.text || 'SAMPLE';
+            }
+
+            function select(id) {
+                if (E === id) return;
+                E = id;
+                render();
+                updateProps();
+                updateBtns();
+            }
+
+            function updateProps() {
+                if (!E) {
+                    pp.innerHTML = 'Select an element to edit its properties.';
+                    return;
+                }
+                const el = S.find(e => e.id === E);
+                if (!el) {
+                    pp.innerHTML = 'Error: Element not found.';
+                    return;
+                }
+                let h = `<div class="prop-grid"><label>X (cm)</label><input type="number" step="0.1" data-prop="x" value="${(Number(el.x)||0).toFixed(2)}"><label>Y (cm)</label><input type="number" step="0.1" data-prop="y" value="${(Number(el.y)||0).toFixed(2)}"><label>Width (cm)</label><input type="number" step="0.1" data-prop="width" value="${(Number(el.width)||0).toFixed(2)}"><label>Height (cm)</label><input type="number" step="0.1" data-prop="height" value="${(Number(el.height)||0).toFixed(2)}"></div><hr>`;
+
+                if (el.type === 'text') h += `<label>Text</label><textarea data-prop="props.text">${el.props.text || ''}</textarea>`;
+                if (el.type === 'data' || el.type === 'qr' || el.type === 'barcode') {
+                    let opts = C.map(col => `<option value="${col}" ${el.props.boundColumn === col ? 'selected' : ''}>${col}</option>`).join('');
+                    h += `<label>Bound Column</label><select data-prop="props.boundColumn"><option value="">-- Select Column --</option>${opts}</select>`;
+                }
+                if (el.type === 'data') h += `<hr><div class="prop-grid"><label>Decimals</label><input type="number" data-prop="props.decimals" value="${el.props.decimals !== undefined ? el.props.decimals : 2}" min="0" max="10"><label>As Percent</label><input type="checkbox" data-prop="props.asPercent" ${el.props.asPercent ? 'checked' : ''}></div>`;
+                if (el.type === 'qr' || el.type === 'barcode') h += `<label>Fallback Text</label><input type="text" data-prop="props.text" value="${el.props.text || ''}">`;
+                if (el.type === 'barcode') h += `<label>Format</label><select data-prop="props.format"><option value="CODE128" ${el.props.format === 'CODE128' ? 'selected' : ''}>CODE128</option><option value="CODE39" ${el.props.format === 'CODE39' ? 'selected' : ''}>CODE39</option><option value="EAN13" ${el.props.format === 'EAN13' ? 'selected' : ''}>EAN13</option><option value="UPC" ${el.props.format === 'UPC' ? 'selected' : ''}>UPC</option></select><label>Show Text</label><input type="checkbox" data-prop="props.displayValue" ${el.props.displayValue !== false ? 'checked' : ''}>`;
+                if (el.type === 'line') h += `<label>Thickness</label><input type="number" data-prop="props.thickness" value="${el.props.thickness || 2}" min="1">`;
+                if (el.type === 'box') h += `<label>Border</label><input type="number" data-prop="props.thickness" value="${el.props.thickness || 2}" min="1"><label>Fill Color</label><input type="color" data-prop="props.fillColor" value="${el.props.fillColor || '#ffffff'}">`;
+                if (el.type === 'text' || el.type === 'data') h += `<hr><div class="prop-grid"><label>Font Size</label><input type="number" data-prop="props.fontSize" value="${el.props.fontSize || 16}" min="6" max="200"><label>Font Family</label><select data-prop="props.fontFamily"><option value="Arial, sans-serif" ${(el.props.fontFamily || 'Arial, sans-serif') === 'Arial, sans-serif' ? 'selected' : ''}>Arial</option><option value="'Courier New', monospace" ${el.props.fontFamily === "'Courier New', monospace" ? 'selected' : ''}>Courier New</option><option value="Consolas, monospace" ${el.props.fontFamily === 'Consolas, monospace' ? 'selected' : ''}>Consolas</option><option value="Georgia, serif" ${el.props.fontFamily === 'Georgia, serif' ? 'selected' : ''}>Georgia</option><option value="'Times New Roman', serif" ${el.props.fontFamily === "'Times New Roman', serif" ? 'selected' : ''}>Times New Roman</option><option value="Verdana, sans-serif" ${el.props.fontFamily === 'Verdana, sans-serif' ? 'selected' : ''}>Verdana</option><option value="'Trebuchet MS', sans-serif" ${el.props.fontFamily === "'Trebuchet MS', sans-serif" ? 'selected' : ''}>Trebuchet MS</option><option value="Impact, sans-serif" ${el.props.fontFamily === 'Impact, sans-serif' ? 'selected' : ''}>Impact</option><option value="'Comic Sans MS', cursive" ${el.props.fontFamily === "'Comic Sans MS', cursive" ? 'selected' : ''}>Comic Sans MS</option></select><label>Weight</label><select data-prop="props.fontWeight"><option value="normal" ${el.props.fontWeight === 'normal' ? 'selected' : ''}>Normal</option><option value="bold" ${el.props.fontWeight === 'bold' ? 'selected' : ''}>Bold</option></select><label>Align</label><select data-prop="props.textAlign"><option value="left" ${el.props.textAlign === 'left' ? 'selected' : ''}>Left</option><option value="center" ${el.props.textAlign === 'center' ? 'selected' : ''}>Center</option><option value="right" ${el.props.textAlign === 'right' ? 'selected' : ''}>Right</option></select></div>`;
+                if (el.type !== 'box') h += `<hr><label>Color</label><input type="color" data-prop="props.color" value="${el.props.color || '#000000'}">`;
+                h += `<button id="btn-delete">Delete Element</button>`;
+                pp.innerHTML = h;
+            }
+
+            function add(t) {
+                const mz = S.length > 0 ? Math.max(...S.map(e => e.zIndex || 0)) : 0;
+                const n = {
+                    id: `el_${Date.now()}`,
+                    type: t,
+                    x: .5,
+                    y: .5,
+                    width: 1.5,
+                    height: .5,
+                    zIndex: mz + 1,
+                    props: {
+                        text: 'Sample Text',
+                        fontSize: 16,
+                        fontWeight: 'normal',
+                        fontFamily: 'Arial, sans-serif',
+                        textAlign: 'left',
+                        color: '#000000',
+                        boundColumn: '',
+                        thickness: 2,
+                        format: 'CODE128',
+                        displayValue: true,
+                        fillColor: '#ffffff',
+                        decimals: 2,
+                        asPercent: false
+                    }
+                };
+                if (t === 'qr') { n.width = 1; n.height = 1; }
+                if (t === 'barcode') { n.width = 2; n.height = .8; }
+                if (t === 'line') { n.height = .02; n.width = 2; }
+                if (t === 'box') { n.width = 1.5; n.height = 1; }
+                S.push(n);
+                select(n.id);
+                render();
+                // Auto-save after adding
+                save();
+            }
+
+            function dup() {
+                if (!E) return;
+                const el = S.find(e => e.id === E);
+                if (!el) return;
+                const mz = Math.max(...S.map(e => e.zIndex || 0));
+                const n = JSON.parse(JSON.stringify(el));
+                n.id = `el_${Date.now()}`;
+                n.x = Math.min(el.x + .2, W - el.width);
+                n.y = Math.min(el.y + .2, H - el.height);
+                n.zIndex = mz + 1;
+                S.push(n);
+                select(n.id);
+                save();
+            }
+
+            function front() {
+                if (!E) return;
+                const el = S.find(e => e.id === E);
+                if (!el) return;
+                const mz = Math.max(...S.map(e => e.zIndex || 0));
+                el.zIndex = mz + 1;
+                render();
+                save();
+            }
+
+            function back() {
+                if (!E) return;
+                const el = S.find(e => e.id === E);
+                if (!el) return;
+                const mz = Math.min(...S.map(e => e.zIndex || 0));
+                el.zIndex = mz - 1;
+                render();
+                save();
+            }
+
+            function del() {
+                if (!E) return;
+                S = S.filter(el => el.id !== E);
+                E = null;
+                render();
+                updateProps();
+                updateBtns();
+                save();
+            }
+
+            function setZoom(nz) {
+                z = Math.max(.1, Math.min(3, nz));
+                cw.style.transform = `scale(${z})`;
+                zd.textContent = `${Math.round(z * 100)}%`;
+            }
+
+            function fit() {
+                const cr = cc.getBoundingClientRect();
+                const hw = (cr.width - 40) / (W * 37.795276);
+                const vw = (cr.height - 40) / (H * 37.795276);
+                setZoom(Math.min(hw, vw, 1.5));
+            }
+
+            // Save / Load improvements
+            // Payload wrapper: { version: 1, timestamp: 123, data: [...] }
+            async function save() {
+                const payloadObj = { version: 1, timestamp: Date.now(), data: S };
+                const payload = JSON.stringify(payloadObj);
+                // Always write to localStorage as a backup
+                try {
+                    localStorage.setItem(KEY, payload);
+                } catch (err) {
+                    console.warn('localStorage.setItem failed:', err);
+                }
+
+                if (isGristAvailable()) {
+                    try {
+                        // grist.setOption may accept string; wrap in try/catch
+                        await window.grist.setOption(KEY, payload);
+                        msg('Layout saved successfully!');
+                        return true;
+                    } catch (err) {
+                        console.warn("Grist.setOption failed, localStorage already saved.", err);
+                        msg('Layout saved locally (Grist unavailable).', false, 2500);
+                        return false;
+                    }
+                } else {
+                    // No grist available, persist locally and offer download fallback
+                    msg('Layout saved locally (no Grist detected).', false, 2500);
+                    return false;
+                }
+            }
+
+            async function load(fromFileContent) {
+                // Try sources in order:
+                // 1) If fromFileContent provided (string) -> try parse
+                // 2) If Grist available -> try grist.getOption
+                // 3) localStorage
+                // 4) Nothing found -> return false
+                let raw = null;
+                if (fromFileContent) {
+                    raw = fromFileContent;
+                } else if (isGristAvailable()) {
+                    try {
+                        raw = await window.grist.getOption(KEY);
+                        // grist.getOption might return wrapper {value: string} or raw string
+                        if (raw && typeof raw === 'object' && raw.value !== undefined) {
+                            raw = raw.value;
+                        }
+                    } catch (err) {
+                        console.warn("Grist.getOption failed, trying localStorage fallback.", err);
+                        raw = null;
+                    }
+                }
+
+                if (!raw) {
+                    try {
+                        raw = localStorage.getItem(KEY);
+                    } catch (err) {
+                        console.warn("localStorage.getItem failed:", err);
+                        raw = null;
+                    }
+                }
+
+                if (!raw) {
+                    msg('No saved layout found. You may import a JSON file.', true, 3500);
+                    // Offer file import to user
+                    // Trigger file input so user can import
+                    fileInput.value = '';
+                    fileInput.click();
+                    return false;
+                }
+
+                try {
+                    let parsed = JSON.parse(raw);
+                    // Support wrapped structure {version, timestamp, data}
+                    if (parsed && parsed.data && Array.isArray(parsed.data)) {
+                        S = parsed.data.map(normalizeElement);
+                    } else if (Array.isArray(parsed)) {
+                        S = parsed.map(normalizeElement);
+                    } else {
+                        // Unexpected structure; try to extract data property
+                        if (parsed && parsed.layout && Array.isArray(parsed.layout)) {
+                            S = parsed.layout.map(normalizeElement);
+                        } else {
+                            throw new Error('Unknown layout structure');
+                        }
+                    }
+                    // Ensure selection cleared and UI updated
+                    E = null;
+                    render();
+                    updateProps();
+                    updateBtns();
+                    msg('Layout loaded successfully!');
+                    return true;
+                } catch (err) {
+                    console.error('Parse error while loading layout:', err);
+                    msg('Error loading layout: invalid JSON', true, 4000);
+                    // Offer file import as next option
+                    fileInput.value = '';
+                    fileInput.click();
+                    return false;
+                }
+            }
+
+            // Export layout to file (download)
+            function exportToFile() {
+                const payloadObj = { version: 1, timestamp: Date.now(), data: S };
+                const blob = new Blob([JSON.stringify(payloadObj, null, 2)], { type: 'application/json' });
+                const url = URL.createObjectURL(blob);
+                const a = document.createElement('a');
+                a.href = url;
+                a.download = 'label-layout.json';
+                document.body.appendChild(a);
+                a.click();
+                a.remove();
+                URL.revokeObjectURL(url);
+            }
+
+            // Event wiring
+            document.getElementById('btn-save').addEventListener('click', () => {
+                save();
+            });
+
+            document.getElementById('btn-load').addEventListener('click', async () => {
+                const ok = await load();
+                if (!ok) {
+                    // nothing found or parse error — allow user to import file manually
+                    // file input click already triggered by load; if user prefers export existing file,
+                    // we also allow them to export current layout (for manual upload/reuse).
+                    // Here do nothing further.
+                }
+            });
+
+            // Allow user to import a file via hidden input
+            fileInput.addEventListener('change', (ev) => {
+                const f = ev.target.files && ev.target.files[0];
+                if (!f) return;
+                const reader = new FileReader();
+                reader.onload = function (e) {
+                    const content = e.target.result;
+                    load(content);
+                };
+                reader.readAsText(f);
+            });
+
+            // Also allow export by ctrl+e or right-click? Provide simple shortcut:
+            window.addEventListener('keydown', (e) => {
+                if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'e') {
+                    e.preventDefault();
+                    exportToFile();
+                    msg('Layout exported to file.');
+                }
+            });
+
+            document.getElementById('btn-print').addEventListener('click', () => {
+                const ws = E;
+                E = null;
+                render();
+                window.print();
+                setTimeout(() => {
+                    E = ws;
+                    render();
+                }, 100);
+            });
+
+            document.getElementById('btn-clear').addEventListener('click', () => {
+                if (confirm('Are you sure you want to clear the layout?')) {
+                    S = [];
+                    E = null;
+                    render();
+                    updateProps();
+                    updateBtns();
+                    save();
+                }
+            });
+
+            // Duplicate / z-index controls
+            bd.addEventListener('click', dup);
+            bf.addEventListener('click', front);
+            bs.addEventListener('click', back);
+
+            // Zoom controls
+            document.getElementById('btn-zoom-in').addEventListener('click', () => setZoom(z * 1.25));
+            document.getElementById('btn-zoom-out').addEventListener('click', () => setZoom(z / 1.25));
+            document.getElementById('btn-zoom-fit').addEventListener('click', fit);
+
+            // Add element buttons
+            document.querySelectorAll('.add-element').forEach(b => {
+                b.addEventListener('click', e => {
+                    add(e.currentTarget.dataset.type);
+                });
+            });
+
+            // Properties panel editing
+            pp.addEventListener('input', e => {
+                if (!E) return;
+                const el = S.find(x => x.id === E);
+                if (!el) return;
+                const t = e.target;
+                const p = t.dataset.prop;
+                if (!p) return;
+                let v;
+                if (t.type === 'number') {
+                    v = parseFloat(t.value);
+                    if (isNaN(v)) v = 0;
+                } else if (t.type === 'checkbox') {
+                    v = t.checked;
+                } else {
+                    v = t.value;
+                }
+                if (p.includes('.')) {
+                    const [o, k] = p.split('.');
+                    if (!el[o]) el[o] = {};
+                    // for boolean/numeric props, ensure correct type
+                    if (typeof el[o][k] === 'number') el[o][k] = Number(v);
+                    else if (typeof el[o][k] === 'boolean') el[o][k] = !!v;
+                    else el[o][k] = v;
+                } else {
+                    // top-level numeric fields
+                    if (['x', 'y', 'width', 'height', 'zIndex'].includes(p)) {
+                        el[p] = Number(v);
+                    } else {
+                        el[p] = v;
+                    }
+                }
+                render();
+                save();
+            });
+
+            pp.addEventListener('click', e => {
+                if (e.target && e.target.id === 'btn-delete') del();
+            });
+
+            // Canvas interactions: select, drag, resize
+            lc.addEventListener('mousedown', e => {
+                const t = e.target;
+                if (t === lc) {
+                    select(null);
+                    return;
+                }
+                const te = t.closest('.label-element');
+                if (!te) return;
+                const id = te.dataset.id;
+                select(id);
+                e.preventDefault();
+                const el = S.find(x => x.id === id);
+                const cr = lc.getBoundingClientRect();
+                const smx = (e.clientX - cr.left) / cr.width * W;
+                const smy = (e.clientY - cr.top) / cr.height * H;
+                if (t.classList.contains('resize-handle')) {
+                    resize = true;
+                    ctx = { el, startWidth: el.width, startHeight: el.height, startMouseX: smx, startMouseY: smy };
+                } else {
+                    drag = true;
+                    ctx = { el, offsetX: smx - el.x, offsetY: smy - el.y };
+                }
+            });
+
+            window.addEventListener('mousemove', e => {
+                if (!drag && !resize) return;
+                const cr = lc.getBoundingClientRect();
+                const mx = (e.clientX - cr.left) / cr.width * W;
+                const my = (e.clientY - cr.top) / cr.height * H;
+                const el = ctx.el;
+                if (!el) return;
+                if (drag) {
+                    let nx = mx - ctx.offsetX;
+                    let ny = my - ctx.offsetY;
+                    el.x = Math.max(0, Math.min(nx, W - el.width));
+                    el.y = Math.max(0, Math.min(ny, H - el.height));
+                } else if (resize) {
+                    const dx = mx - ctx.startMouseX;
+                    const dy = my - ctx.startMouseY;
+                    let nw = ctx.startWidth + dx;
+                    let nh = ctx.startHeight + dy;
+                    el.width = Math.max(.2, Math.min(nw, W - el.x));
+                    el.height = Math.max(.2, Math.min(nh, H - el.y));
+                }
+                render();
+                updateProps();
+            });
+
+            window.addEventListener('mouseup', e => {
+                if (drag || resize) save();
+                drag = false; resize = false; ctx = {};
+            });
+
+            // Keyboard interactions
+            window.addEventListener('keydown', e => {
+                if (!E) {
+                    // allow quick export on ctrl+e handled earlier
+                }
+                if (!E) return;
+                if (e.key === 'Delete' || e.key === 'Backspace') {
+                    if (e.target.tagName !== 'INPUT' && e.target.tagName !== 'TEXTAREA') {
+                        e.preventDefault();
+                        del();
+                    }
+                }
+                if (['ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight'].includes(e.key)) {
+                    if (e.target.tagName !== 'INPUT' && e.target.tagName !== 'TEXTAREA') {
+                        e.preventDefault();
+                        const el = S.find(x => x.id === E);
+                        if (!el) return;
+                        const st = e.shiftKey ? 0.1 : 0.01;
+                        switch (e.key) {
+                            case 'ArrowUp': el.y = Math.max(0, el.y - st); break;
+                            case 'ArrowDown': el.y = Math.min(H - el.height, el.y + st); break;
+                            case 'ArrowLeft': el.x = Math.max(0, el.x - st); break;
+                            case 'ArrowRight': el.x = Math.min(W - el.width, el.x + st); break;
+                        }
+                        render();
+                        updateProps();
+                        save();
+                    }
+                }
+                if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'd') {
+                    e.preventDefault();
+                    dup();
+                }
+            });
+
+            // Grist integration (guarded)
+            if (isGristAvailable()) {
+                try {
+                    window.grist.ready({ requiredAccess: 'full' });
+                } catch (err) {
+                    // ignore
+                }
+                try {
+                    if (typeof window.grist.onRecord === 'function') {
+                        window.grist.onRecord(function (record, mappings) {
+                            R = record || {};
+                            C = Object.keys(R);
+                            if (E) updateProps();
+                            render();
+                        });
+                    }
+                } catch (err) {
+                    console.warn('grist.onRecord error:', err);
+                }
+                try {
+                    if (typeof window.grist.onOptions === 'function') {
+                        window.grist.onOptions(function (options) {
+                            // no-op but keep for compatibility
+                        });
+                    }
+                } catch (err) {
+                    // ignore
+                }
+            } else {
+                // No Grist: still keep R/C empty and allow local usage
+                R = {};
+                C = [];
+            }
+
+            // Initial load attempt after small delay (allow Grist API to initialize if present)
+            setTimeout(() => {
+                load().then(() => fit());
+            }, 120);
+
+            updateBtns();
+        });
     </script>
 </body>
 </html>
