@@ -155,14 +155,11 @@ document.addEventListener('DOMContentLoaded', ()=>{
 
     // ---------- History (undo/redo) ----------
     function pushHistorySnapshot(){
-        // truncate forward
         if(historyIndex < history.length - 1) history = history.slice(0, historyIndex + 1);
-        // push snapshot of current state
         history.push({
             data: deepCopy(S),
             sel: deepCopy(selectedIds)
         });
-        // cap
         if(history.length > MAX_HISTORY) history.shift();
         historyIndex = history.length - 1;
     }
@@ -170,7 +167,7 @@ document.addEventListener('DOMContentLoaded', ()=>{
     function resetHistory(){
         history = [];
         historyIndex = -1;
-        pushHistorySnapshot(); // initial state
+        pushHistorySnapshot();
     }
 
     function undo(){
@@ -182,7 +179,7 @@ document.addEventListener('DOMContentLoaded', ()=>{
         render();
         updateProps();
         updateBtns();
-        save(); // persist after undo
+        save();
         msg('Undo');
     }
 
@@ -212,12 +209,32 @@ document.addEventListener('DOMContentLoaded', ()=>{
                 textAlign: 'left', valign: 'top', color: '#000000',
                 boundColumn: '', prefix:'', suffix:'', rotation:0,
                 showBorder:false, borderColor:'#000000', borderWidth:1,
-                padding: 0.1, thickness:2, format:'CODE128', displayValue:true,
+                // padding sides in cm; default 0 per request
+                paddingTop: 0, paddingRight: 0, paddingBottom: 0, paddingLeft: 0,
+                thickness:2, format:'CODE128', displayValue:true,
                 fillColor:'#ffffff', decimals:2, asPercent:false
             }
         };
+
+        // Merge top-level / props
         const base = Object.assign({}, defaults, el);
         base.props = Object.assign({}, defaults.props, el && el.props ? el.props : {});
+
+        // If old single padding exists (legacy data), convert to sides
+        if(base.props.padding !== undefined && !isNaN(Number(base.props.padding))){
+            const v = Number(base.props.padding);
+            base.props.paddingTop = base.props.paddingTop !== undefined ? Number(base.props.paddingTop) : v;
+            base.props.paddingRight = base.props.paddingRight !== undefined ? Number(base.props.paddingRight) : v;
+            base.props.paddingBottom = base.props.paddingBottom !== undefined ? Number(base.props.paddingBottom) : v;
+            base.props.paddingLeft = base.props.paddingLeft !== undefined ? Number(base.props.paddingLeft) : v;
+        } else {
+            // ensure defined sides fallback to 0
+            base.props.paddingTop = Number(base.props.paddingTop) || 0;
+            base.props.paddingRight = Number(base.props.paddingRight) || 0;
+            base.props.paddingBottom = Number(base.props.paddingBottom) || 0;
+            base.props.paddingLeft = Number(base.props.paddingLeft) || 0;
+        }
+
         base.x = Number(base.x) || 0;
         base.y = Number(base.y) || 0;
         base.width = Number(base.width) || 1;
@@ -235,7 +252,6 @@ document.addEventListener('DOMContentLoaded', ()=>{
         base.props.suffix = base.props.suffix || '';
         base.props.showBorder = !!base.props.showBorder;
         base.props.borderColor = base.props.borderColor || '#000000';
-        base.props.padding = Number.isFinite(Number(base.props.padding)) ? Number(base.props.padding) : 0.1;
         return base;
     }
 
@@ -272,12 +288,18 @@ document.addEventListener('DOMContentLoaded', ()=>{
             const rotation = Number(el.props.rotation) || 0;
             d.style.transform = `rotate(${rotation}deg)`;
             d.style.transformOrigin = 'center center';
-            // padding (cm) for text/data
-            if((el.type === 'text' || el.type === 'data') && Number.isFinite(Number(el.props.padding))){
-                d.style.padding = `${Number(el.props.padding)}cm`;
+
+            // padding sides applied in cm if element is text or data (default 0)
+            if((el.type === 'text' || el.type === 'data')){
+                const pt = Number.isFinite(Number(el.props.paddingTop)) ? Number(el.props.paddingTop) : 0;
+                const pr = Number.isFinite(Number(el.props.paddingRight)) ? Number(el.props.paddingRight) : 0;
+                const pb = Number.isFinite(Number(el.props.paddingBottom)) ? Number(el.props.paddingBottom) : 0;
+                const pl = Number.isFinite(Number(el.props.paddingLeft)) ? Number(el.props.paddingLeft) : 0;
+                d.style.padding = `${pt}cm ${pr}cm ${pb}cm ${pl}cm`;
             } else {
                 d.style.padding = '';
             }
+
             // border
             if(el.props.showBorder && el.type !== 'box'){
                 d.style.border = `${Number(el.props.borderWidth)||1}px solid ${el.props.borderColor||'#000'}`;
@@ -400,7 +422,6 @@ document.addEventListener('DOMContentLoaded', ()=>{
     function setSelection(ids, append=false){
         if(!Array.isArray(ids)) ids = ids ? [ids] : [];
         if(append){
-            // toggle each id
             ids.forEach(id=>{
                 const i = selectedIds.indexOf(id);
                 if(i===-1) selectedIds.push(id);
@@ -414,7 +435,6 @@ document.addEventListener('DOMContentLoaded', ()=>{
         updateBtns();
     }
 
-    // toggles a single id (ctrl/meta click)
     function toggleSelection(id){
         const i = selectedIds.indexOf(id);
         if(i===-1) selectedIds.push(id);
@@ -426,54 +446,65 @@ document.addEventListener('DOMContentLoaded', ()=>{
 
     function getPrimarySelectedId(){ return selectedIds.length>0 ? selectedIds[0] : null; }
 
-    // update properties panel (single or multiple)
     function updateProps(){
         if(selectedIds.length===0){
             pp.innerHTML = 'Select an element to edit its properties.';
             return;
         }
-
         if(selectedIds.length===1){
             const el = S.find(x=>x.id===selectedIds[0]);
             if(!el){ pp.innerHTML='Error: Element not found.'; return; }
             singlePropsPanel(el);
             return;
         }
-
-        // Multiple selection panel
         multiPropsPanel(selectedIds.map(id=>S.find(e=>e.id===id)).filter(Boolean));
     }
 
+    // ---------- Properties Panels ----------
     function singlePropsPanel(el){
-        let h = `<div class="prop-grid"><label>X (cm)</label><input type="number" step="0.1" data-prop="x" value="${(Number(el.x)||0).toFixed(2)}"><label>Y (cm)</label><input type="number" step="0.1" data-prop="y" value="${(Number(el.y)||0).toFixed(2)}"><label>Width (cm)</label><input type="number" step="0.1" data-prop="width" value="${(Number(el.width)||0).toFixed(2)}"><label>Height (cm)</label><input type="number" step="0.1" data-prop="widthHeight" value="${(Number(el.height)||0).toFixed(2)}"></div><hr>`;
+        let h = `<div class="prop-grid"><label>X (cm)</label><input type="number" step="0.1" data-prop="x" value="${(Number(el.x)||0).toFixed(2)}"><label>Y (cm)</label><input type="number" step="0.1" data-prop="y" value="${(Number(el.y)||0).toFixed(2)}"></div>`;
+        h += `<div class="prop-grid"><label>Width (cm)</label><input type="number" step="0.1" data-prop="width" value="${(Number(el.width)||0).toFixed(2)}"><label>Height (cm)</label><input type="number" step="0.1" data-prop="height" value="${(Number(el.height)||0).toFixed(2)}"></div><hr>`;
+
         if(el.type==='text') h += `<label>Text</label><textarea data-prop="props.text">${escapeHtml(el.props.text||'')}</textarea>`;
+
         if(el.type==='data' || el.type==='qr' || el.type==='barcode'){
             let opts = C.map(col=>`<option value="${col}" ${el.props.boundColumn===col?'selected':''}>${col}</option>`).join('');
             h += `<label>Bound Column</label><select data-prop="props.boundColumn"><option value="">-- Select Column --</option>${opts}</select>`;
         }
+
         if(el.type==='data'){
             h += `<label>Prefix</label><input type="text" data-prop="props.prefix" value="${escapeHtml(el.props.prefix||'')}">`;
             h += `<label>Suffix</label><input type="text" data-prop="props.suffix" value="${escapeHtml(el.props.suffix||'')}">`;
             h += `<hr><div class="prop-grid"><label>Decimals</label><input type="number" data-prop="props.decimals" value="${el.props.decimals!==undefined?el.props.decimals:2}" min="0" max="10"><label>As Percent</label><input type="checkbox" data-prop="props.asPercent" ${el.props.asPercent?'checked':''}></div>`;
         }
+
         if(el.type==='qr' || el.type==='barcode'){
             h += `<label>Fallback Text</label><input type="text" data-prop="props.text" value="${escapeHtml(el.props.text||'')}">`;
         }
+
         if(el.type==='barcode'){
             h += `<label>Format</label><select data-prop="props.format"><option value="CODE128" ${el.props.format==='CODE128'?'selected':''}>CODE128</option><option value="CODE39" ${el.props.format==='CODE39'?'selected':''}>CODE39</option><option value="EAN13" ${el.props.format==='EAN13'?'selected':''}>EAN13</option><option value="UPC" ${el.props.format==='UPC'?'selected':''}>UPC</option></select><label>Show Text</label><input type="checkbox" data-prop="props.displayValue" ${el.props.displayValue!==false?'checked':''}>`;
         }
+
         if(el.type==='line'){
             h += `<label>Thickness (px)</label><input type="number" data-prop="props.thickness" value="${el.props.thickness||2}" min="1">`;
         }
+
         if(el.type==='box'){
             h += `<label>Border (px)</label><input type="number" data-prop="props.thickness" value="${el.props.thickness||2}" min="1"><label>Fill Color</label><input type="color" data-prop="props.fillColor" value="${el.props.fillColor||'#ffffff'}">`;
         }
+
         if(el.type==='text' || el.type==='data'){
             h += `<hr><div class="prop-grid"><label>Font Size</label><input type="number" data-prop="props.fontSize" value="${el.props.fontSize||16}" min="6" max="200"><label>Font Family</label><select data-prop="props.fontFamily"><option value="Arial, sans-serif" ${(el.props.fontFamily||'Arial, sans-serif')==='Arial, sans-serif'?'selected':''}>Arial</option><option value="'Courier New', monospace" ${el.props.fontFamily==="'Courier New', monospace"?'selected':''}>Courier New</option><option value="Consolas, monospace" ${el.props.fontFamily==='Consolas, monospace'?'selected':''}>Consolas</option><option value="Georgia, serif" ${el.props.fontFamily==='Georgia, serif'?'selected':''}>Georgia</option><option value="'Times New Roman', serif" ${el.props.fontFamily==="'Times New Roman', serif"?'selected':''}>Times New Roman</option><option value="Verdana, sans-serif" ${el.props.fontFamily==='Verdana, sans-serif'?'selected':''}>Verdana</option><option value="'Trebuchet MS', sans-serif" ${el.props.fontFamily==="'Trebuchet MS', sans-serif"?'selected':''}>Trebuchet MS</option><option value="Impact, sans-serif" ${el.props.fontFamily==='Impact, sans-serif'?'selected':''}>Impact</option><option value="'Comic Sans MS', cursive" ${el.props.fontFamily==="'Comic Sans MS', cursive"?'selected':''}>Comic Sans MS</option></select></div>`;
-            // align and vertical align styled the same
             h += `<div class="prop-grid"><label>Weight</label><select data-prop="props.fontWeight"><option value="normal" ${el.props.fontWeight==='normal'?'selected':''}>Normal</option><option value="bold" ${el.props.fontWeight==='bold'?'selected':''}>Bold</option></select><label>Align</label><select data-prop="props.textAlign"><option value="left" ${el.props.textAlign==='left'?'selected':''}>Left</option><option value="center" ${el.props.textAlign==='center'?'selected':''}>Center</option><option value="right" ${el.props.textAlign==='right'?'selected':''}>Right</option></select></div>`;
-            h += `<div class="prop-grid"><label>Vertical Align</label><select data-prop="props.valign"><option value="top" ${el.props.valign==='top'?'selected':''}>Top</option><option value="middle" ${el.props.valign==='middle'?'selected':''}>Middle</option><option value="bottom" ${el.props.valign==='bottom'?'selected':''}>Bottom</option></select><label>Padding (cm)</label><input type="number" step="0.1" data-prop="props.padding" value="${Number(el.props.padding||0).toFixed(2)}" min="0"></div>`;
+
+            // padding sides as four fields, default 0
+            h += `<div class="prop-grid"><label>Vertical Align</label><select data-prop="props.valign"><option value="top" ${el.props.valign==='top'?'selected':''}>Top</option><option value="middle" ${el.props.valign==='middle'?'selected':''}>Middle</option><option value="bottom" ${el.props.valign==='bottom'?'selected':''}>Bottom</option></select><label>Padding Top (cm)</label><input type="number" step="0.1" data-prop="props.paddingTop" value="${Number(el.props.paddingTop||0).toFixed(2)}" min="0"></div>`;
+            h += `<div class="prop-grid"><label></label><label>Padding Right (cm)</label><input type="number" step="0.1" data-prop="props.paddingRight" value="${Number(el.props.paddingRight||0).toFixed(2)}" min="0"></div>`;
+            h += `<div class="prop-grid"><label></label><label>Padding Bottom (cm)</label><input type="number" step="0.1" data-prop="props.paddingBottom" value="${Number(el.props.paddingBottom||0).toFixed(2)}" min="0"></div>`;
+            h += `<div class="prop-grid"><label></label><label>Padding Left (cm)</label><input type="number" step="0.1" data-prop="props.paddingLeft" value="${Number(el.props.paddingLeft||0).toFixed(2)}" min="0"></div>`;
         }
+
         // border + rotation
         h += `<hr><div class="prop-grid"><label>Show Border</label><input type="checkbox" data-prop="props.showBorder" ${el.props.showBorder?'checked':''}><label>Border Color</label><input type="color" data-prop="props.borderColor" value="${el.props.borderColor||'#000000'}"></div>`;
         h += `<div class="prop-grid"><label>Border Width</label><input type="number" data-prop="props.borderWidth" value="${el.props.borderWidth||1}" min="0"><label>Rotation°</label><input type="number" step="1" data-prop="props.rotation" value="${el.props.rotation||0}"></div>`;
@@ -483,7 +514,6 @@ document.addEventListener('DOMContentLoaded', ()=>{
     }
 
     function multiPropsPanel(elems){
-        // show aggregated controls — if all values same show it, else blank
         function common(propPath){
             const parts = propPath.split('.');
             let val = undefined;
@@ -493,7 +523,7 @@ document.addEventListener('DOMContentLoaded', ()=>{
                     if(cur && Object.prototype.hasOwnProperty.call(cur,p)) cur = cur[p]; else { cur = undefined; break; }
                 }
                 if(val === undefined) val = cur;
-                else if(String(val) !== String(cur)) return ''; // mixed
+                else if(String(val) !== String(cur)) return '';
             }
             return val === undefined ? '' : val;
         }
@@ -501,12 +531,13 @@ document.addEventListener('DOMContentLoaded', ()=>{
         let h = `<div style="font-weight:600;margin-bottom:6px">${elems.length} elements selected</div>`;
         h += `<div class="prop-grid"><label>X (cm)</label><input type="number" step="0.1" data-prop="multi.x" value="${common('x')}"><label>Y (cm)</label><input type="number" step="0.1" data-prop="multi.y" value="${common('y')}"></div>`;
         h += `<div class="prop-grid"><label>Width (cm)</label><input type="number" step="0.1" data-prop="multi.width" value="${common('width')}"><label>Height (cm)</label><input type="number" step="0.1" data-prop="multi.height" value="${common('height')}"></div><hr>`;
-        // font/align/padding/color/rotation/border options common to text/data
         h += `<div class="prop-grid"><label>Font Size</label><input type="number" data-prop="multi.props.fontSize" value="${common('props.fontSize')}" min="6"><label>Font Weight</label><select data-prop="multi.props.fontWeight"><option value="">—</option><option value="normal" ${common('props.fontWeight')==='normal'?'selected':''}>Normal</option><option value="bold" ${common('props.fontWeight')==='bold'?'selected':''}>Bold</option></select></div>`;
         h += `<div class="prop-grid"><label>Align</label><select data-prop="multi.props.textAlign"><option value="">—</option><option value="left" ${common('props.textAlign')==='left'?'selected':''}>Left</option><option value="center" ${common('props.textAlign')==='center'?'selected':''}>Center</option><option value="right" ${common('props.textAlign')==='right'?'selected':''}>Right</option></select><label>Vertical Align</label><select data-prop="multi.props.valign"><option value="">—</option><option value="top" ${common('props.valign')==='top'?'selected':''}>Top</option><option value="middle" ${common('props.valign')==='middle'?'selected':''}>Middle</option><option value="bottom" ${common('props.valign')==='bottom'?'selected':''}>Bottom</option></select></div>`;
-        h += `<div class="prop-grid"><label>Padding (cm)</label><input type="number" step="0.1" data-prop="multi.props.padding" value="${common('props.padding')}" min="0"><label>Rotation°</label><input type="number" step="1" data-prop="multi.props.rotation" value="${common('props.rotation')}"></div>`;
-        h += `<div class="prop-grid"><label>Show Border</label><input type="checkbox" data-prop="multi.props.showBorder" ${common('props.showBorder')?'checked':''}><label>Border Color</label><input type="color" data-prop="multi.props.borderColor" value="${common('props.borderColor')||'#000000'}"></div>`;
-        h += `<div class="prop-grid"><label>Border Width</label><input type="number" data-prop="multi.props.borderWidth" value="${common('props.borderWidth')}" min="0"><label>Color</label><input type="color" data-prop="multi.props.color" value="${common('props.color')||'#000000'}"></div>`;
+        h += `<div class="prop-grid"><label>Padding Top (cm)</label><input type="number" step="0.1" data-prop="multi.props.paddingTop" value="${common('props.paddingTop')}" min="0"><label>Padding Right (cm)</label><input type="number" step="0.1" data-prop="multi.props.paddingRight" value="${common('props.paddingRight')}" min="0"></div>`;
+        h += `<div class="prop-grid"><label>Padding Bottom (cm)</label><input type="number" step="0.1" data-prop="multi.props.paddingBottom" value="${common('props.paddingBottom')}" min="0"><label>Padding Left (cm)</label><input type="number" step="0.1" data-prop="multi.props.paddingLeft" value="${common('props.paddingLeft')}" min="0"></div>`;
+        h += `<div class="prop-grid"><label>Rotation°</label><input type="number" step="1" data-prop="multi.props.rotation" value="${common('props.rotation')}"><label>Show Border</label><input type="checkbox" data-prop="multi.props.showBorder" ${common('props.showBorder')?'checked':''}></div>`;
+        h += `<div class="prop-grid"><label>Border Color</label><input type="color" data-prop="multi.props.borderColor" value="${common('props.borderColor')||'#000000'}"><label>Border Width</label><input type="number" data-prop="multi.props.borderWidth" value="${common('props.borderWidth')}" min="0"></div>`;
+        h += `<div class="prop-grid"><label>Color</label><input type="color" data-prop="multi.props.color" value="${common('props.color')||'#000000'}"><label></label></div>`;
         h += `<hr><button id="btn-delete">Delete Selected</button>`;
         pp.innerHTML = h;
     }
@@ -514,6 +545,9 @@ document.addEventListener('DOMContentLoaded', ()=>{
     function escapeHtml(str){ if(str===null||str===undefined) return ''; return String(str).replaceAll('&','&amp;').replaceAll('<','&lt;').replaceAll('>','&gt;').replaceAll('"','&quot;'); }
 
     // ---------- Element operations (multi-aware) ----------
+    function pushBeforeChange(){ pushHistorySnapshot(); }
+    function pushAfterChange(){ /* placeholder */ }
+
     function add(type){
         pushBeforeChange();
         const mz = S.length>0 ? Math.max(...S.map(e=>e.zIndex||0)) : 0;
@@ -524,7 +558,9 @@ document.addEventListener('DOMContentLoaded', ()=>{
             props:{
                 text:'Sample Text',fontSize:16,fontWeight:'normal',fontFamily:'Arial, sans-serif',
                 textAlign:'left',valign:'top',color:'#000000',boundColumn:'',prefix:'',suffix:'',
-                rotation:0,showBorder:false,borderColor:'#000',borderWidth:1,padding:0.1,
+                rotation:0,showBorder:false,borderColor:'#000',borderWidth:1,
+                // defaults: padding sides 0 per user request
+                paddingTop:0,paddingRight:0,paddingBottom:0,paddingLeft:0,
                 thickness:2,format:'CODE128',displayValue:true,fillColor:'#fff',decimals:2,asPercent:false
             }
         };
@@ -563,26 +599,22 @@ document.addEventListener('DOMContentLoaded', ()=>{
         if(selectedIds.length===0) return;
         pushBeforeChange();
         let mz = S.length>0 ? Math.max(...S.map(e=>e.zIndex||0)) : 0;
-        // bring each selected in order to top
         selectedIds.forEach(id=>{
             const el = S.find(e=>e.id===id);
             if(el){ mz++; el.zIndex = mz; }
         });
-        render(); save();
-        pushAfterChange();
+        render(); save(); pushAfterChange();
     }
 
     function sendToBack(){
         if(selectedIds.length===0) return;
         pushBeforeChange();
         let mn = S.length>0 ? Math.min(...S.map(e=>e.zIndex||0)) : 0;
-        // send each selected to back (decreasing)
         selectedIds.forEach((id, idx)=>{
             const el = S.find(e=>e.id===id);
             if(el){ el.zIndex = mn - (idx+1); }
         });
-        render(); save();
-        pushAfterChange();
+        render(); save(); pushAfterChange();
     }
 
     function deleteSelected(){
@@ -642,15 +674,10 @@ document.addEventListener('DOMContentLoaded', ()=>{
         document.body.appendChild(a); a.click(); a.remove(); URL.revokeObjectURL(url);
     }
 
-    // ---------- Interaction helpers for history ----------
-    function pushBeforeChange(){ pushHistorySnapshot(); } // snapshot current state before mutation
-    function pushAfterChange(){ /* no-op placeholder if needed */ }
-
     // ---------- Mouse interactions: selection / drag / resize ----------
     lc.addEventListener('mousedown', (e)=>{
         const t = e.target;
         if(t === lc){
-            // click empty area clears selection unless ctrl pressed
             if(!(e.ctrlKey||e.metaKey)) { setSelection([]); }
             return;
         }
@@ -660,39 +687,28 @@ document.addEventListener('DOMContentLoaded', ()=>{
         const clickedElement = S.find(x=>x.id===id);
         if(!clickedElement) return;
 
-        // selection logic
-        if(e.ctrlKey || e.metaKey){ // toggle selection
+        if(e.ctrlKey || e.metaKey){
             pushBeforeChange();
             toggleSelection(id);
-            // do not start drag for toggle only (but allow dragging immediately if user holds mouse and the element becomes selected)
         } else {
             if(!selectedIds.includes(id)){
-                // selecting a single element (clear others)
                 pushBeforeChange();
                 setSelection([id]);
             }
         }
 
-        // prepare for drag or resize
         const cr = lc.getBoundingClientRect();
         const smx = (e.clientX - cr.left) / cr.width * W;
         const smy = (e.clientY - cr.top) / cr.height * H;
 
         if(t.classList.contains('resize-handle') && selectedIds.length <= 1){
-            // only resize the primary (if multiple selected, allow resize only of single selected element)
             resizeMode = true;
             ctx = { el: clickedElement, startWidth: clickedElement.width, startHeight: clickedElement.height, startMouseX: smx, startMouseY: smy };
-            // mousedown already pushed history above
         } else {
-            // Start dragging. If clicked element is part of selectedIds, move all selected; else move single (already selected)
             drag = true;
-            // prepare offsets for each selected element
             const movers = selectedIds.includes(id) ? selectedIds.slice() : [id];
-            // ensure they exist
             const items = movers.map(iid => S.find(s => s.id === iid)).filter(Boolean);
             ctx = { items: items.map(it => ({ id: it.id, startX: it.x, startY: it.y })), offsetMouseX: smx, offsetMouseY: smy, baseMouseX: smx, baseMouseY: smy };
-            // history already pushed if we changed selection; but if we didn't change selection and didn't call pushBeforeChange, we still need a snapshot
-            // ensure we have a snapshot to undo the drag. If last history snapshot equals current S (rare), we still push to be safe.
             pushBeforeChange();
         }
         e.preventDefault();
@@ -705,10 +721,8 @@ document.addEventListener('DOMContentLoaded', ()=>{
         const my = (e.clientY - cr.top) / cr.height * H;
 
         if(drag && ctx && ctx.items){
-            // calculate delta based on mouse movement relative to starting mouse position
             const dx = mx - ctx.baseMouseX;
             const dy = my - ctx.baseMouseY;
-            // move each item by dx/dy relative to its startX/startY
             ctx.items.forEach(it=>{
                 const el = S.find(s=>s.id===it.id);
                 if(!el) return;
@@ -739,7 +753,6 @@ document.addEventListener('DOMContentLoaded', ()=>{
 
     // ---------- Keyboard shortcuts (undo/redo/multi) ----------
     window.addEventListener('keydown', (e)=>{
-        // Undo: Ctrl/Cmd+Z ; Redo: Ctrl/Cmd+Shift+Z or Ctrl/Cmd+Y
         if((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'z'){
             e.preventDefault();
             if(e.shiftKey) redo(); else undo();
@@ -749,12 +762,10 @@ document.addEventListener('DOMContentLoaded', ()=>{
             e.preventDefault(); redo(); return;
         }
 
-        // Delete
         if((e.key === 'Delete' || e.key === 'Backspace') && selectedIds.length>0){
             if(e.target.tagName !== 'INPUT' && e.target.tagName !== 'TEXTAREA'){ e.preventDefault(); deleteSelected(); }
         }
 
-        // Arrow movement for selected elements (nudge)
         if(['ArrowUp','ArrowDown','ArrowLeft','ArrowRight'].includes(e.key)){
             if(e.target.tagName !== 'INPUT' && e.target.tagName !== 'TEXTAREA'){
                 if(selectedIds.length>0){
@@ -775,7 +786,6 @@ document.addEventListener('DOMContentLoaded', ()=>{
             }
         }
 
-        // Duplicate with Ctrl/Cmd+D (prevent browser)
         if((e.ctrlKey||e.metaKey) && e.key.toLowerCase() === 'd'){
             e.preventDefault();
             dupSelected();
@@ -789,10 +799,8 @@ document.addEventListener('DOMContentLoaded', ()=>{
         const prop = target.dataset.prop;
         if(!prop) return;
 
-        // For multi selection controls, props start with multi.
         if(prop.startsWith('multi.')){
-            // apply to all selected elements
-            const keyPath = prop.slice('multi.'.length); // e.g., props.fontSize or x
+            const keyPath = prop.slice('multi.'.length);
             const value = (target.type === 'checkbox') ? target.checked : (target.type === 'number' ? Number(target.value) : target.value);
             pushBeforeChange();
             selectedIds.forEach(id=>{
@@ -801,7 +809,7 @@ document.addEventListener('DOMContentLoaded', ()=>{
                 if(keyPath.includes('.')){
                     const [o,k] = keyPath.split('.');
                     if(!el[o]) el[o] = {};
-                    if(['fontSize','decimals','thickness','borderWidth','rotation','padding','x','y','width','height'].includes(k)) el[o][k] = Number(value);
+                    if(['fontSize','decimals','thickness','borderWidth','rotation','paddingTop','paddingRight','paddingBottom','paddingLeft','x','y','width','height'].includes(k)) el[o][k] = Number(value);
                     else if(['showBorder','displayValue','asPercent'].includes(k)) el[o][k] = !!value;
                     else el[o][k] = value;
                 } else {
@@ -813,17 +821,15 @@ document.addEventListener('DOMContentLoaded', ()=>{
             return;
         }
 
-        // Normal single-element props — but if multiple selected, apply to all selected
         const applyToAll = selectedIds.length > 1;
         const parsedValue = (target.type === 'checkbox') ? target.checked : (target.type === 'number' ? Number(target.value) : target.value);
 
-        // For backward compatibility: some code used data-prop="widthHeight" due to earlier mistake; handle both
         function applyPropToElement(el, p, v){
             if(p === 'widthHeight'){ el.height = Number(v); return; }
             if(p.includes('.')){
                 const [o,k] = p.split('.');
                 if(!el[o]) el[o] = {};
-                if(['fontSize','decimals','thickness','borderWidth','rotation','padding','x','y','width','height'].includes(k)) el[o][k] = Number(v);
+                if(['fontSize','decimals','thickness','borderWidth','rotation','paddingTop','paddingRight','paddingBottom','paddingLeft','x','y','width','height'].includes(k)) el[o][k] = Number(v);
                 else if(['showBorder','displayValue','asPercent'].includes(k)) el[o][k] = !!v;
                 else el[o][k] = v;
             } else {
@@ -851,9 +857,6 @@ document.addEventListener('DOMContentLoaded', ()=>{
             deleteSelected();
         }
     });
-
-    // ---------- Canvas click behavior: ctrl toggle or single select handled in mousedown above ----------
-    // No extra click handler needed.
 
     // ---------- Buttons ----------
     document.getElementById('btn-save').addEventListener('click', ()=> save());
@@ -883,10 +886,8 @@ document.addEventListener('DOMContentLoaded', ()=>{
     document.getElementById('btn-zoom-out').addEventListener('click', ()=> setZoom(z/1.25));
     document.getElementById('btn-zoom-fit').addEventListener('click', fit);
 
-    // Add element buttons wired
     document.querySelectorAll('.add-element').forEach(b=> b.addEventListener('click', e => add(e.currentTarget.dataset.type)));
 
-    // File import/export
     btnExport.addEventListener('click', ()=>{ exportToFile(); msg('Layout exported to file.'); });
     btnImport.addEventListener('click', ()=>{ fileInput.value=''; fileInput.click(); });
     fileInput.addEventListener('change', (ev)=>{
@@ -922,15 +923,6 @@ document.addEventListener('DOMContentLoaded', ()=>{
 
     // ---------- Initial load & history init ----------
     setTimeout(()=>{ load().then(()=> fit()); }, 120);
-
-    function pushHistorySnapshot(){ // override to handle initial push properly
-        // This is overwritten earlier; keep compatibility by calling the outer function
-        if(historyIndex < history.length - 1) history = history.slice(0, historyIndex + 1);
-        history.push({ data: deepCopy(S), sel: deepCopy(selectedIds) });
-        if(history.length > MAX_HISTORY) history.shift();
-        historyIndex = history.length - 1;
-    }
-    // ensure history initially matches current state
     resetHistory();
 
 }); // DOMContentLoaded
