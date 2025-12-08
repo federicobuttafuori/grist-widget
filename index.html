@@ -1,13 +1,57 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-    <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-    <title>Grist Label Designer</title>
+    <meta charset="utf-8"/>
+    <meta name="viewport" content="width=device-width,initial-scale=1"/>
+    <title>Grist Label Designer — Multi-select + Undo/Redo</title>
     <script src="https://docs.getgrist.com/grist-plugin-api.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/jsbarcode@3.11.5/dist/JsBarcode.all.min.js"></script>
     <style>
-        *{box-sizing:border-box;margin:0;padding:0}html,body{height:100vh;width:100vw;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;display:flex;flex-direction:column;overflow:hidden;background:#f0f0f0;color:#333}button{padding:6px 10px;border:1px solid #ccc;background:#fff;border-radius:4px;cursor:pointer;font-size:14px;transition:all .2s}button:hover{background:#f9f9f9;border-color:#aaa}button:active{background:#e0e0e0}button:disabled{opacity:.5;cursor:not-allowed}input,select,textarea{width:100%;padding:6px;border:1px solid #ccc;border-radius:4px;font-size:14px}textarea{resize:vertical;min-height:60px}hr{border:none;border-top:1px solid #eee;margin:12px 0}#toolbar{flex-shrink:0;padding:8px;background:#fff;border-bottom:1px solid #e0e0e0;display:flex;gap:8px;align-items:center;flex-wrap:wrap}#toolbar .zoom-label{font-size:14px;margin-left:auto}#toolbar .divider{width:1px;height:24px;background:#e0e0e0;margin:0 4px}#main-content{display:flex;flex-grow:1;overflow:hidden}#sidebar{width:320px;flex-shrink:0;background:#fdfdfd;border-right:1px solid #e0e0e0;padding:12px;overflow-y:auto;display:flex;flex-direction:column;gap:16px}#sidebar h3{font-size:16px;font-weight:600;border-bottom:1px solid #eee;padding-bottom:6px;margin-bottom:4px}.sidebar-section{display:flex;flex-direction:column;gap:8px}.sidebar-section .add-buttons{display:grid;grid-template-columns:1fr 1fr;gap:8px}.prop-grid{display:grid;grid-template-columns:90px 1fr;gap:8px;align-items:center}.prop-grid label{font-size:14px;font-weight:500}.prop-full{grid-column:1/-1}#properties-panel{font-size:14px}#btn-delete{background:#fbebeb;border-color:#d9a0a0;color:#c00;margin-top:12px}#btn-delete:hover{background:#f7dada}.button-group{display:flex;gap:4px}#canvas-container{flex-grow:1;display:flex;justify-content:center;align-items:center;overflow:auto;background:#e0e0e0;padding:20px}#canvas-wrapper{display:inline-block;transform-origin:center center}#label-canvas{width:8cm;height:5cm;background:#fff;box-shadow:0 4px 12px rgba(0,0,0,.15);position:relative;overflow:hidden}@media print{@page{size:8cm 5cm;margin:0}html,body{margin:0!important;padding:0!important;width:8cm!important;height:5cm!important;overflow:hidden!important}body *{visibility:hidden!important}#canvas-wrapper,#canvas-wrapper *{visibility:visible!important}#canvas-wrapper{position:absolute!important;left:0!important;top:0!important;width:8cm!important;height:5cm!important;margin:0!important;padding:0!important;transform:none!important}#label-canvas{position:absolute!important;left:0!important;top:0!important;width:8cm!important;height:5cm!important;transform:none!important;box-shadow:none!important}.label-element.selected{border:none!important;box-shadow:none!important}.resize-handle{display:none!important}}.label-element{position:absolute;cursor:move;border:1px solid transparent;font-size:16px;line-height:1.2;overflow:hidden;word-wrap:break-word;user-select:none;transform-origin:center center}.label-element.selected{border:2px dashed #007aff;box-shadow:0 0 0 1px rgba(0,122,255,.1)}.resize-handle{position:absolute;width:12px;height:12px;background:#007aff;border:2px solid #fff;border-radius:50%;bottom:-6px;right:-6px;cursor:nwse-resize;display:none;box-shadow:0 2px 4px rgba(0,0,0,.2)}.label-element.selected .resize-handle{display:block}.label-element img,.label-element svg{width:100%;height:100%;object-fit:contain;pointer-events:none}.status-message{position:fixed;top:60px;right:20px;padding:12px 16px;background:#4CAF50;color:#fff;border-radius:4px;box-shadow:0 2px 8px rgba(0,0,0,.2);z-index:1000;animation:slideIn .3s ease-out}@keyframes slideIn{from{transform:translateX(400px);opacity:0}to{transform:translateX(0);opacity:1}}.status-message.error{background:#f44336}
+        *{box-sizing:border-box;margin:0;padding:0}
+        html,body{height:100vh;width:100vw;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;display:flex;flex-direction:column;overflow:hidden;background:#f0f0f0;color:#333}
+        button{padding:6px 10px;border:1px solid #ccc;background:#fff;border-radius:4px;cursor:pointer;font-size:14px;transition:all .2s}
+        button:hover{background:#f9f9f9;border-color:#aaa}
+        button:active{background:#e0e0e0}
+        button:disabled{opacity:.5;cursor:not-allowed}
+        input,select,textarea{width:100%;padding:6px;border:1px solid #ccc;border-radius:4px;font-size:14px}
+        textarea{resize:vertical;min-height:60px}
+        hr{border:none;border-top:1px solid #eee;margin:12px 0}
+        #toolbar{flex-shrink:0;padding:8px;background:#fff;border-bottom:1px solid #e0e0e0;display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+        #toolbar .zoom-label{font-size:14px;margin-left:auto}
+        #toolbar .divider{width:1px;height:24px;background:#e0e0e0;margin:0 4px}
+        #main-content{display:flex;flex-grow:1;overflow:hidden}
+        #sidebar{width:320px;flex-shrink:0;background:#fdfdfd;border-right:1px solid #e0e0e0;padding:12px;overflow-y:auto;display:flex;flex-direction:column;gap:16px}
+        #sidebar h3{font-size:16px;font-weight:600;border-bottom:1px solid #eee;padding-bottom:6px;margin-bottom:4px}
+        .sidebar-section{display:flex;flex-direction:column;gap:8px}
+        .sidebar-section .add-buttons{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+        .prop-grid{display:grid;grid-template-columns:90px 1fr;gap:8px;align-items:center}
+        .prop-grid label{font-size:14px;font-weight:500}
+        .prop-full{grid-column:1/-1}
+        #properties-panel{font-size:14px}
+        #btn-delete{background:#fbebeb;border-color:#d9a0a0;color:#c00;margin-top:12px}
+        #btn-delete:hover{background:#f7dada}
+        .button-group{display:flex;gap:4px}
+        #canvas-container{flex-grow:1;display:flex;justify-content:center;align-items:center;overflow:auto;background:#e0e0e0;padding:20px}
+        #canvas-wrapper{display:inline-block;transform-origin:center center}
+        #label-canvas{width:8cm;height:5cm;background:#fff;box-shadow:0 4px 12px rgba(0,0,0,.15);position:relative;overflow:hidden}
+        @media print{
+            @page{size:8cm 5cm;margin:0}
+            html,body{margin:0!important;padding:0!important;width:8cm!important;height:5cm!important;overflow:hidden!important}
+            body *{visibility:hidden!important}
+            #canvas-wrapper,#canvas-wrapper *{visibility:visible!important}
+            #canvas-wrapper{position:absolute!important;left:0!important;top:0!important;width:8cm!important;height:5cm!important;margin:0!important;padding:0!important;transform:none!important}
+            #label-canvas{position:absolute!important;left:0!important;top:0!important;width:8cm!important;height:5cm!important;transform:none!important;box-shadow:none!important}
+            .label-element.selected{border:none!important;box-shadow:none!important}
+            .resize-handle{display:none!important}
+        }
+        .label-element{position:absolute;cursor:move;border:1px solid transparent;font-size:16px;line-height:1.2;overflow:hidden;word-wrap:break-word;user-select:none;transform-origin:center center}
+        .label-element.selected{border:2px dashed #007aff;box-shadow:0 0 0 1px rgba(0,122,255,.1)}
+        .resize-handle{position:absolute;width:12px;height:12px;background:#007aff;border:2px solid #fff;border-radius:50%;bottom:-6px;right:-6px;cursor:nwse-resize;display:none;box-shadow:0 2px 4px rgba(0,0,0,.2)}
+        .label-element.selected .resize-handle{display:block}
+        .label-element img,.label-element svg{width:100%;height:100%;object-fit:contain;pointer-events:none}
+        .status-message{position:fixed;top:60px;right:20px;padding:12px 16px;background:#4CAF50;color:#fff;border-radius:4px;box-shadow:0 2px 8px rgba(0,0,0,.2);z-index:1000;animation:slideIn .3s ease-out}
+        @keyframes slideIn{from{transform:translateX(400px);opacity:0}to{transform:translateX(0);opacity:1}}
+        .status-message.error{background:#f44336}
     </style>
 </head>
 <body>
@@ -18,7 +62,7 @@
         <div class="divider"></div>
         <button id="btn-print" title="Print Label">🖨️ Print</button>
         <div class="divider"></div>
-        <button id="btn-duplicate" title="Duplicate Selected Element" disabled>📋 Duplicate</button>
+        <button id="btn-duplicate" title="Duplicate Selected Elements" disabled>📋 Duplicate</button>
         <button id="btn-bring-front" title="Bring to Front" disabled>⬆️ Front</button>
         <button id="btn-send-back" title="Send to Back" disabled>⬇️ Back</button>
         <span class="zoom-label">Zoom:</span>
@@ -29,13 +73,14 @@
         </div>
         <span id="zoom-display">100%</span>
     </div>
+
     <div id="main-content">
         <div id="sidebar">
             <div class="sidebar-section">
                 <h3>Add Element</h3>
                 <div class="add-buttons">
                     <button class="add-element" data-type="text">📝 Text</button>
-                    <button class="add-element" data-type="data">🔗🧵 Data Field</button>
+                    <button class="add-element" data-type="data">🔗 Data Field</button>
                     <button class="add-element" data-type="qr">📱 QR Code</button>
                     <button class="add-element" data-type="barcode">📊 Barcode</button>
                     <button class="add-element" data-type="line">➖ Line</button>
@@ -54,9 +99,10 @@
                     <button id="btn-export">⬇️ Export</button>
                     <button id="btn-import">⬆️ Import</button>
                 </div>
-                <small>Tip: Ctrl/Cmd+E exports layout.</small>
+                <small>Tip: Ctrl/Cmd+E exports layout. Ctrl/Cmd+Z = undo, Ctrl/Cmd+Shift+Z = redo</small>
             </div>
         </div>
+
         <div id="canvas-container">
             <div id="canvas-wrapper">
                 <div id="label-canvas"></div>
@@ -64,821 +110,831 @@
         </div>
     </div>
 
-    <!-- Hidden file input for import -->
     <input id="file-import" type="file" accept="application/json" style="display:none" />
 
-    <script>
-        document.addEventListener('DOMContentLoaded', () => {
-            // Core state
-            let S = [], E = null, z = 1, R = {}, C = [], drag = false, resize = false, ctx = {};
-            const W = 8, H = 5;
-            const KEY = 'grist_label_layout_v1';
-            const cc = document.getElementById('canvas-container');
-            const cw = document.getElementById('canvas-wrapper');
-            const lc = document.getElementById('label-canvas');
-            const pp = document.getElementById('properties-panel');
-            const zd = document.getElementById('zoom-display');
-            const bd = document.getElementById('btn-duplicate');
-            const bf = document.getElementById('btn-bring-front');
-            const bs = document.getElementById('btn-send-back');
-            const fileInput = document.getElementById('file-import');
-            const btnExport = document.getElementById('btn-export');
-            const btnImport = document.getElementById('btn-import');
+<script>
+document.addEventListener('DOMContentLoaded', ()=>{
 
-            // Utility: show messages
-            function msg(m, e = false, timeout = 3000) {
-                const x = document.querySelector('.status-message');
-                if (x) x.remove();
-                const s = document.createElement('div');
-                s.className = 'status-message' + (e ? ' error' : '');
-                s.textContent = m;
-                document.body.appendChild(s);
-                setTimeout(() => {
-                    if (s && s.parentNode) s.parentNode.removeChild(s);
-                }, timeout);
-            }
+    // ---------- State ----------
+    let S = [];                       // elements array
+    let selectedIds = [];             // array of selected element ids (multi-select)
+    let z = 1;
+    let R = {}, C = [];
+    let drag = false, resizeMode = false, ctx = {};
+    const W = 8, H = 5;
+    const KEY = 'grist_label_layout_v1';
+    const MAX_HISTORY = 100;
 
-            function isGristAvailable() {
-                return (typeof window.grist !== 'undefined'
-                    && window.grist
-                    && typeof window.grist.getOption === 'function'
-                    && typeof window.grist.setOption === 'function');
-            }
+    // History stacks for undo/redo
+    let history = [];
+    let historyIndex = -1;
 
-            // Normalize incoming element to ensure required fields and types exist
-            function normalizeElement(el) {
-                if (!el) return null;
-                const defaults = {
-                    id: `el_${Date.now()}`,
-                    type: 'text',
-                    x: 0.5,
-                    y: 0.5,
-                    width: 1.5,
-                    height: 0.5,
-                    zIndex: 0,
-                    props: {
-                        text: 'Sample Text',
-                        fontSize: 16,
-                        fontWeight: 'normal',
-                        fontFamily: 'Arial, sans-serif',
-                        textAlign: 'left',
-                        valign: 'top',
-                        color: '#000000',
-                        boundColumn: '',
-                        prefix: '',
-                        suffix: '',
-                        rotation: 0,
-                        showBorder: false,
-                        borderColor: '#000000',
-                        borderWidth: 1,
-                        padding: 0.1,           // NEW: padding (cm) from border for text/data
-                        thickness: 2,
-                        format: 'CODE128',
-                        displayValue: true,
-                        fillColor: '#ffffff',
-                        decimals: 2,
-                        asPercent: false
-                    }
-                };
-                // Merge
-                const base = Object.assign({}, defaults, el);
-                base.props = Object.assign({}, defaults.props, el && el.props ? el.props : {});
-                // Convert numeric/boolean fields
-                base.x = Number(base.x) || 0;
-                base.y = Number(base.y) || 0;
-                base.width = Number(base.width) || 1;
-                base.height = Number(base.height) || 1;
-                base.zIndex = Number(base.zIndex) || 0;
-                base.props.fontSize = Number(base.props.fontSize) || 16;
-                base.props.decimals = Number(base.props.decimals) || 0;
-                base.props.thickness = Number(base.props.thickness) || 2;
-                base.props.borderWidth = Number(base.props.borderWidth) || 1;
-                base.props.displayValue = (base.props.displayValue !== false);
-                base.props.asPercent = !!base.props.asPercent;
-                base.props.rotation = Number(base.props.rotation) || 0;
-                base.props.valign = base.props.valign || 'top';
-                base.props.prefix = base.props.prefix || '';
-                base.props.suffix = base.props.suffix || '';
-                base.props.showBorder = !!base.props.showBorder;
-                base.props.borderColor = base.props.borderColor || '#000000';
-                base.props.padding = Number.isFinite(Number(base.props.padding)) ? Number(base.props.padding) : 0.1;
-                return base;
-            }
+    // DOM refs
+    const cc = document.getElementById('canvas-container');
+    const cw = document.getElementById('canvas-wrapper');
+    const lc = document.getElementById('label-canvas');
+    const pp = document.getElementById('properties-panel');
+    const zd = document.getElementById('zoom-display');
+    const bd = document.getElementById('btn-duplicate');
+    const bf = document.getElementById('btn-bring-front');
+    const bs = document.getElementById('btn-send-back');
+    const fileInput = document.getElementById('file-import');
+    const btnExport = document.getElementById('btn-export');
+    const btnImport = document.getElementById('btn-import');
 
-            function updateBtns() {
-                const h = E !== null;
-                bd.disabled = !h;
-                bf.disabled = !h;
-                bs.disabled = !h;
-            }
+    // ---------- Utilities ----------
+    function msg(m, error=false, timeout=3000){
+        const x = document.querySelector('.status-message'); if(x) x.remove();
+        const s = document.createElement('div'); s.className = 'status-message' + (error ? ' error' : ''); s.textContent = m;
+        document.body.appendChild(s); setTimeout(()=>{ if(s.parentNode) s.parentNode.removeChild(s) }, timeout);
+    }
 
-            function fmt(v, d, p) {
-                if (v === null || v === undefined || v === '') return '';
-                let n = parseFloat(v);
-                if (isNaN(n)) return String(v);
-                if (p) n = n * 100;
-                n = n.toFixed(d);
-                return p ? n + '%' : n;
-            }
+    function isGristAvailable(){ return (typeof window.grist !== 'undefined' && window.grist && typeof window.grist.getOption === 'function' && typeof window.grist.setOption === 'function'); }
 
-            // Rendering
-            function render() {
-                lc.innerHTML = '';
-                // Sort by zIndex to render in order
-                const sorted = S.slice().sort((a, b) => (a.zIndex || 0) - (b.zIndex || 0));
-                sorted.forEach(el => {
-                    const d = document.createElement('div');
-                    d.classList.add('label-element');
-                    d.dataset.id = el.id;
-                    d.style.left = `${el.x}cm`;
-                    d.style.top = `${el.y}cm`;
-                    d.style.width = `${el.width}cm`;
-                    d.style.height = `${el.height}cm`;
-                    d.style.zIndex = el.zIndex || 0;
-                    d.style.fontSize = `${el.props.fontSize || 16}px`;
-                    d.style.fontWeight = el.props.fontWeight || 'normal';
-                    d.style.fontFamily = el.props.fontFamily || 'Arial, sans-serif';
-                    // Horizontal alignment via flex justify
-                    const justifyMap = { left: 'flex-start', center: 'center', right: 'flex-end' };
-                    const alignMap = { top: 'flex-start', middle: 'center', bottom: 'flex-end' };
-                    // default display flex for content alignment (except line)
-                    if (el.type !== 'line') {
-                        d.style.display = 'flex';
-                        d.style.alignItems = alignMap[el.props.valign] || 'flex-start';
-                        d.style.justifyContent = justifyMap[el.props.textAlign] || 'flex-start';
-                        // ensure text lines wrap and don't overflow
-                        d.style.whiteSpace = 'normal';
-                    } else {
-                        d.style.display = '';
-                        d.style.whiteSpace = '';
-                    }
-                    d.style.textAlign = el.props.textAlign || 'left';
-                    d.style.color = el.props.color || '#000000';
-                    d.style.boxSizing = 'border-box';
-                    // Rotation (applies to whole element)
-                    const rotation = Number(el.props.rotation) || 0;
-                    d.style.transform = `rotate(${rotation}deg)`;
-                    d.style.transformOrigin = 'center center';
+    function deepCopy(obj){ return JSON.parse(JSON.stringify(obj)); }
 
-                    // Padding from border (for text/data)
-                    if ((el.type === 'text' || el.type === 'data') && Number.isFinite(Number(el.props.padding))) {
-                        d.style.padding = `${Number(el.props.padding)}cm`;
-                    } else {
-                        // reset padding for others
-                        d.style.padding = '';
-                    }
-
-                    // Border if requested (non-box elements will show around element)
-                    if (el.props.showBorder && el.type !== 'box') {
-                        d.style.border = `${Number(el.props.borderWidth)||1}px solid ${el.props.borderColor||'#000'}`;
-                    } else {
-                        // For non-box, if not showBorder, keep transparent (CSS default)
-                        if (el.type !== 'box') d.style.border = '1px solid transparent';
-                    }
-
-                    // content
-                    switch (el.type) {
-                        case 'text': {
-                            const span = document.createElement('div');
-                            span.style.display = 'block';
-                            span.style.width = '100%';
-                            span.style.pointerEvents = 'none';
-                            span.style.overflow = 'hidden';
-                            span.style.wordWrap = 'break-word';
-                            span.textContent = el.props.text || 'Static Text';
-                            d.appendChild(span);
-                            break;
-                        }
-                        case 'data': {
-                            const span = document.createElement('div');
-                            span.style.display = 'block';
-                            span.style.width = '100%';
-                            span.style.pointerEvents = 'none';
-                            span.style.overflow = 'hidden';
-                            span.style.wordWrap = 'break-word';
-                            span.textContent = getData(el);
-                            d.appendChild(span);
-                            break;
-                        }
-                        case 'line':
-                            d.style.backgroundColor = el.props.color || '#000000';
-                            d.style.height = `${el.props.thickness || 2}px`;
-                            d.style.width = `${el.width}cm`;
-                            break;
-                        case 'box':
-                            d.style.border = `${el.props.thickness || 2}px solid ${el.props.color || '#000000'}`;
-                            d.style.backgroundColor = el.props.fillColor || 'transparent';
-                            break;
-                        case 'qr': {
-                            const c = getData(el);
-                            const q = document.createElement('img');
-                            const dpi = 37.795276; // px per cm
-                            const qs = Math.min(el.width, el.height) * dpi;
-                            q.src = `https://api.qrserver.com/v1/create-qr-code/?size=${Math.round(qs)}x${Math.round(qs)}&data=${encodeURIComponent(c)}`;
-                            q.style.pointerEvents = 'none';
-                            q.style.width = '100%';
-                            q.style.height = '100%';
-                            q.style.objectFit = 'contain';
-                            d.appendChild(q);
-                            break;
-                        }
-                        case 'barcode': {
-                            const c = getData(el) || '';
-                            const sv = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
-                            sv.style.pointerEvents = 'none';
-                            sv.setAttribute('width', '100%');
-                            sv.setAttribute('height', '100%');
-                            d.appendChild(sv);
-                            try {
-                                const pxHeight = Math.max(30, (el.height * 37.795276) - 10);
-                                JsBarcode(sv, String(c), {
-                                    format: el.props.format || "CODE128",
-                                    displayValue: el.props.displayValue !== false,
-                                    width: 2,
-                                    height: pxHeight,
-                                    margin: 0
-                                });
-                            } catch (err) {
-                                sv.innerHTML = `<text x="10" y="20" fill="red" font-size="12">Invalid barcode</text>`;
-                                console.error("Barcode Error:", err);
-                            }
-                            break;
-                        }
-                        default:
-                            d.innerText = el.props.text || '';
-                    }
-
-                    if (el.id === E) {
-                        d.classList.add('selected');
-                        const h = document.createElement('div');
-                        h.classList.add('resize-handle');
-                        d.appendChild(h);
-                    }
-                    lc.appendChild(d);
-                });
-            }
-
-            function getData(el) {
-                // Support prefix/suffix for data fields
-                const prefix = el.props.prefix || '';
-                const suffix = el.props.suffix || '';
-                if (el.props.boundColumn && R && Object.prototype.hasOwnProperty.call(R, el.props.boundColumn)) {
-                    let v = R[el.props.boundColumn];
-                    if (el.type === 'data' && typeof v === 'number') {
-                        const dec = (el.props.decimals !== undefined) ? Number(el.props.decimals) : 2;
-                        const pct = !!el.props.asPercent;
-                        return prefix + fmt(v, dec, pct) + suffix;
-                    }
-                    return prefix + String(v) + suffix;
-                }
-                // fallback text if not bound
-                return prefix + (el.props.text || 'SAMPLE') + suffix;
-            }
-
-            function select(id) {
-                if (E === id) return;
-                E = id;
-                render();
-                updateProps();
-                updateBtns();
-            }
-
-            function updateProps() {
-                if (!E) {
-                    pp.innerHTML = 'Select an element to edit its properties.';
-                    return;
-                }
-                const el = S.find(e => e.id === E);
-                if (!el) {
-                    pp.innerHTML = 'Error: Element not found.';
-                    return;
-                }
-                // Common top/grid fields
-                let h = `<div class="prop-grid"><label>X (cm)</label><input type="number" step="0.1" data-prop="x" value="${(Number(el.x)||0).toFixed(2)}"><label>Y (cm)</label><input type="number" step="0.1" data-prop="y" value="${(Number(el.y)||0).toFixed(2)}"><label>Width (cm)</label><input type="number" step="0.1" data-prop="width" value="${(Number(el.width)||0).toFixed(2)}"><label>Height (cm)</label><input type="number" step="0.1" data-prop="height" value="${(Number(el.height)||0).toFixed(2)}"></div><hr>`;
-
-                // Text content
-                if (el.type === 'text') {
-                    h += `<label>Text</label><textarea data-prop="props.text">${escapeHtml(el.props.text || '')}</textarea>`;
-                }
-
-                // Data / QR / Barcode binding + prefix/suffix for data
-                if (el.type === 'data' || el.type === 'qr' || el.type === 'barcode') {
-                    let opts = C.map(col => `<option value="${col}" ${el.props.boundColumn === col ? 'selected' : ''}>${col}</option>`).join('');
-                    h += `<label>Bound Column</label><select data-prop="props.boundColumn"><option value="">-- Select Column --</option>${opts}</select>`;
-                }
-
-                if (el.type === 'data') {
-                    h += `<label>Prefix</label><input type="text" data-prop="props.prefix" value="${escapeHtml(el.props.prefix||'')}">`;
-                    h += `<label>Suffix</label><input type="text" data-prop="props.suffix" value="${escapeHtml(el.props.suffix||'')}">`;
-                    h += `<hr><div class="prop-grid"><label>Decimals</label><input type="number" data-prop="props.decimals" value="${el.props.decimals !== undefined ? el.props.decimals : 2}" min="0" max="10"><label>As Percent</label><input type="checkbox" data-prop="props.asPercent" ${el.props.asPercent ? 'checked' : ''}></div>`;
-                }
-
-                if (el.type === 'qr' || el.type === 'barcode') {
-                    h += `<label>Fallback Text</label><input type="text" data-prop="props.text" value="${escapeHtml(el.props.text||'')}">`;
-                }
-
-                if (el.type === 'barcode') {
-                    h += `<label>Format</label><select data-prop="props.format"><option value="CODE128" ${el.props.format === 'CODE128' ? 'selected' : ''}>CODE128</option><option value="CODE39" ${el.props.format === 'CODE39' ? 'selected' : ''}>CODE39</option><option value="EAN13" ${el.props.format === 'EAN13' ? 'selected' : ''}>EAN13</option><option value="UPC" ${el.props.format === 'UPC' ? 'selected' : ''}>UPC</option></select><label>Show Text</label><input type="checkbox" data-prop="props.displayValue" ${el.props.displayValue !== false ? 'checked' : ''}>`;
-                }
-
-                if (el.type === 'line') {
-                    h += `<label>Thickness (px)</label><input type="number" data-prop="props.thickness" value="${el.props.thickness || 2}" min="1">`;
-                }
-
-                if (el.type === 'box') {
-                    h += `<label>Border (px)</label><input type="number" data-prop="props.thickness" value="${el.props.thickness || 2}" min="1"><label>Fill Color</label><input type="color" data-prop="props.fillColor" value="${el.props.fillColor || '#ffffff'}">`;
-                }
-
-                // Font and alignment for text/data
-                if (el.type === 'text' || el.type === 'data') {
-                    h += `<hr><div class="prop-grid"><label>Font Size</label><input type="number" data-prop="props.fontSize" value="${el.props.fontSize || 16}" min="6" max="200"><label>Font Family</label><select data-prop="props.fontFamily"><option value="Arial, sans-serif" ${(el.props.fontFamily || 'Arial, sans-serif') === 'Arial, sans-serif' ? 'selected' : ''}>Arial</option><option value="'Courier New', monospace" ${el.props.fontFamily === "'Courier New', monospace" ? 'selected' : ''}>Courier New</option><option value="Consolas, monospace" ${el.props.fontFamily === 'Consolas, monospace' ? 'selected' : ''}>Consolas</option><option value="Georgia, serif" ${el.props.fontFamily === 'Georgia, serif' ? 'selected' : ''}>Georgia</option><option value="'Times New Roman', serif" ${el.props.fontFamily === "'Times New Roman', serif" ? 'selected' : ''}>Times New Roman</option><option value="Verdana, sans-serif" ${el.props.fontFamily === 'Verdana, sans-serif' ? 'selected' : ''}>Verdana</option><option value="'Trebuchet MS', sans-serif" ${el.props.fontFamily === "'Trebuchet MS', sans-serif" ? 'selected' : ''}>Trebuchet MS</option><option value="Impact, sans-serif" ${el.props.fontFamily === 'Impact, sans-serif' ? 'selected' : ''}>Impact</option><option value="'Comic Sans MS', cursive" ${el.props.fontFamily === "'Comic Sans MS', cursive" ? 'selected' : ''}>Comic Sans MS</option></select></div>`;
-
-                    // Align and Vertical Align on same styled grid as normal Align
-                    h += `<div class="prop-grid"><label>Weight</label><select data-prop="props.fontWeight"><option value="normal" ${el.props.fontWeight === 'normal' ? 'selected' : ''}>Normal</option><option value="bold" ${el.props.fontWeight === 'bold' ? 'selected' : ''}>Bold</option></select><label>Align</label><select data-prop="props.textAlign"><option value="left" ${el.props.textAlign === 'left' ? 'selected' : ''}>Left</option><option value="center" ${el.props.textAlign === 'center' ? 'selected' : ''}>Center</option><option value="right" ${el.props.textAlign === 'right' ? 'selected' : ''}>Right</option></select></div>`;
-
-                    // vertical align placed in same prop-grid style (two-column row)
-                    h += `<div class="prop-grid"><label>Vertical Align</label><select data-prop="props.valign"><option value="top" ${el.props.valign==='top'?'selected':''}>Top</option><option value="middle" ${el.props.valign==='middle'?'selected':''}>Middle</option><option value="bottom" ${el.props.valign==='bottom'?'selected':''}>Bottom</option></select><label>Padding (cm)</label><input type="number" step="0.1" data-prop="props.padding" value="${Number(el.props.padding||0).toFixed(2)}" min="0"></div>`;
-                }
-
-                // Border and rotation controls (for most types)
-                h += `<hr><div class="prop-grid"><label>Show Border</label><input type="checkbox" data-prop="props.showBorder" ${el.props.showBorder ? 'checked' : ''}><label>Border Color</label><input type="color" data-prop="props.borderColor" value="${el.props.borderColor||'#000000'}"></div>`;
-                h += `<div class="prop-grid"><label>Border Width</label><input type="number" data-prop="props.borderWidth" value="${el.props.borderWidth||1}" min="0"><label>Rotation°</label><input type="number" step="1" data-prop="props.rotation" value="${el.props.rotation||0}"></div>`;
-
-                // Color for non-box elements
-                if (el.type !== 'box') h += `<hr><label>Color</label><input type="color" data-prop="props.color" value="${el.props.color || '#000000'}">`;
-
-                h += `<hr><button id="btn-delete">Delete Element</button>`;
-                pp.innerHTML = h;
-            }
-
-            function escapeHtml(str) {
-                if (str === null || str === undefined) return '';
-                return String(str).replaceAll('&', '&amp;').replaceAll('<', '&lt;').replaceAll('>', '&gt;').replaceAll('"', '&quot;');
-            }
-
-            function add(t) {
-                const mz = S.length > 0 ? Math.max(...S.map(e => e.zIndex || 0)) : 0;
-                const n = {
-                    id: `el_${Date.now()}`,
-                    type: t,
-                    x: .5,
-                    y: .5,
-                    width: 1.5,
-                    height: .5,
-                    zIndex: mz + 1,
-                    props: {
-                        text: 'Sample Text',
-                        fontSize: 16,
-                        fontWeight: 'normal',
-                        fontFamily: 'Arial, sans-serif',
-                        textAlign: 'left',
-                        valign: 'top',
-                        color: '#000000',
-                        boundColumn: '',
-                        prefix: '',
-                        suffix: '',
-                        rotation: 0,
-                        showBorder: false,
-                        borderColor: '#000000',
-                        borderWidth: 1,
-                        padding: 0.1,
-                        thickness: 2,
-                        format: 'CODE128',
-                        displayValue: true,
-                        fillColor: '#ffffff',
-                        decimals: 2,
-                        asPercent: false
-                    }
-                };
-                if (t === 'qr') { n.width = 1; n.height = 1; }
-                if (t === 'barcode') { n.width = 2; n.height = .8; }
-                if (t === 'line') { n.height = .02; n.width = 2; }
-                if (t === 'box') { n.width = 1.5; n.height = 1; }
-                S.push(n);
-                select(n.id);
-                render();
-                // Auto-save after adding
-                save();
-            }
-
-            function dup() {
-                if (!E) return;
-                const el = S.find(e => e.id === E);
-                if (!el) return;
-                const mz = Math.max(...S.map(e => e.zIndex || 0));
-                const n = JSON.parse(JSON.stringify(el));
-                n.id = `el_${Date.now()}`;
-                n.x = Math.min(el.x + .2, W - el.width);
-                n.y = Math.min(el.y + .2, H - el.height);
-                n.zIndex = mz + 1;
-                S.push(n);
-                select(n.id);
-                save();
-            }
-
-            function front() {
-                if (!E) return;
-                const el = S.find(e => e.id === E);
-                if (!el) return;
-                const mz = Math.max(...S.map(e => e.zIndex || 0));
-                el.zIndex = mz + 1;
-                render();
-                save();
-            }
-
-            function back() {
-                if (!E) return;
-                const el = S.find(e => e.id === E);
-                if (!el) return;
-                const mz = Math.min(...S.map(e => e.zIndex || 0));
-                el.zIndex = mz - 1;
-                render();
-                save();
-            }
-
-            function del() {
-                if (!E) return;
-                S = S.filter(el => el.id !== E);
-                E = null;
-                render();
-                updateProps();
-                updateBtns();
-                save();
-            }
-
-            function setZoom(nz) {
-                z = Math.max(.1, Math.min(3, nz));
-                cw.style.transform = `scale(${z})`;
-                zd.textContent = `${Math.round(z * 100)}%`;
-            }
-
-            function fit() {
-                const cr = cc.getBoundingClientRect();
-                const hw = (cr.width - 40) / (W * 37.795276);
-                const vw = (cr.height - 40) / (H * 37.795276);
-                setZoom(Math.min(hw, vw, 1.5));
-            }
-
-            // Save / Load improvements
-            // Payload wrapper: { version: 1, timestamp: 123, data: [...] }
-            async function save() {
-                const payloadObj = { version: 1, timestamp: Date.now(), data: S };
-                const payload = JSON.stringify(payloadObj);
-                // Always write to localStorage as a backup
-                try {
-                    localStorage.setItem(KEY, payload);
-                } catch (err) {
-                    console.warn('localStorage.setItem failed:', err);
-                }
-
-                if (isGristAvailable()) {
-                    try {
-                        await window.grist.setOption(KEY, payload);
-                        msg('Layout saved successfully!');
-                        return true;
-                    } catch (err) {
-                        console.warn("Grist.setOption failed, localStorage already saved.", err);
-                        msg('Layout saved locally (Grist unavailable).', false, 2500);
-                        return false;
-                    }
-                } else {
-                    msg('Layout saved locally (no Grist detected).', false, 2500);
-                    return false;
-                }
-            }
-
-            async function load(fromFileContent) {
-                // Try sources in order:
-                // 1) If fromFileContent provided (string) -> try parse
-                // 2) If Grist available -> try grist.getOption
-                // 3) localStorage
-                let raw = null;
-                if (fromFileContent) {
-                    raw = fromFileContent;
-                } else if (isGristAvailable()) {
-                    try {
-                        raw = await window.grist.getOption(KEY);
-                        if (raw && typeof raw === 'object' && raw.value !== undefined) {
-                            raw = raw.value;
-                        }
-                    } catch (err) {
-                        console.warn("Grist.getOption failed, trying localStorage fallback.", err);
-                        raw = null;
-                    }
-                }
-
-                if (!raw) {
-                    try {
-                        raw = localStorage.getItem(KEY);
-                    } catch (err) {
-                        console.warn("localStorage.getItem failed:", err);
-                        raw = null;
-                    }
-                }
-
-                if (!raw) {
-                    msg('No saved layout found. You may import a JSON file.', true, 3500);
-                    // Prompt user to import file
-                    return false;
-                }
-
-                try {
-                    let parsed = JSON.parse(raw);
-                    // Support wrapped structure {version, timestamp, data}
-                    if (parsed && parsed.data && Array.isArray(parsed.data)) {
-                        S = parsed.data.map(normalizeElement);
-                    } else if (Array.isArray(parsed)) {
-                        S = parsed.map(normalizeElement);
-                    } else {
-                        if (parsed && parsed.layout && Array.isArray(parsed.layout)) {
-                            S = parsed.layout.map(normalizeElement);
-                        } else {
-                            throw new Error('Unknown layout structure');
-                        }
-                    }
-                    E = null;
-                    render();
-                    updateProps();
-                    updateBtns();
-                    msg('Layout loaded successfully!');
-                    return true;
-                } catch (err) {
-                    console.error('Parse error while loading layout:', err);
-                    msg('Error loading layout: invalid JSON', true, 4000);
-                    return false;
-                }
-            }
-
-            // Export layout to file (download)
-            function exportToFile() {
-                const payloadObj = { version: 1, timestamp: Date.now(), data: S };
-                const blob = new Blob([JSON.stringify(payloadObj, null, 2)], { type: 'application/json' });
-                const url = URL.createObjectURL(blob);
-                const a = document.createElement('a');
-                a.href = url;
-                a.download = 'label-layout.json';
-                document.body.appendChild(a);
-                a.click();
-                a.remove();
-                URL.revokeObjectURL(url);
-            }
-
-            // Event wiring
-            document.getElementById('btn-save').addEventListener('click', () => {
-                save();
-            });
-
-            document.getElementById('btn-load').addEventListener('click', async () => {
-                const ok = await load();
-                if (!ok) {
-                    fileInput.value = '';
-                    fileInput.click();
-                }
-            });
-
-            btnExport.addEventListener('click', () => {
-                exportToFile();
-                msg('Layout exported to file.');
-            });
-
-            btnImport.addEventListener('click', () => {
-                fileInput.value = '';
-                fileInput.click();
-            });
-
-            // Allow user to import a file via hidden input
-            fileInput.addEventListener('change', (ev) => {
-                const f = ev.target.files && ev.target.files[0];
-                if (!f) return;
-                const reader = new FileReader();
-                reader.onload = function (e) {
-                    const content = e.target.result;
-                    load(content);
-                };
-                reader.readAsText(f);
-            });
-
-            // Also allow export by ctrl+e or cmd+e
-            window.addEventListener('keydown', (e) => {
-                if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'e') {
-                    e.preventDefault();
-                    exportToFile();
-                    msg('Layout exported to file.');
-                }
-            });
-
-            document.getElementById('btn-print').addEventListener('click', () => {
-                const ws = E;
-                E = null;
-                render();
-                window.print();
-                setTimeout(() => {
-                    E = ws;
-                    render();
-                }, 100);
-            });
-
-            document.getElementById('btn-clear').addEventListener('click', () => {
-                if (confirm('Are you sure you want to clear the layout?')) {
-                    S = [];
-                    E = null;
-                    render();
-                    updateProps();
-                    updateBtns();
-                    save();
-                }
-            });
-
-            // Duplicate / z-index controls
-            bd.addEventListener('click', dup);
-            bf.addEventListener('click', front);
-            bs.addEventListener('click', back);
-
-            // Zoom controls
-            document.getElementById('btn-zoom-in').addEventListener('click', () => setZoom(z * 1.25));
-            document.getElementById('btn-zoom-out').addEventListener('click', () => setZoom(z / 1.25));
-            document.getElementById('btn-zoom-fit').addEventListener('click', fit);
-
-            // Add element buttons
-            document.querySelectorAll('.add-element').forEach(b => {
-                b.addEventListener('click', e => {
-                    add(e.currentTarget.dataset.type);
-                });
-            });
-
-            // Properties panel editing
-            pp.addEventListener('input', e => {
-                if (!E) return;
-                const el = S.find(x => x.id === E);
-                if (!el) return;
-                const t = e.target;
-                const p = t.dataset.prop;
-                if (!p) return;
-                let v;
-                if (t.type === 'number') {
-                    v = parseFloat(t.value);
-                    if (isNaN(v)) v = 0;
-                } else if (t.type === 'checkbox') {
-                    v = t.checked;
-                } else {
-                    v = t.value;
-                }
-                if (p.includes('.')) {
-                    const [o, k] = p.split('.');
-                    if (!el[o]) el[o] = {};
-                    // coerce numeric/bool where appropriate
-                    if (['fontSize','decimals','thickness','borderWidth','rotation','padding'].includes(k)) {
-                        el[o][k] = Number(v);
-                    } else if (['showBorder','displayValue','asPercent'].includes(k)) {
-                        el[o][k] = !!v;
-                    } else {
-                        el[o][k] = v;
-                    }
-                } else {
-                    if (['x', 'y', 'width', 'height', 'zIndex'].includes(p)) {
-                        el[p] = Number(v);
-                    } else {
-                        el[p] = v;
-                    }
-                }
-                render();
-                save();
-            });
-
-            pp.addEventListener('click', e => {
-                if (e.target && e.target.id === 'btn-delete') del();
-            });
-
-            // Canvas interactions: select, drag, resize
-            lc.addEventListener('mousedown', e => {
-                const t = e.target;
-                if (t === lc) {
-                    select(null);
-                    return;
-                }
-                const te = t.closest('.label-element');
-                if (!te) return;
-                const id = te.dataset.id;
-                select(id);
-                e.preventDefault();
-                const el = S.find(x => x.id === id);
-                const cr = lc.getBoundingClientRect();
-                const smx = (e.clientX - cr.left) / cr.width * W;
-                const smy = (e.clientY - cr.top) / cr.height * H;
-                if (t.classList.contains('resize-handle')) {
-                    resize = true;
-                    ctx = { el, startWidth: el.width, startHeight: el.height, startMouseX: smx, startMouseY: smy };
-                } else {
-                    drag = true;
-                    ctx = { el, offsetX: smx - el.x, offsetY: smy - el.y };
-                }
-            });
-
-            window.addEventListener('mousemove', e => {
-                if (!drag && !resize) return;
-                const cr = lc.getBoundingClientRect();
-                const mx = (e.clientX - cr.left) / cr.width * W;
-                const my = (e.clientY - cr.top) / cr.height * H;
-                const el = ctx.el;
-                if (!el) return;
-                if (drag) {
-                    let nx = mx - ctx.offsetX;
-                    let ny = my - ctx.offsetY;
-                    el.x = Math.max(0, Math.min(nx, W - el.width));
-                    el.y = Math.max(0, Math.min(ny, H - el.height));
-                } else if (resize) {
-                    const dx = mx - ctx.startMouseX;
-                    const dy = my - ctx.startMouseY;
-                    let nw = ctx.startWidth + dx;
-                    let nh = ctx.startHeight + dy;
-                    el.width = Math.max(.2, Math.min(nw, W - el.x));
-                    el.height = Math.max(.2, Math.min(nh, H - el.y));
-                }
-                render();
-                updateProps();
-            });
-
-            window.addEventListener('mouseup', e => {
-                if (drag || resize) save();
-                drag = false; resize = false; ctx = {};
-            });
-
-            // Keyboard interactions
-            window.addEventListener('keydown', e => {
-                if (!E) {
-                    // allow quick export handled earlier
-                }
-                if (!E) return;
-                if (e.key === 'Delete' || e.key === 'Backspace') {
-                    if (e.target.tagName !== 'INPUT' && e.target.tagName !== 'TEXTAREA') {
-                        e.preventDefault();
-                        del();
-                    }
-                }
-                if (['ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight'].includes(e.key)) {
-                    if (e.target.tagName !== 'INPUT' && e.target.tagName !== 'TEXTAREA') {
-                        e.preventDefault();
-                        const el = S.find(x => x.id === E);
-                        if (!el) return;
-                        const st = e.shiftKey ? 0.1 : 0.01;
-                        switch (e.key) {
-                            case 'ArrowUp': el.y = Math.max(0, el.y - st); break;
-                            case 'ArrowDown': el.y = Math.min(H - el.height, el.y + st); break;
-                            case 'ArrowLeft': el.x = Math.max(0, el.x - st); break;
-                            case 'ArrowRight': el.x = Math.min(W - el.width, el.x + st); break;
-                        }
-                        render();
-                        updateProps();
-                        save();
-                    }
-                }
-                if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'd') {
-                    e.preventDefault();
-                    dup();
-                }
-            });
-
-            // Grist integration (guarded)
-            if (isGristAvailable()) {
-                try {
-                    window.grist.ready({ requiredAccess: 'full' });
-                } catch (err) {
-                    // ignore
-                }
-                try {
-                    if (typeof window.grist.onRecord === 'function') {
-                        window.grist.onRecord(function (record, mappings) {
-                            R = record || {};
-                            C = Object.keys(R);
-                            if (E) updateProps();
-                            render();
-                        });
-                    }
-                } catch (err) {
-                    console.warn('grist.onRecord error:', err);
-                }
-                try {
-                    if (typeof window.grist.onOptions === 'function') {
-                        window.grist.onOptions(function (options) {
-                            // no-op
-                        });
-                    }
-                } catch (err) {
-                    // ignore
-                }
-            } else {
-                // No Grist: still keep R/C empty and allow local usage
-                R = {};
-                C = [];
-            }
-
-            // Initial load attempt after small delay (allow Grist API to initialize if present)
-            setTimeout(() => {
-                load().then(() => fit());
-            }, 120);
-
-            updateBtns();
+    // ---------- History (undo/redo) ----------
+    function pushHistorySnapshot(){
+        // truncate forward
+        if(historyIndex < history.length - 1) history = history.slice(0, historyIndex + 1);
+        // push snapshot of current state
+        history.push({
+            data: deepCopy(S),
+            sel: deepCopy(selectedIds)
         });
-    </script>
+        // cap
+        if(history.length > MAX_HISTORY) history.shift();
+        historyIndex = history.length - 1;
+    }
+
+    function resetHistory(){
+        history = [];
+        historyIndex = -1;
+        pushHistorySnapshot(); // initial state
+    }
+
+    function undo(){
+        if(historyIndex <= 0) { msg('Nothing to undo'); return; }
+        historyIndex--;
+        const snap = history[historyIndex];
+        S = deepCopy(snap.data);
+        selectedIds = deepCopy(snap.sel);
+        render();
+        updateProps();
+        updateBtns();
+        save(); // persist after undo
+        msg('Undo');
+    }
+
+    function redo(){
+        if(historyIndex >= history.length - 1) { msg('Nothing to redo'); return; }
+        historyIndex++;
+        const snap = history[historyIndex];
+        S = deepCopy(snap.data);
+        selectedIds = deepCopy(snap.sel);
+        render();
+        updateProps();
+        updateBtns();
+        save();
+        msg('Redo');
+    }
+
+    // ---------- Element normalization ----------
+    function normalizeElement(el){
+        if(!el) return null;
+        const defaults = {
+            id: `el_${Date.now()}`,
+            type: 'text',
+            x: 0.5, y: 0.5, width: 1.5, height: 0.5, zIndex: 0,
+            props: {
+                text: 'Sample Text',
+                fontSize: 16, fontWeight: 'normal', fontFamily: 'Arial, sans-serif',
+                textAlign: 'left', valign: 'top', color: '#000000',
+                boundColumn: '', prefix:'', suffix:'', rotation:0,
+                showBorder:false, borderColor:'#000000', borderWidth:1,
+                padding: 0.1, thickness:2, format:'CODE128', displayValue:true,
+                fillColor:'#ffffff', decimals:2, asPercent:false
+            }
+        };
+        const base = Object.assign({}, defaults, el);
+        base.props = Object.assign({}, defaults.props, el && el.props ? el.props : {});
+        base.x = Number(base.x) || 0;
+        base.y = Number(base.y) || 0;
+        base.width = Number(base.width) || 1;
+        base.height = Number(base.height) || 1;
+        base.zIndex = Number(base.zIndex) || 0;
+        base.props.fontSize = Number(base.props.fontSize) || 16;
+        base.props.decimals = Number(base.props.decimals) || 0;
+        base.props.thickness = Number(base.props.thickness) || 2;
+        base.props.borderWidth = Number(base.props.borderWidth) || 1;
+        base.props.displayValue = (base.props.displayValue !== false);
+        base.props.asPercent = !!base.props.asPercent;
+        base.props.rotation = Number(base.props.rotation) || 0;
+        base.props.valign = base.props.valign || 'top';
+        base.props.prefix = base.props.prefix || '';
+        base.props.suffix = base.props.suffix || '';
+        base.props.showBorder = !!base.props.showBorder;
+        base.props.borderColor = base.props.borderColor || '#000000';
+        base.props.padding = Number.isFinite(Number(base.props.padding)) ? Number(base.props.padding) : 0.1;
+        return base;
+    }
+
+    // ---------- Rendering ----------
+    function render(){
+        lc.innerHTML = '';
+        const sorted = S.slice().sort((a,b)=> (a.zIndex||0) - (b.zIndex||0));
+        sorted.forEach(el=>{
+            const d = document.createElement('div');
+            d.classList.add('label-element');
+            d.dataset.id = el.id;
+            d.style.left = `${el.x}cm`;
+            d.style.top = `${el.y}cm`;
+            d.style.width = `${el.width}cm`;
+            d.style.height = `${el.height}cm`;
+            d.style.zIndex = el.zIndex || 0;
+            d.style.fontSize = `${el.props.fontSize || 16}px`;
+            d.style.fontWeight = el.props.fontWeight || 'normal';
+            d.style.fontFamily = el.props.fontFamily || 'Arial, sans-serif';
+            const justifyMap = { left: 'flex-start', center: 'center', right: 'flex-end' };
+            const alignMap = { top: 'flex-start', middle: 'center', bottom: 'flex-end' };
+            if(el.type !== 'line'){
+                d.style.display = 'flex';
+                d.style.alignItems = alignMap[el.props.valign] || 'flex-start';
+                d.style.justifyContent = justifyMap[el.props.textAlign] || 'flex-start';
+                d.style.whiteSpace = 'normal';
+            } else {
+                d.style.display = '';
+                d.style.whiteSpace = '';
+            }
+            d.style.textAlign = el.props.textAlign || 'left';
+            d.style.color = el.props.color || '#000000';
+            d.style.boxSizing = 'border-box';
+            const rotation = Number(el.props.rotation) || 0;
+            d.style.transform = `rotate(${rotation}deg)`;
+            d.style.transformOrigin = 'center center';
+            // padding (cm) for text/data
+            if((el.type === 'text' || el.type === 'data') && Number.isFinite(Number(el.props.padding))){
+                d.style.padding = `${Number(el.props.padding)}cm`;
+            } else {
+                d.style.padding = '';
+            }
+            // border
+            if(el.props.showBorder && el.type !== 'box'){
+                d.style.border = `${Number(el.props.borderWidth)||1}px solid ${el.props.borderColor||'#000'}`;
+            } else {
+                if(el.type !== 'box') d.style.border = '1px solid transparent';
+            }
+
+            // content
+            switch(el.type){
+                case 'text': {
+                    const span = document.createElement('div');
+                    span.style.display='block';
+                    span.style.width='100%';
+                    span.style.pointerEvents='none';
+                    span.style.overflow='hidden';
+                    span.style.wordWrap='break-word';
+                    span.textContent = el.props.text || 'Static Text';
+                    d.appendChild(span);
+                    break;
+                }
+                case 'data': {
+                    const span = document.createElement('div');
+                    span.style.display='block';
+                    span.style.width='100%';
+                    span.style.pointerEvents='none';
+                    span.style.overflow='hidden';
+                    span.style.wordWrap='break-word';
+                    span.textContent = getData(el);
+                    d.appendChild(span);
+                    break;
+                }
+                case 'line':
+                    d.style.backgroundColor = el.props.color || '#000000';
+                    d.style.height = `${el.props.thickness || 2}px`;
+                    d.style.width = `${el.width}cm`;
+                    break;
+                case 'box':
+                    d.style.border = `${el.props.thickness || 2}px solid ${el.props.color || '#000000'}`;
+                    d.style.backgroundColor = el.props.fillColor || 'transparent';
+                    break;
+                case 'qr': {
+                    const c = getData(el);
+                    const q = document.createElement('img');
+                    const dpi = 37.795276;
+                    const qs = Math.min(el.width, el.height) * dpi;
+                    q.src = `https://api.qrserver.com/v1/create-qr-code/?size=${Math.round(qs)}x${Math.round(qs)}&data=${encodeURIComponent(c)}`;
+                    q.style.pointerEvents='none';
+                    q.style.width='100%';
+                    q.style.height='100%';
+                    q.style.objectFit='contain';
+                    d.appendChild(q);
+                    break;
+                }
+                case 'barcode': {
+                    const c = getData(el) || '';
+                    const sv = document.createElementNS('http://www.w3.org/2000/svg','svg');
+                    sv.style.pointerEvents='none';
+                    sv.setAttribute('width','100%');
+                    sv.setAttribute('height','100%');
+                    d.appendChild(sv);
+                    try{
+                        const pxHeight = Math.max(30, (el.height * 37.795276) - 10);
+                        JsBarcode(sv, String(c), {
+                            format: el.props.format || "CODE128",
+                            displayValue: el.props.displayValue !== false,
+                            width: 2, height: pxHeight, margin:0
+                        });
+                    }catch(err){
+                        sv.innerHTML = `<text x="10" y="20" fill="red" font-size="12">Invalid barcode</text>`;
+                        console.error("Barcode Error:",err);
+                    }
+                    break;
+                }
+                default:
+                    d.innerText = el.props.text || '';
+            }
+
+            // selection visuals
+            if(selectedIds.includes(el.id)){
+                d.classList.add('selected');
+                const h = document.createElement('div');
+                h.classList.add('resize-handle');
+                d.appendChild(h);
+            }
+
+            lc.appendChild(d);
+        });
+    }
+
+    function getData(el){
+        const prefix = el.props.prefix || '';
+        const suffix = el.props.suffix || '';
+        if(el.props.boundColumn && R && Object.prototype.hasOwnProperty.call(R, el.props.boundColumn)){
+            let v = R[el.props.boundColumn];
+            if(el.type === 'data' && typeof v === 'number'){
+                const dec = (el.props.decimals !== undefined) ? Number(el.props.decimals) : 2;
+                const pct = !!el.props.asPercent;
+                return prefix + fmt(v,dec,pct) + suffix;
+            }
+            return prefix + String(v) + suffix;
+        }
+        return prefix + (el.props.text || 'SAMPLE') + suffix;
+    }
+
+    function fmt(v,d,p){
+        if(v===null||v===undefined||v==='') return '';
+        let n=parseFloat(v);
+        if(isNaN(n)) return String(v);
+        if(p) n=n*100;
+        n=n.toFixed(d);
+        return p?n+'%':n;
+    }
+
+    // ---------- Selection / Buttons / Props ----------
+    function updateBtns(){
+        const has = selectedIds.length>0;
+        bd.disabled = !has; bf.disabled = !has; bs.disabled = !has;
+    }
+
+    function setSelection(ids, append=false){
+        if(!Array.isArray(ids)) ids = ids ? [ids] : [];
+        if(append){
+            // toggle each id
+            ids.forEach(id=>{
+                const i = selectedIds.indexOf(id);
+                if(i===-1) selectedIds.push(id);
+                else selectedIds.splice(i,1);
+            });
+        } else {
+            selectedIds = ids;
+        }
+        render();
+        updateProps();
+        updateBtns();
+    }
+
+    // toggles a single id (ctrl/meta click)
+    function toggleSelection(id){
+        const i = selectedIds.indexOf(id);
+        if(i===-1) selectedIds.push(id);
+        else selectedIds.splice(i,1);
+        render();
+        updateProps();
+        updateBtns();
+    }
+
+    function getPrimarySelectedId(){ return selectedIds.length>0 ? selectedIds[0] : null; }
+
+    // update properties panel (single or multiple)
+    function updateProps(){
+        if(selectedIds.length===0){
+            pp.innerHTML = 'Select an element to edit its properties.';
+            return;
+        }
+
+        if(selectedIds.length===1){
+            const el = S.find(x=>x.id===selectedIds[0]);
+            if(!el){ pp.innerHTML='Error: Element not found.'; return; }
+            singlePropsPanel(el);
+            return;
+        }
+
+        // Multiple selection panel
+        multiPropsPanel(selectedIds.map(id=>S.find(e=>e.id===id)).filter(Boolean));
+    }
+
+    function singlePropsPanel(el){
+        let h = `<div class="prop-grid"><label>X (cm)</label><input type="number" step="0.1" data-prop="x" value="${(Number(el.x)||0).toFixed(2)}"><label>Y (cm)</label><input type="number" step="0.1" data-prop="y" value="${(Number(el.y)||0).toFixed(2)}"><label>Width (cm)</label><input type="number" step="0.1" data-prop="width" value="${(Number(el.width)||0).toFixed(2)}"><label>Height (cm)</label><input type="number" step="0.1" data-prop="widthHeight" value="${(Number(el.height)||0).toFixed(2)}"></div><hr>`;
+        if(el.type==='text') h += `<label>Text</label><textarea data-prop="props.text">${escapeHtml(el.props.text||'')}</textarea>`;
+        if(el.type==='data' || el.type==='qr' || el.type==='barcode'){
+            let opts = C.map(col=>`<option value="${col}" ${el.props.boundColumn===col?'selected':''}>${col}</option>`).join('');
+            h += `<label>Bound Column</label><select data-prop="props.boundColumn"><option value="">-- Select Column --</option>${opts}</select>`;
+        }
+        if(el.type==='data'){
+            h += `<label>Prefix</label><input type="text" data-prop="props.prefix" value="${escapeHtml(el.props.prefix||'')}">`;
+            h += `<label>Suffix</label><input type="text" data-prop="props.suffix" value="${escapeHtml(el.props.suffix||'')}">`;
+            h += `<hr><div class="prop-grid"><label>Decimals</label><input type="number" data-prop="props.decimals" value="${el.props.decimals!==undefined?el.props.decimals:2}" min="0" max="10"><label>As Percent</label><input type="checkbox" data-prop="props.asPercent" ${el.props.asPercent?'checked':''}></div>`;
+        }
+        if(el.type==='qr' || el.type==='barcode'){
+            h += `<label>Fallback Text</label><input type="text" data-prop="props.text" value="${escapeHtml(el.props.text||'')}">`;
+        }
+        if(el.type==='barcode'){
+            h += `<label>Format</label><select data-prop="props.format"><option value="CODE128" ${el.props.format==='CODE128'?'selected':''}>CODE128</option><option value="CODE39" ${el.props.format==='CODE39'?'selected':''}>CODE39</option><option value="EAN13" ${el.props.format==='EAN13'?'selected':''}>EAN13</option><option value="UPC" ${el.props.format==='UPC'?'selected':''}>UPC</option></select><label>Show Text</label><input type="checkbox" data-prop="props.displayValue" ${el.props.displayValue!==false?'checked':''}>`;
+        }
+        if(el.type==='line'){
+            h += `<label>Thickness (px)</label><input type="number" data-prop="props.thickness" value="${el.props.thickness||2}" min="1">`;
+        }
+        if(el.type==='box'){
+            h += `<label>Border (px)</label><input type="number" data-prop="props.thickness" value="${el.props.thickness||2}" min="1"><label>Fill Color</label><input type="color" data-prop="props.fillColor" value="${el.props.fillColor||'#ffffff'}">`;
+        }
+        if(el.type==='text' || el.type==='data'){
+            h += `<hr><div class="prop-grid"><label>Font Size</label><input type="number" data-prop="props.fontSize" value="${el.props.fontSize||16}" min="6" max="200"><label>Font Family</label><select data-prop="props.fontFamily"><option value="Arial, sans-serif" ${(el.props.fontFamily||'Arial, sans-serif')==='Arial, sans-serif'?'selected':''}>Arial</option><option value="'Courier New', monospace" ${el.props.fontFamily==="'Courier New', monospace"?'selected':''}>Courier New</option><option value="Consolas, monospace" ${el.props.fontFamily==='Consolas, monospace'?'selected':''}>Consolas</option><option value="Georgia, serif" ${el.props.fontFamily==='Georgia, serif'?'selected':''}>Georgia</option><option value="'Times New Roman', serif" ${el.props.fontFamily==="'Times New Roman', serif"?'selected':''}>Times New Roman</option><option value="Verdana, sans-serif" ${el.props.fontFamily==='Verdana, sans-serif'?'selected':''}>Verdana</option><option value="'Trebuchet MS', sans-serif" ${el.props.fontFamily==="'Trebuchet MS', sans-serif"?'selected':''}>Trebuchet MS</option><option value="Impact, sans-serif" ${el.props.fontFamily==='Impact, sans-serif'?'selected':''}>Impact</option><option value="'Comic Sans MS', cursive" ${el.props.fontFamily==="'Comic Sans MS', cursive"?'selected':''}>Comic Sans MS</option></select></div>`;
+            // align and vertical align styled the same
+            h += `<div class="prop-grid"><label>Weight</label><select data-prop="props.fontWeight"><option value="normal" ${el.props.fontWeight==='normal'?'selected':''}>Normal</option><option value="bold" ${el.props.fontWeight==='bold'?'selected':''}>Bold</option></select><label>Align</label><select data-prop="props.textAlign"><option value="left" ${el.props.textAlign==='left'?'selected':''}>Left</option><option value="center" ${el.props.textAlign==='center'?'selected':''}>Center</option><option value="right" ${el.props.textAlign==='right'?'selected':''}>Right</option></select></div>`;
+            h += `<div class="prop-grid"><label>Vertical Align</label><select data-prop="props.valign"><option value="top" ${el.props.valign==='top'?'selected':''}>Top</option><option value="middle" ${el.props.valign==='middle'?'selected':''}>Middle</option><option value="bottom" ${el.props.valign==='bottom'?'selected':''}>Bottom</option></select><label>Padding (cm)</label><input type="number" step="0.1" data-prop="props.padding" value="${Number(el.props.padding||0).toFixed(2)}" min="0"></div>`;
+        }
+        // border + rotation
+        h += `<hr><div class="prop-grid"><label>Show Border</label><input type="checkbox" data-prop="props.showBorder" ${el.props.showBorder?'checked':''}><label>Border Color</label><input type="color" data-prop="props.borderColor" value="${el.props.borderColor||'#000000'}"></div>`;
+        h += `<div class="prop-grid"><label>Border Width</label><input type="number" data-prop="props.borderWidth" value="${el.props.borderWidth||1}" min="0"><label>Rotation°</label><input type="number" step="1" data-prop="props.rotation" value="${el.props.rotation||0}"></div>`;
+        if(el.type!=='box') h += `<hr><label>Color</label><input type="color" data-prop="props.color" value="${el.props.color||'#000000'}">`;
+        h += `<hr><button id="btn-delete">Delete Element</button>`;
+        pp.innerHTML = h;
+    }
+
+    function multiPropsPanel(elems){
+        // show aggregated controls — if all values same show it, else blank
+        function common(propPath){
+            const parts = propPath.split('.');
+            let val = undefined;
+            for(const el of elems){
+                let cur = el;
+                for(const p of parts){
+                    if(cur && Object.prototype.hasOwnProperty.call(cur,p)) cur = cur[p]; else { cur = undefined; break; }
+                }
+                if(val === undefined) val = cur;
+                else if(String(val) !== String(cur)) return ''; // mixed
+            }
+            return val === undefined ? '' : val;
+        }
+
+        let h = `<div style="font-weight:600;margin-bottom:6px">${elems.length} elements selected</div>`;
+        h += `<div class="prop-grid"><label>X (cm)</label><input type="number" step="0.1" data-prop="multi.x" value="${common('x')}"><label>Y (cm)</label><input type="number" step="0.1" data-prop="multi.y" value="${common('y')}"></div>`;
+        h += `<div class="prop-grid"><label>Width (cm)</label><input type="number" step="0.1" data-prop="multi.width" value="${common('width')}"><label>Height (cm)</label><input type="number" step="0.1" data-prop="multi.height" value="${common('height')}"></div><hr>`;
+        // font/align/padding/color/rotation/border options common to text/data
+        h += `<div class="prop-grid"><label>Font Size</label><input type="number" data-prop="multi.props.fontSize" value="${common('props.fontSize')}" min="6"><label>Font Weight</label><select data-prop="multi.props.fontWeight"><option value="">—</option><option value="normal" ${common('props.fontWeight')==='normal'?'selected':''}>Normal</option><option value="bold" ${common('props.fontWeight')==='bold'?'selected':''}>Bold</option></select></div>`;
+        h += `<div class="prop-grid"><label>Align</label><select data-prop="multi.props.textAlign"><option value="">—</option><option value="left" ${common('props.textAlign')==='left'?'selected':''}>Left</option><option value="center" ${common('props.textAlign')==='center'?'selected':''}>Center</option><option value="right" ${common('props.textAlign')==='right'?'selected':''}>Right</option></select><label>Vertical Align</label><select data-prop="multi.props.valign"><option value="">—</option><option value="top" ${common('props.valign')==='top'?'selected':''}>Top</option><option value="middle" ${common('props.valign')==='middle'?'selected':''}>Middle</option><option value="bottom" ${common('props.valign')==='bottom'?'selected':''}>Bottom</option></select></div>`;
+        h += `<div class="prop-grid"><label>Padding (cm)</label><input type="number" step="0.1" data-prop="multi.props.padding" value="${common('props.padding')}" min="0"><label>Rotation°</label><input type="number" step="1" data-prop="multi.props.rotation" value="${common('props.rotation')}"></div>`;
+        h += `<div class="prop-grid"><label>Show Border</label><input type="checkbox" data-prop="multi.props.showBorder" ${common('props.showBorder')?'checked':''}><label>Border Color</label><input type="color" data-prop="multi.props.borderColor" value="${common('props.borderColor')||'#000000'}"></div>`;
+        h += `<div class="prop-grid"><label>Border Width</label><input type="number" data-prop="multi.props.borderWidth" value="${common('props.borderWidth')}" min="0"><label>Color</label><input type="color" data-prop="multi.props.color" value="${common('props.color')||'#000000'}"></div>`;
+        h += `<hr><button id="btn-delete">Delete Selected</button>`;
+        pp.innerHTML = h;
+    }
+
+    function escapeHtml(str){ if(str===null||str===undefined) return ''; return String(str).replaceAll('&','&amp;').replaceAll('<','&lt;').replaceAll('>','&gt;').replaceAll('"','&quot;'); }
+
+    // ---------- Element operations (multi-aware) ----------
+    function add(type){
+        pushBeforeChange();
+        const mz = S.length>0 ? Math.max(...S.map(e=>e.zIndex||0)) : 0;
+        const n = {
+            id: `el_${Date.now()}`,
+            type,
+            x:.5,y:.5,width:1.5,height:.5,zIndex:mz+1,
+            props:{
+                text:'Sample Text',fontSize:16,fontWeight:'normal',fontFamily:'Arial, sans-serif',
+                textAlign:'left',valign:'top',color:'#000000',boundColumn:'',prefix:'',suffix:'',
+                rotation:0,showBorder:false,borderColor:'#000',borderWidth:1,padding:0.1,
+                thickness:2,format:'CODE128',displayValue:true,fillColor:'#fff',decimals:2,asPercent:false
+            }
+        };
+        if(type==='qr'){ n.width=1;n.height=1 }
+        if(type==='barcode'){ n.width=2;n.height=.8 }
+        if(type==='line'){ n.height=.02;n.width=2 }
+        if(type==='box'){ n.width=1.5;n.height=1 }
+        S.push(n);
+        setSelection([n.id]);
+        pushAfterChange();
+        save();
+    }
+
+    function dupSelected(){
+        if(selectedIds.length===0) return;
+        pushBeforeChange();
+        const mz = S.length>0 ? Math.max(...S.map(e=>e.zIndex||0)) : 0;
+        const newIds = [];
+        selectedIds.forEach((id, idx)=>{
+            const el = S.find(e=>e.id===id);
+            if(!el) return;
+            const copy = deepCopy(el);
+            copy.id = `el_${Date.now()}_${idx}`;
+            copy.x = Math.min(el.x + 0.2, W - el.width);
+            copy.y = Math.min(el.y + 0.2, H - el.height);
+            copy.zIndex = mz + idx + 1;
+            S.push(copy);
+            newIds.push(copy.id);
+        });
+        setSelection(newIds);
+        pushAfterChange();
+        save();
+    }
+
+    function bringToFront(){
+        if(selectedIds.length===0) return;
+        pushBeforeChange();
+        let mz = S.length>0 ? Math.max(...S.map(e=>e.zIndex||0)) : 0;
+        // bring each selected in order to top
+        selectedIds.forEach(id=>{
+            const el = S.find(e=>e.id===id);
+            if(el){ mz++; el.zIndex = mz; }
+        });
+        render(); save();
+        pushAfterChange();
+    }
+
+    function sendToBack(){
+        if(selectedIds.length===0) return;
+        pushBeforeChange();
+        let mn = S.length>0 ? Math.min(...S.map(e=>e.zIndex||0)) : 0;
+        // send each selected to back (decreasing)
+        selectedIds.forEach((id, idx)=>{
+            const el = S.find(e=>e.id===id);
+            if(el){ el.zIndex = mn - (idx+1); }
+        });
+        render(); save();
+        pushAfterChange();
+    }
+
+    function deleteSelected(){
+        if(selectedIds.length===0) return;
+        pushBeforeChange();
+        S = S.filter(e => !selectedIds.includes(e.id));
+        selectedIds = [];
+        render(); updateProps(); updateBtns();
+        pushAfterChange();
+        save();
+    }
+
+    // ---------- Save / Load ----------
+    async function save(){
+        const payloadObj = { version:1, timestamp: Date.now(), data: S };
+        const payload = JSON.stringify(payloadObj);
+        try{ localStorage.setItem(KEY, payload); } catch(e){ console.warn('localStorage.setItem failed:',e) }
+        if(isGristAvailable()){
+            try{ await window.grist.setOption(KEY,payload); msg('Layout saved successfully!'); return true; }
+            catch(e){ console.warn('Grist.setOption failed',e); msg('Layout saved locally (Grist unavailable).',false,2000); return false; }
+        } else { msg('Layout saved locally.', false, 1500); return false; }
+    }
+
+    async function load(fromFileContent){
+        let raw = null;
+        if(fromFileContent) raw = fromFileContent;
+        else if(isGristAvailable()){
+            try{ raw = await window.grist.getOption(KEY); if(raw && typeof raw === 'object' && raw.value !== undefined) raw = raw.value; }catch(e){ console.warn("Grist.getOption failed:",e); raw=null; }
+        }
+        if(!raw){
+            try{ raw = localStorage.getItem(KEY); }catch(e){ console.warn("localStorage.getItem failed:",e); raw=null; }
+        }
+        if(!raw){ msg('No saved layout found. Use Import or create elements.'); return false; }
+        try{
+            let parsed = JSON.parse(raw);
+            if(parsed && parsed.data && Array.isArray(parsed.data)) S = parsed.data.map(normalizeElement);
+            else if(Array.isArray(parsed)) S = parsed.map(normalizeElement);
+            else if(parsed && parsed.layout && Array.isArray(parsed.layout)) S = parsed.layout.map(normalizeElement);
+            else throw new Error('Unknown layout structure');
+            selectedIds = [];
+            render(); updateProps(); updateBtns();
+            resetHistory();
+            msg('Layout loaded successfully!');
+            return true;
+        }catch(e){
+            console.error('Parse error while loading layout:',e);
+            msg('Error loading layout: invalid JSON', true, 4000);
+            return false;
+        }
+    }
+
+    function exportToFile(){
+        const payloadObj = { version:1, timestamp:Date.now(), data: S };
+        const blob = new Blob([JSON.stringify(payloadObj,null,2)], { type:'application/json' });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a'); a.href = url; a.download = 'label-layout.json';
+        document.body.appendChild(a); a.click(); a.remove(); URL.revokeObjectURL(url);
+    }
+
+    // ---------- Interaction helpers for history ----------
+    function pushBeforeChange(){ pushHistorySnapshot(); } // snapshot current state before mutation
+    function pushAfterChange(){ /* no-op placeholder if needed */ }
+
+    // ---------- Mouse interactions: selection / drag / resize ----------
+    lc.addEventListener('mousedown', (e)=>{
+        const t = e.target;
+        if(t === lc){
+            // click empty area clears selection unless ctrl pressed
+            if(!(e.ctrlKey||e.metaKey)) { setSelection([]); }
+            return;
+        }
+        const te = t.closest('.label-element');
+        if(!te) return;
+        const id = te.dataset.id;
+        const clickedElement = S.find(x=>x.id===id);
+        if(!clickedElement) return;
+
+        // selection logic
+        if(e.ctrlKey || e.metaKey){ // toggle selection
+            pushBeforeChange();
+            toggleSelection(id);
+            // do not start drag for toggle only (but allow dragging immediately if user holds mouse and the element becomes selected)
+        } else {
+            if(!selectedIds.includes(id)){
+                // selecting a single element (clear others)
+                pushBeforeChange();
+                setSelection([id]);
+            }
+        }
+
+        // prepare for drag or resize
+        const cr = lc.getBoundingClientRect();
+        const smx = (e.clientX - cr.left) / cr.width * W;
+        const smy = (e.clientY - cr.top) / cr.height * H;
+
+        if(t.classList.contains('resize-handle') && selectedIds.length <= 1){
+            // only resize the primary (if multiple selected, allow resize only of single selected element)
+            resizeMode = true;
+            ctx = { el: clickedElement, startWidth: clickedElement.width, startHeight: clickedElement.height, startMouseX: smx, startMouseY: smy };
+            // mousedown already pushed history above
+        } else {
+            // Start dragging. If clicked element is part of selectedIds, move all selected; else move single (already selected)
+            drag = true;
+            // prepare offsets for each selected element
+            const movers = selectedIds.includes(id) ? selectedIds.slice() : [id];
+            // ensure they exist
+            const items = movers.map(iid => S.find(s => s.id === iid)).filter(Boolean);
+            ctx = { items: items.map(it => ({ id: it.id, startX: it.x, startY: it.y })), offsetMouseX: smx, offsetMouseY: smy, baseMouseX: smx, baseMouseY: smy };
+            // history already pushed if we changed selection; but if we didn't change selection and didn't call pushBeforeChange, we still need a snapshot
+            // ensure we have a snapshot to undo the drag. If last history snapshot equals current S (rare), we still push to be safe.
+            pushBeforeChange();
+        }
+        e.preventDefault();
+    });
+
+    window.addEventListener('mousemove', (e)=>{
+        if(!drag && !resizeMode) return;
+        const cr = lc.getBoundingClientRect();
+        const mx = (e.clientX - cr.left) / cr.width * W;
+        const my = (e.clientY - cr.top) / cr.height * H;
+
+        if(drag && ctx && ctx.items){
+            // calculate delta based on mouse movement relative to starting mouse position
+            const dx = mx - ctx.baseMouseX;
+            const dy = my - ctx.baseMouseY;
+            // move each item by dx/dy relative to its startX/startY
+            ctx.items.forEach(it=>{
+                const el = S.find(s=>s.id===it.id);
+                if(!el) return;
+                el.x = Math.max(0, Math.min(it.startX + dx, W - el.width));
+                el.y = Math.max(0, Math.min(it.startY + dy, H - el.height));
+            });
+            render();
+            updateProps();
+        } else if(resizeMode && ctx && ctx.el){
+            const dx = mx - ctx.startMouseX;
+            const dy = my - ctx.startMouseY;
+            let nw = ctx.startWidth + dx;
+            let nh = ctx.startHeight + dy;
+            ctx.el.width = Math.max(.2, Math.min(nw, W - ctx.el.x));
+            ctx.el.height = Math.max(.2, Math.min(nh, H - ctx.el.y));
+            render();
+            updateProps();
+        }
+    });
+
+    window.addEventListener('mouseup', (e)=>{
+        if(drag || resizeMode){
+            save();
+            pushAfterChange();
+        }
+        drag = false; resizeMode = false; ctx = {};
+    });
+
+    // ---------- Keyboard shortcuts (undo/redo/multi) ----------
+    window.addEventListener('keydown', (e)=>{
+        // Undo: Ctrl/Cmd+Z ; Redo: Ctrl/Cmd+Shift+Z or Ctrl/Cmd+Y
+        if((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'z'){
+            e.preventDefault();
+            if(e.shiftKey) redo(); else undo();
+            return;
+        }
+        if((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'y'){
+            e.preventDefault(); redo(); return;
+        }
+
+        // Delete
+        if((e.key === 'Delete' || e.key === 'Backspace') && selectedIds.length>0){
+            if(e.target.tagName !== 'INPUT' && e.target.tagName !== 'TEXTAREA'){ e.preventDefault(); deleteSelected(); }
+        }
+
+        // Arrow movement for selected elements (nudge)
+        if(['ArrowUp','ArrowDown','ArrowLeft','ArrowRight'].includes(e.key)){
+            if(e.target.tagName !== 'INPUT' && e.target.tagName !== 'TEXTAREA'){
+                if(selectedIds.length>0){
+                    e.preventDefault();
+                    const step = e.shiftKey ? 0.1 : 0.01;
+                    pushBeforeChange();
+                    selectedIds.forEach(id=>{
+                        const el = S.find(s=>s.id===id); if(!el) return;
+                        switch(e.key){
+                            case 'ArrowUp': el.y = Math.max(0, el.y - step); break;
+                            case 'ArrowDown': el.y = Math.min(H - el.height, el.y + step); break;
+                            case 'ArrowLeft': el.x = Math.max(0, el.x - step); break;
+                            case 'ArrowRight': el.x = Math.min(W - el.width, el.x + step); break;
+                        }
+                    });
+                    render(); updateProps(); save(); pushAfterChange();
+                }
+            }
+        }
+
+        // Duplicate with Ctrl/Cmd+D (prevent browser)
+        if((e.ctrlKey||e.metaKey) && e.key.toLowerCase() === 'd'){
+            e.preventDefault();
+            dupSelected();
+        }
+    });
+
+    // ---------- Property edits (apply to single or multiple) ----------
+    pp.addEventListener('input', (e)=>{
+        if(selectedIds.length === 0) return;
+        const target = e.target;
+        const prop = target.dataset.prop;
+        if(!prop) return;
+
+        // For multi selection controls, props start with multi.
+        if(prop.startsWith('multi.')){
+            // apply to all selected elements
+            const keyPath = prop.slice('multi.'.length); // e.g., props.fontSize or x
+            const value = (target.type === 'checkbox') ? target.checked : (target.type === 'number' ? Number(target.value) : target.value);
+            pushBeforeChange();
+            selectedIds.forEach(id=>{
+                const el = S.find(s=>s.id===id);
+                if(!el) return;
+                if(keyPath.includes('.')){
+                    const [o,k] = keyPath.split('.');
+                    if(!el[o]) el[o] = {};
+                    if(['fontSize','decimals','thickness','borderWidth','rotation','padding','x','y','width','height'].includes(k)) el[o][k] = Number(value);
+                    else if(['showBorder','displayValue','asPercent'].includes(k)) el[o][k] = !!value;
+                    else el[o][k] = value;
+                } else {
+                    if(['x','y','width','height','zIndex'].includes(keyPath)) el[keyPath] = Number(value);
+                    else el[keyPath] = value;
+                }
+            });
+            render(); updateProps(); save(); pushAfterChange();
+            return;
+        }
+
+        // Normal single-element props — but if multiple selected, apply to all selected
+        const applyToAll = selectedIds.length > 1;
+        const parsedValue = (target.type === 'checkbox') ? target.checked : (target.type === 'number' ? Number(target.value) : target.value);
+
+        // For backward compatibility: some code used data-prop="widthHeight" due to earlier mistake; handle both
+        function applyPropToElement(el, p, v){
+            if(p === 'widthHeight'){ el.height = Number(v); return; }
+            if(p.includes('.')){
+                const [o,k] = p.split('.');
+                if(!el[o]) el[o] = {};
+                if(['fontSize','decimals','thickness','borderWidth','rotation','padding','x','y','width','height'].includes(k)) el[o][k] = Number(v);
+                else if(['showBorder','displayValue','asPercent'].includes(k)) el[o][k] = !!v;
+                else el[o][k] = v;
+            } else {
+                if(['x','y','width','height','zIndex'].includes(p)) el[p] = Number(v);
+                else el[p] = v;
+            }
+        }
+
+        pushBeforeChange();
+        if(applyToAll){
+            selectedIds.forEach(id=>{
+                const el = S.find(s=>s.id===id); if(!el) return;
+                applyPropToElement(el, prop, parsedValue);
+            });
+        } else {
+            const id = selectedIds[0];
+            const el = S.find(s=>s.id===id);
+            if(el) applyPropToElement(el, prop, parsedValue);
+        }
+        render(); save(); pushAfterChange();
+    });
+
+    pp.addEventListener('click', (e)=>{
+        if(e.target && e.target.id === 'btn-delete'){
+            deleteSelected();
+        }
+    });
+
+    // ---------- Canvas click behavior: ctrl toggle or single select handled in mousedown above ----------
+    // No extra click handler needed.
+
+    // ---------- Buttons ----------
+    document.getElementById('btn-save').addEventListener('click', ()=> save());
+    document.getElementById('btn-load').addEventListener('click', async ()=>{
+        const ok = await load();
+        if(!ok){ fileInput.value = ''; fileInput.click(); }
+    });
+    document.getElementById('btn-print').addEventListener('click', ()=>{
+        const prevSel = deepCopy(selectedIds);
+        selectedIds = []; render();
+        window.print();
+        setTimeout(()=>{ selectedIds = prevSel; render(); }, 100);
+    });
+    document.getElementById('btn-clear').addEventListener('click', ()=>{
+        if(confirm('Are you sure you want to clear the layout?')){
+            pushBeforeChange();
+            S=[]; selectedIds=[];
+            render(); updateProps(); updateBtns();
+            pushAfterChange();
+            save();
+        }
+    });
+    bd.addEventListener('click', dupSelected);
+    bf.addEventListener('click', bringToFront);
+    bs.addEventListener('click', sendToBack);
+    document.getElementById('btn-zoom-in').addEventListener('click', ()=> setZoom(z*1.25));
+    document.getElementById('btn-zoom-out').addEventListener('click', ()=> setZoom(z/1.25));
+    document.getElementById('btn-zoom-fit').addEventListener('click', fit);
+
+    // Add element buttons wired
+    document.querySelectorAll('.add-element').forEach(b=> b.addEventListener('click', e => add(e.currentTarget.dataset.type)));
+
+    // File import/export
+    btnExport.addEventListener('click', ()=>{ exportToFile(); msg('Layout exported to file.'); });
+    btnImport.addEventListener('click', ()=>{ fileInput.value=''; fileInput.click(); });
+    fileInput.addEventListener('change', (ev)=>{
+        const f = ev.target.files && ev.target.files[0];
+        if(!f) return;
+        const reader = new FileReader();
+        reader.onload = function(e){ load(e.target.result); };
+        reader.readAsText(f);
+    });
+
+    window.addEventListener('keydown', (e)=>{
+        if((e.ctrlKey||e.metaKey) && e.key.toLowerCase() === 'e'){ e.preventDefault(); exportToFile(); msg('Layout exported to file.'); }
+    });
+
+    // ---------- Zoom / fit ----------
+    function setZoom(nz){ z = Math.max(.1, Math.min(3, nz)); cw.style.transform = `scale(${z})`; zd.textContent = `${Math.round(z*100)}%`; }
+    function fit(){ const cr = cc.getBoundingClientRect(); const hw = (cr.width-40)/(W*37.795276); const vw = (cr.height-40)/(H*37.795276); setZoom(Math.min(hw,vw,1.5)); }
+
+    // ---------- Grist integration (optional) ----------
+    if(isGristAvailable()){
+        try{ window.grist.ready({ requiredAccess:'full' }); }catch(e){}
+        try{
+            if(typeof window.grist.onRecord === 'function'){
+                window.grist.onRecord(function(record,mappings){ R = record||{}; C = Object.keys(R); if(selectedIds.length) updateProps(); render(); });
+            }
+        }catch(e){ console.warn('grist.onRecord error',e); }
+        try{
+            if(typeof window.grist.onOptions === 'function'){
+                window.grist.onOptions(function(options){ /* no-op */ });
+            }
+        }catch(e){}
+    } else { R = {}; C = []; }
+
+    // ---------- Initial load & history init ----------
+    setTimeout(()=>{ load().then(()=> fit()); }, 120);
+
+    function pushHistorySnapshot(){ // override to handle initial push properly
+        // This is overwritten earlier; keep compatibility by calling the outer function
+        if(historyIndex < history.length - 1) history = history.slice(0, historyIndex + 1);
+        history.push({ data: deepCopy(S), sel: deepCopy(selectedIds) });
+        if(history.length > MAX_HISTORY) history.shift();
+        historyIndex = history.length - 1;
+    }
+    // ensure history initially matches current state
+    resetHistory();
+
+}); // DOMContentLoaded
+</script>
+
 </body>
 </html>
