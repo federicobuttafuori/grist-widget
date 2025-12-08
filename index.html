@@ -122,15 +122,16 @@
                         fontWeight: 'normal',
                         fontFamily: 'Arial, sans-serif',
                         textAlign: 'left',
-                        valign: 'top',           // new: vertical alignment: top|middle|bottom
+                        valign: 'top',
                         color: '#000000',
                         boundColumn: '',
-                        prefix: '',             // new: prefix for data fields
-                        suffix: '',             // new: suffix for data fields
-                        rotation: 0,            // new: rotation degrees
-                        showBorder: false,      // new: show border around element
-                        borderColor: '#000000', // new: border color
-                        borderWidth: 1,         // new: border width (px)
+                        prefix: '',
+                        suffix: '',
+                        rotation: 0,
+                        showBorder: false,
+                        borderColor: '#000000',
+                        borderWidth: 1,
+                        padding: 0.1,           // NEW: padding (cm) from border for text/data
                         thickness: 2,
                         format: 'CODE128',
                         displayValue: true,
@@ -160,6 +161,7 @@
                 base.props.suffix = base.props.suffix || '';
                 base.props.showBorder = !!base.props.showBorder;
                 base.props.borderColor = base.props.borderColor || '#000000';
+                base.props.padding = Number.isFinite(Number(base.props.padding)) ? Number(base.props.padding) : 0.1;
                 return base;
             }
 
@@ -218,6 +220,14 @@
                     d.style.transform = `rotate(${rotation}deg)`;
                     d.style.transformOrigin = 'center center';
 
+                    // Padding from border (for text/data)
+                    if ((el.type === 'text' || el.type === 'data') && Number.isFinite(Number(el.props.padding))) {
+                        d.style.padding = `${Number(el.props.padding)}cm`;
+                    } else {
+                        // reset padding for others
+                        d.style.padding = '';
+                    }
+
                     // Border if requested (non-box elements will show around element)
                     if (el.props.showBorder && el.type !== 'box') {
                         d.style.border = `${Number(el.props.borderWidth)||1}px solid ${el.props.borderColor||'#000'}`;
@@ -252,7 +262,6 @@
                         }
                         case 'line':
                             d.style.backgroundColor = el.props.color || '#000000';
-                            // thickness in px, but element height is in cm - convert if given small value
                             d.style.height = `${el.props.thickness || 2}px`;
                             d.style.width = `${el.width}cm`;
                             break;
@@ -382,9 +391,13 @@
 
                 // Font and alignment for text/data
                 if (el.type === 'text' || el.type === 'data') {
-                    h += `<hr><div class="prop-grid"><label>Font Size</label><input type="number" data-prop="props.fontSize" value="${el.props.fontSize || 16}" min="6" max="200"><label>Font Family</label><select data-prop="props.fontFamily"><option value="Arial, sans-serif" ${(el.props.fontFamily || 'Arial, sans-serif') === 'Arial, sans-serif' ? 'selected' : ''}>Arial</option><option value="'Courier New', monospace" ${el.props.fontFamily === "'Courier New', monospace" ? 'selected' : ''}>Courier New</option><option value="Consolas, monospace" ${el.props.fontFamily === 'Consolas, monospace' ? 'selected' : ''}>Consolas</option><option value="Georgia, serif" ${el.props.fontFamily === 'Georgia, serif' ? 'selected' : ''}>Georgia</option><option value="'Times New Roman', serif" ${el.props.fontFamily === "'Times New Roman', serif" ? 'selected' : ''}>Times New Roman</option><option value="Verdana, sans-serif" ${el.props.fontFamily === 'Verdana, sans-serif' ? 'selected' : ''}>Verdana</option><option value="'Trebuchet MS', sans-serif" ${el.props.fontFamily === "'Trebuchet MS', sans-serif" ? 'selected' : ''}>Trebuchet MS</option><option value="Impact, sans-serif" ${el.props.fontFamily === 'Impact, sans-serif' ? 'selected' : ''}>Impact</option><option value="'Comic Sans MS', cursive" ${el.props.fontFamily === "'Comic Sans MS', cursive" ? 'selected' : ''}>Comic Sans MS</option></select><label>Weight</label><select data-prop="props.fontWeight"><option value="normal" ${el.props.fontWeight === 'normal' ? 'selected' : ''}>Normal</option><option value="bold" ${el.props.fontWeight === 'bold' ? 'selected' : ''}>Bold</option></select><label>Align</label><select data-prop="props.textAlign"><option value="left" ${el.props.textAlign === 'left' ? 'selected' : ''}>Left</option><option value="center" ${el.props.textAlign === 'center' ? 'selected' : ''}>Center</option><option value="right" ${el.props.textAlign === 'right' ? 'selected' : ''}>Right</option></select></div>`;
-                    // vertical alignment
-                    h += `<label>Vertical Align</label><select data-prop="props.valign"><option value="top" ${el.props.valign==='top'?'selected':''}>Top</option><option value="middle" ${el.props.valign==='middle'?'selected':''}>Middle</option><option value="bottom" ${el.props.valign==='bottom'?'selected':''}>Bottom</option></select>`;
+                    h += `<hr><div class="prop-grid"><label>Font Size</label><input type="number" data-prop="props.fontSize" value="${el.props.fontSize || 16}" min="6" max="200"><label>Font Family</label><select data-prop="props.fontFamily"><option value="Arial, sans-serif" ${(el.props.fontFamily || 'Arial, sans-serif') === 'Arial, sans-serif' ? 'selected' : ''}>Arial</option><option value="'Courier New', monospace" ${el.props.fontFamily === "'Courier New', monospace" ? 'selected' : ''}>Courier New</option><option value="Consolas, monospace" ${el.props.fontFamily === 'Consolas, monospace' ? 'selected' : ''}>Consolas</option><option value="Georgia, serif" ${el.props.fontFamily === 'Georgia, serif' ? 'selected' : ''}>Georgia</option><option value="'Times New Roman', serif" ${el.props.fontFamily === "'Times New Roman', serif" ? 'selected' : ''}>Times New Roman</option><option value="Verdana, sans-serif" ${el.props.fontFamily === 'Verdana, sans-serif' ? 'selected' : ''}>Verdana</option><option value="'Trebuchet MS', sans-serif" ${el.props.fontFamily === "'Trebuchet MS', sans-serif" ? 'selected' : ''}>Trebuchet MS</option><option value="Impact, sans-serif" ${el.props.fontFamily === 'Impact, sans-serif' ? 'selected' : ''}>Impact</option><option value="'Comic Sans MS', cursive" ${el.props.fontFamily === "'Comic Sans MS', cursive" ? 'selected' : ''}>Comic Sans MS</option></select></div>`;
+
+                    // Align and Vertical Align on same styled grid as normal Align
+                    h += `<div class="prop-grid"><label>Weight</label><select data-prop="props.fontWeight"><option value="normal" ${el.props.fontWeight === 'normal' ? 'selected' : ''}>Normal</option><option value="bold" ${el.props.fontWeight === 'bold' ? 'selected' : ''}>Bold</option></select><label>Align</label><select data-prop="props.textAlign"><option value="left" ${el.props.textAlign === 'left' ? 'selected' : ''}>Left</option><option value="center" ${el.props.textAlign === 'center' ? 'selected' : ''}>Center</option><option value="right" ${el.props.textAlign === 'right' ? 'selected' : ''}>Right</option></select></div>`;
+
+                    // vertical align placed in same prop-grid style (two-column row)
+                    h += `<div class="prop-grid"><label>Vertical Align</label><select data-prop="props.valign"><option value="top" ${el.props.valign==='top'?'selected':''}>Top</option><option value="middle" ${el.props.valign==='middle'?'selected':''}>Middle</option><option value="bottom" ${el.props.valign==='bottom'?'selected':''}>Bottom</option></select><label>Padding (cm)</label><input type="number" step="0.1" data-prop="props.padding" value="${Number(el.props.padding||0).toFixed(2)}" min="0"></div>`;
                 }
 
                 // Border and rotation controls (for most types)
@@ -428,6 +441,7 @@
                         showBorder: false,
                         borderColor: '#000000',
                         borderWidth: 1,
+                        padding: 0.1,
                         thickness: 2,
                         format: 'CODE128',
                         displayValue: true,
@@ -565,7 +579,6 @@
                 if (!raw) {
                     msg('No saved layout found. You may import a JSON file.', true, 3500);
                     // Prompt user to import file
-                    // Do not auto click here to avoid annoyances
                     return false;
                 }
 
@@ -618,7 +631,6 @@
             document.getElementById('btn-load').addEventListener('click', async () => {
                 const ok = await load();
                 if (!ok) {
-                    // If nothing loaded, allow user to import file manually
                     fileInput.value = '';
                     fileInput.click();
                 }
@@ -715,7 +727,7 @@
                     const [o, k] = p.split('.');
                     if (!el[o]) el[o] = {};
                     // coerce numeric/bool where appropriate
-                    if (['fontSize','decimals','thickness','borderWidth','rotation'].includes(k)) {
+                    if (['fontSize','decimals','thickness','borderWidth','rotation','padding'].includes(k)) {
                         el[o][k] = Number(v);
                     } else if (['showBorder','displayValue','asPercent'].includes(k)) {
                         el[o][k] = !!v;
