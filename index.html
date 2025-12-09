@@ -3,7 +3,7 @@
 <head>
     <meta charset="utf-8"/>
     <meta name="viewport" content="width=device-width,initial-scale=1"/>
-    <title>Grist Label Designer — Multi-select + Undo/Redo</title>
+    <title>Grist Label Designer — Marquee Fix</title>
     <script src="https://docs.getgrist.com/grist-plugin-api.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/jsbarcode@3.11.5/dist/JsBarcode.all.min.js"></script>
     <style>
@@ -31,9 +31,10 @@
         #btn-delete{background:#fbebeb;border-color:#d9a0a0;color:#c00;margin-top:12px}
         #btn-delete:hover{background:#f7dada}
         .button-group{display:flex;gap:4px}
-        #canvas-container{flex-grow:1;display:flex;justify-content:center;align-items:center;overflow:auto;background:#e0e0e0;padding:20px}
-        #canvas-wrapper{display:inline-block;transform-origin:center center}
+        #canvas-container{flex-grow:1;display:flex;justify-content:center;align-items:center;overflow:auto;background:#e0e0e0;padding:20px;position:relative}
+        #canvas-wrapper{display:inline-block;transform-origin:center center;position:relative}
         #label-canvas{width:8cm;height:5cm;background:#fff;box-shadow:0 4px 12px rgba(0,0,0,.15);position:relative;overflow:hidden}
+        #marquee{position:absolute;border:1px dashed #007aff;background:rgba(0,122,255,0.08);pointer-events:none;display:none;z-index:9999}
         @media print{
             @page{size:8cm 5cm;margin:0}
             html,body{margin:0!important;padding:0!important;width:8cm!important;height:5cm!important;overflow:hidden!important}
@@ -107,6 +108,7 @@
             <div id="canvas-wrapper">
                 <div id="label-canvas"></div>
             </div>
+            <div id="marquee"></div>
         </div>
     </div>
 
@@ -141,6 +143,11 @@ document.addEventListener('DOMContentLoaded', ()=>{
     const fileInput = document.getElementById('file-import');
     const btnExport = document.getElementById('btn-export');
     const btnImport = document.getElementById('btn-import');
+    const marquee = document.getElementById('marquee');
+
+    // Marquee state
+    let marqueeActive = false;
+    let marqueeStart = { clientX:0, clientY:0, startX:0, startY:0, containerRect:null };
 
     // ---------- Utilities ----------
     function msg(m, error=false, timeout=3000){
@@ -209,7 +216,6 @@ document.addEventListener('DOMContentLoaded', ()=>{
                 textAlign: 'left', valign: 'top', color: '#000000',
                 boundColumn: '', prefix:'', suffix:'', rotation:0,
                 showBorder:false, borderColor:'#000000', borderWidth:1,
-                // padding sides in cm; default 0 per request
                 paddingTop: 0, paddingRight: 0, paddingBottom: 0, paddingLeft: 0,
                 thickness:2, format:'CODE128', displayValue:true,
                 fillColor:'#ffffff', decimals:2, asPercent:false
@@ -228,7 +234,6 @@ document.addEventListener('DOMContentLoaded', ()=>{
             base.props.paddingBottom = base.props.paddingBottom !== undefined ? Number(base.props.paddingBottom) : v;
             base.props.paddingLeft = base.props.paddingLeft !== undefined ? Number(base.props.paddingLeft) : v;
         } else {
-            // ensure defined sides fallback to 0
             base.props.paddingTop = Number(base.props.paddingTop) || 0;
             base.props.paddingRight = Number(base.props.paddingRight) || 0;
             base.props.paddingBottom = Number(base.props.paddingBottom) || 0;
@@ -444,8 +449,6 @@ document.addEventListener('DOMContentLoaded', ()=>{
         updateBtns();
     }
 
-    function getPrimarySelectedId(){ return selectedIds.length>0 ? selectedIds[0] : null; }
-
     function updateProps(){
         if(selectedIds.length===0){
             pp.innerHTML = 'Select an element to edit its properties.';
@@ -462,14 +465,21 @@ document.addEventListener('DOMContentLoaded', ()=>{
 
     // ---------- Properties Panels ----------
     function singlePropsPanel(el){
-        let h = `<div class="prop-grid"><label>X (cm)</label><input type="number" step="0.1" data-prop="x" value="${(Number(el.x)||0).toFixed(2)}"><label>Y (cm)</label><input type="number" step="0.1" data-prop="y" value="${(Number(el.y)||0).toFixed(2)}"></div>`;
-        h += `<div class="prop-grid"><label>Width (cm)</label><input type="number" step="0.1" data-prop="width" value="${(Number(el.width)||0).toFixed(2)}"><label>Height (cm)</label><input type="number" step="0.1" data-prop="height" value="${(Number(el.height)||0).toFixed(2)}"></div><hr>`;
+        // bound column: render search input + select
+        let bindHtml = '';
+        if(C && C.length){
+            bindHtml = `<div style="display:flex;gap:8px;margin-bottom:8px"><input type="text" placeholder="Search columns..." data-prop="bind_search" style="flex:1"><select data-prop="props.boundColumn" style="flex:1"><option value="">-- Select Column --</option>${C.map(col=>`<option value="${col}" ${el.props.boundColumn===col?'selected':''}>${col}</option>`).join('')}</select></div>`;
+        } else {
+            bindHtml = `<select data-prop="props.boundColumn"><option value="">-- No columns --</option></select>`;
+        }
+
+        let h = `<div class="prop-grid"><label>X</label><input type="number" step="0.1" data-prop="x" value="${(Number(el.x)||0).toFixed(2)}"><label>Y</label><input type="number" step="0.1" data-prop="y" value="${(Number(el.y)||0).toFixed(2)}"></div>`;
+        h += `<div class="prop-grid"><label>Width</label><input type="number" step="0.1" data-prop="width" value="${(Number(el.width)||0).toFixed(2)}"><label>Height</label><input type="number" step="0.1" data-prop="height" value="${(Number(el.height)||0).toFixed(2)}"></div><hr>`;
 
         if(el.type==='text') h += `<label>Text</label><textarea data-prop="props.text">${escapeHtml(el.props.text||'')}</textarea>`;
 
         if(el.type==='data' || el.type==='qr' || el.type==='barcode'){
-            let opts = C.map(col=>`<option value="${col}" ${el.props.boundColumn===col?'selected':''}>${col}</option>`).join('');
-            h += `<label>Bound Column</label><select data-prop="props.boundColumn"><option value="">-- Select Column --</option>${opts}</select>`;
+            h += `<label>Bound Column</label>${bindHtml}`;
         }
 
         if(el.type==='data'){
@@ -498,11 +508,11 @@ document.addEventListener('DOMContentLoaded', ()=>{
             h += `<hr><div class="prop-grid"><label>Font Size</label><input type="number" data-prop="props.fontSize" value="${el.props.fontSize||16}" min="6" max="200"><label>Font Family</label><select data-prop="props.fontFamily"><option value="Arial, sans-serif" ${(el.props.fontFamily||'Arial, sans-serif')==='Arial, sans-serif'?'selected':''}>Arial</option><option value="'Courier New', monospace" ${el.props.fontFamily==="'Courier New', monospace"?'selected':''}>Courier New</option><option value="Consolas, monospace" ${el.props.fontFamily==='Consolas, monospace'?'selected':''}>Consolas</option><option value="Georgia, serif" ${el.props.fontFamily==='Georgia, serif'?'selected':''}>Georgia</option><option value="'Times New Roman', serif" ${el.props.fontFamily==="'Times New Roman', serif"?'selected':''}>Times New Roman</option><option value="Verdana, sans-serif" ${el.props.fontFamily==='Verdana, sans-serif'?'selected':''}>Verdana</option><option value="'Trebuchet MS', sans-serif" ${el.props.fontFamily==="'Trebuchet MS', sans-serif"?'selected':''}>Trebuchet MS</option><option value="Impact, sans-serif" ${el.props.fontFamily==='Impact, sans-serif'?'selected':''}>Impact</option><option value="'Comic Sans MS', cursive" ${el.props.fontFamily==="'Comic Sans MS', cursive"?'selected':''}>Comic Sans MS</option></select></div>`;
             h += `<div class="prop-grid"><label>Weight</label><select data-prop="props.fontWeight"><option value="normal" ${el.props.fontWeight==='normal'?'selected':''}>Normal</option><option value="bold" ${el.props.fontWeight==='bold'?'selected':''}>Bold</option></select><label>Align</label><select data-prop="props.textAlign"><option value="left" ${el.props.textAlign==='left'?'selected':''}>Left</option><option value="center" ${el.props.textAlign==='center'?'selected':''}>Center</option><option value="right" ${el.props.textAlign==='right'?'selected':''}>Right</option></select></div>`;
 
-            // padding sides as four fields, default 0
-            h += `<div class="prop-grid"><label>Vertical Align</label><select data-prop="props.valign"><option value="top" ${el.props.valign==='top'?'selected':''}>Top</option><option value="middle" ${el.props.valign==='middle'?'selected':''}>Middle</option><option value="bottom" ${el.props.valign==='bottom'?'selected':''}>Bottom</option></select><label>Padding Top (cm)</label><input type="number" step="0.1" data-prop="props.paddingTop" value="${Number(el.props.paddingTop||0).toFixed(2)}" min="0"></div>`;
-            h += `<div class="prop-grid"><label></label><label>Padding Right (cm)</label><input type="number" step="0.1" data-prop="props.paddingRight" value="${Number(el.props.paddingRight||0).toFixed(2)}" min="0"></div>`;
-            h += `<div class="prop-grid"><label></label><label>Padding Bottom (cm)</label><input type="number" step="0.1" data-prop="props.paddingBottom" value="${Number(el.props.paddingBottom||0).toFixed(2)}" min="0"></div>`;
-            h += `<div class="prop-grid"><label></label><label>Padding Left (cm)</label><input type="number" step="0.1" data-prop="props.paddingLeft" value="${Number(el.props.paddingLeft||0).toFixed(2)}" min="0"></div>`;
+            // padding sides as four fields, labels without units
+            h += `<div class="prop-grid"><label>Vertical Align</label><select data-prop="props.valign"><option value="top" ${el.props.valign==='top'?'selected':''}>Top</option><option value="middle" ${el.props.valign==='middle'?'selected':''}>Middle</option><option value="bottom" ${el.props.valign==='bottom'?'selected':''}>Bottom</option></select><label>Padding Top</label><input type="number" step="0.1" data-prop="props.paddingTop" value="${Number(el.props.paddingTop||0).toFixed(2)}" min="0"></div>`;
+            h += `<div class="prop-grid"><label></label><label>Padding Right</label><input type="number" step="0.1" data-prop="props.paddingRight" value="${Number(el.props.paddingRight||0).toFixed(2)}" min="0"></div>`;
+            h += `<div class="prop-grid"><label></label><label>Padding Bottom</label><input type="number" step="0.1" data-prop="props.paddingBottom" value="${Number(el.props.paddingBottom||0).toFixed(2)}" min="0"></div>`;
+            h += `<div class="prop-grid"><label></label><label>Padding Left</label><input type="number" step="0.1" data-prop="props.paddingLeft" value="${Number(el.props.paddingLeft||0).toFixed(2)}" min="0"></div>`;
         }
 
         // border + rotation
@@ -529,12 +539,12 @@ document.addEventListener('DOMContentLoaded', ()=>{
         }
 
         let h = `<div style="font-weight:600;margin-bottom:6px">${elems.length} elements selected</div>`;
-        h += `<div class="prop-grid"><label>X (cm)</label><input type="number" step="0.1" data-prop="multi.x" value="${common('x')}"><label>Y (cm)</label><input type="number" step="0.1" data-prop="multi.y" value="${common('y')}"></div>`;
-        h += `<div class="prop-grid"><label>Width (cm)</label><input type="number" step="0.1" data-prop="multi.width" value="${common('width')}"><label>Height (cm)</label><input type="number" step="0.1" data-prop="multi.height" value="${common('height')}"></div><hr>`;
+        h += `<div class="prop-grid"><label>X</label><input type="number" step="0.1" data-prop="multi.x" value="${common('x')}"><label>Y</label><input type="number" step="0.1" data-prop="multi.y" value="${common('y')}"></div>`;
+        h += `<div class="prop-grid"><label>Width</label><input type="number" step="0.1" data-prop="multi.width" value="${common('width')}"><label>Height</label><input type="number" step="0.1" data-prop="multi.height" value="${common('height')}"></div><hr>`;
         h += `<div class="prop-grid"><label>Font Size</label><input type="number" data-prop="multi.props.fontSize" value="${common('props.fontSize')}" min="6"><label>Font Weight</label><select data-prop="multi.props.fontWeight"><option value="">—</option><option value="normal" ${common('props.fontWeight')==='normal'?'selected':''}>Normal</option><option value="bold" ${common('props.fontWeight')==='bold'?'selected':''}>Bold</option></select></div>`;
         h += `<div class="prop-grid"><label>Align</label><select data-prop="multi.props.textAlign"><option value="">—</option><option value="left" ${common('props.textAlign')==='left'?'selected':''}>Left</option><option value="center" ${common('props.textAlign')==='center'?'selected':''}>Center</option><option value="right" ${common('props.textAlign')==='right'?'selected':''}>Right</option></select><label>Vertical Align</label><select data-prop="multi.props.valign"><option value="">—</option><option value="top" ${common('props.valign')==='top'?'selected':''}>Top</option><option value="middle" ${common('props.valign')==='middle'?'selected':''}>Middle</option><option value="bottom" ${common('props.valign')==='bottom'?'selected':''}>Bottom</option></select></div>`;
-        h += `<div class="prop-grid"><label>Padding Top (cm)</label><input type="number" step="0.1" data-prop="multi.props.paddingTop" value="${common('props.paddingTop')}" min="0"><label>Padding Right (cm)</label><input type="number" step="0.1" data-prop="multi.props.paddingRight" value="${common('props.paddingRight')}" min="0"></div>`;
-        h += `<div class="prop-grid"><label>Padding Bottom (cm)</label><input type="number" step="0.1" data-prop="multi.props.paddingBottom" value="${common('props.paddingBottom')}" min="0"><label>Padding Left (cm)</label><input type="number" step="0.1" data-prop="multi.props.paddingLeft" value="${common('props.paddingLeft')}" min="0"></div>`;
+        h += `<div class="prop-grid"><label>Padding Top</label><input type="number" step="0.1" data-prop="multi.props.paddingTop" value="${common('props.paddingTop')}" min="0"><label>Padding Right</label><input type="number" step="0.1" data-prop="multi.props.paddingRight" value="${common('props.paddingRight')}" min="0"></div>`;
+        h += `<div class="prop-grid"><label>Padding Bottom</label><input type="number" step="0.1" data-prop="multi.props.paddingBottom" value="${common('props.paddingBottom')}" min="0"><label>Padding Left</label><input type="number" step="0.1" data-prop="multi.props.paddingLeft" value="${common('props.paddingLeft')}" min="0"></div>`;
         h += `<div class="prop-grid"><label>Rotation°</label><input type="number" step="1" data-prop="multi.props.rotation" value="${common('props.rotation')}"><label>Show Border</label><input type="checkbox" data-prop="multi.props.showBorder" ${common('props.showBorder')?'checked':''}></div>`;
         h += `<div class="prop-grid"><label>Border Color</label><input type="color" data-prop="multi.props.borderColor" value="${common('props.borderColor')||'#000000'}"><label>Border Width</label><input type="number" data-prop="multi.props.borderWidth" value="${common('props.borderWidth')}" min="0"></div>`;
         h += `<div class="prop-grid"><label>Color</label><input type="color" data-prop="multi.props.color" value="${common('props.color')||'#000000'}"><label></label></div>`;
@@ -559,7 +569,6 @@ document.addEventListener('DOMContentLoaded', ()=>{
                 text:'Sample Text',fontSize:16,fontWeight:'normal',fontFamily:'Arial, sans-serif',
                 textAlign:'left',valign:'top',color:'#000000',boundColumn:'',prefix:'',suffix:'',
                 rotation:0,showBorder:false,borderColor:'#000',borderWidth:1,
-                // defaults: padding sides 0 per user request
                 paddingTop:0,paddingRight:0,paddingBottom:0,paddingLeft:0,
                 thickness:2,format:'CODE128',displayValue:true,fillColor:'#fff',decimals:2,asPercent:false
             }
@@ -674,19 +683,38 @@ document.addEventListener('DOMContentLoaded', ()=>{
         document.body.appendChild(a); a.click(); a.remove(); URL.revokeObjectURL(url);
     }
 
-    // ---------- Mouse interactions: selection / drag / resize ----------
+    // ---------- Mouse interactions: marquee, selection, drag, resize ----------
     lc.addEventListener('mousedown', (e)=>{
         const t = e.target;
+        // If clicking on the background of label-canvas, start marquee selection
         if(t === lc){
-            if(!(e.ctrlKey||e.metaKey)) { setSelection([]); }
+            // start marquee - compute coordinates relative to canvas-container (so zoom & transform do not misplace)
+            const containerRect = cc.getBoundingClientRect();
+            marqueeActive = true;
+            marqueeStart.clientX = e.clientX;
+            marqueeStart.clientY = e.clientY;
+            // startX/startY in pixels relative to container
+            marqueeStart.startX = e.clientX - containerRect.left;
+            marqueeStart.startY = e.clientY - containerRect.top;
+            marqueeStart.containerRect = containerRect;
+            marquee.style.display = 'block';
+            marquee.style.left = `${marqueeStart.startX}px`;
+            marquee.style.top = `${marqueeStart.startY}px`;
+            marquee.style.width = '0px';
+            marquee.style.height = '0px';
+            // do not immediately clear selection; selection will be applied on mouseup (unless ctrl/meta is not pressed - behavior preserved)
+            e.preventDefault();
             return;
         }
+
+        // clicked element
         const te = t.closest('.label-element');
         if(!te) return;
         const id = te.dataset.id;
         const clickedElement = S.find(x=>x.id===id);
         if(!clickedElement) return;
 
+        // selection logic
         if(e.ctrlKey || e.metaKey){
             pushBeforeChange();
             toggleSelection(id);
@@ -708,13 +736,29 @@ document.addEventListener('DOMContentLoaded', ()=>{
             drag = true;
             const movers = selectedIds.includes(id) ? selectedIds.slice() : [id];
             const items = movers.map(iid => S.find(s => s.id === iid)).filter(Boolean);
-            ctx = { items: items.map(it => ({ id: it.id, startX: it.x, startY: it.y })), offsetMouseX: smx, offsetMouseY: smy, baseMouseX: smx, baseMouseY: smy };
+            ctx = { items: items.map(it => ({ id: it.id, startX: it.x, startY: it.y })), baseMouseX: smx, baseMouseY: smy };
             pushBeforeChange();
         }
         e.preventDefault();
     });
 
     window.addEventListener('mousemove', (e)=>{
+        // marquee active handling: draw marquee relative to container (so zoom/transform doesn't misplace)
+        if(marqueeActive){
+            const containerRect = marqueeStart.containerRect || cc.getBoundingClientRect();
+            const curX = e.clientX - containerRect.left;
+            const curY = e.clientY - containerRect.top;
+            const left = Math.min(marqueeStart.startX, curX);
+            const top = Math.min(marqueeStart.startY, curY);
+            const width = Math.abs(curX - marqueeStart.startX);
+            const height = Math.abs(curY - marqueeStart.startY);
+            marquee.style.left = `${left}px`;
+            marquee.style.top = `${top}px`;
+            marquee.style.width = `${width}px`;
+            marquee.style.height = `${height}px`;
+            return;
+        }
+
         if(!drag && !resizeMode) return;
         const cr = lc.getBoundingClientRect();
         const mx = (e.clientX - cr.left) / cr.width * W;
@@ -744,6 +788,64 @@ document.addEventListener('DOMContentLoaded', ()=>{
     });
 
     window.addEventListener('mouseup', (e)=>{
+        if(marqueeActive){
+            // compute selection rectangle intersection using label-canvas bounding rect (this respects zoom)
+            const rect = lc.getBoundingClientRect();
+            const x1 = marqueeStart.clientX, y1 = marqueeStart.clientY;
+            const x2 = e.clientX, y2 = e.clientY;
+            // determine screen-space selection bounds
+            const leftPx = Math.min(x1,x2);
+            const topPx = Math.min(y1,y2);
+            const rightPx = Math.max(x1,x2);
+            const bottomPx = Math.max(y1,y2);
+            // clamp to label-canvas
+            const selLeft = Math.max(leftPx, rect.left);
+            const selTop = Math.max(topPx, rect.top);
+            const selRight = Math.min(rightPx, rect.right);
+            const selBottom = Math.min(bottomPx, rect.bottom);
+
+            let selected = [];
+            if(selRight > selLeft && selBottom > selTop){
+                const fracLeft = (selLeft - rect.left) / rect.width;
+                const fracTop = (selTop - rect.top) / rect.height;
+                const fracRight = (selRight - rect.left) / rect.width;
+                const fracBottom = (selBottom - rect.top) / rect.height;
+                const cmLeft = fracLeft * W;
+                const cmTop = fracTop * H;
+                const cmRight = fracRight * W;
+                const cmBottom = fracBottom * H;
+
+                // select elements whose rectangles intersect the selection rect
+                S.forEach(el=>{
+                    const elLeft = el.x;
+                    const elTop = el.y;
+                    const elRight = el.x + el.width;
+                    const elBottom = el.y + el.height;
+                    const intersect = !(elRight < cmLeft || elLeft > cmRight || elBottom < cmTop || elTop > cmBottom);
+                    if(intersect) selected.push(el.id);
+                });
+            }
+
+            // ctrl/meta -> toggle behavior; otherwise replace selection
+            if(e.ctrlKey || e.metaKey){
+                selected.forEach(id=>{
+                    const i = selectedIds.indexOf(id);
+                    if(i===-1) selectedIds.push(id); else selectedIds.splice(i,1);
+                });
+            } else {
+                selectedIds = selected;
+            }
+
+            marqueeActive = false;
+            marquee.style.display = 'none';
+            render();
+            updateProps();
+            updateBtns();
+            save();
+            e.preventDefault();
+            return;
+        }
+
         if(drag || resizeMode){
             save();
             pushAfterChange();
@@ -794,10 +896,19 @@ document.addEventListener('DOMContentLoaded', ()=>{
 
     // ---------- Property edits (apply to single or multiple) ----------
     pp.addEventListener('input', (e)=>{
-        if(selectedIds.length === 0) return;
+        if(selectedIds.length === 0 && e.target.dataset.prop !== 'bind_search') return;
         const target = e.target;
         const prop = target.dataset.prop;
         if(!prop) return;
+
+        // Handle bound column search input
+        if(prop === 'bind_search'){
+            const query = String(target.value || '').toLowerCase();
+            const select = pp.querySelector('select[data-prop="props.boundColumn"]');
+            if(!select) return;
+            select.innerHTML = `<option value="">-- Select Column --</option>${C.filter(col => col.toLowerCase().includes(query)).map(col => `<option value="${col}" ${select.value===col?'selected':''}>${col}</option>`).join('')}`;
+            return;
+        }
 
         if(prop.startsWith('multi.')){
             const keyPath = prop.slice('multi.'.length);
