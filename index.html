@@ -50,8 +50,6 @@
 </head>
 <body>
     <div id="toolbar">
-        <button id="btn-save" title="Save Layout">💾 Save</button>
-        <button id="btn-load" title="Load Layout">📂 Load</button>
         <button id="btn-clear" title="Clear Layout">🗑️ Clear</button>
         <div class="divider"></div>
         <button id="btn-print" title="Print Label">🖨️ Print</button>
@@ -361,7 +359,7 @@ document.addEventListener('DOMContentLoaded', ()=>{
             updateProps();
         }
         updateCanvasControls();
-        save();
+        saveCurrentDesign();
     }
 
     function saveCurrentDesign(){
@@ -422,7 +420,7 @@ document.addEventListener('DOMContentLoaded', ()=>{
         };
         switchProfile(key);
         msg(`Profile ${w} × ${h} cm added`);
-        save();
+        saveCurrentDesign();
     }
 
     function removeProfile(){
@@ -436,7 +434,7 @@ document.addEventListener('DOMContentLoaded', ()=>{
         const firstKey = Object.keys(profiles)[0];
         switchProfile(firstKey);
         msg('Profile removed');
-        save();
+        saveCurrentDesign();
     }
 
     function addDesign(){
@@ -455,7 +453,7 @@ document.addEventListener('DOMContentLoaded', ()=>{
         };
         switchDesign(designKey);
         msg(`Design "${designKey}" added`);
-        save();
+        saveCurrentDesign();
     }
 
     function removeDesign(){
@@ -470,7 +468,7 @@ document.addEventListener('DOMContentLoaded', ()=>{
         const firstKey = Object.keys(profile.designs)[0];
         switchDesign(firstKey);
         msg('Design removed');
-        save();
+        saveCurrentDesign();
     }
 
     // ---------- History (undo/redo) ----------
@@ -499,7 +497,7 @@ document.addEventListener('DOMContentLoaded', ()=>{
         render();
         updateProps();
         updateBtns();
-        save();
+        saveCurrentDesign();
         msg('Undo');
     }
 
@@ -512,7 +510,7 @@ document.addEventListener('DOMContentLoaded', ()=>{
         render();
         updateProps();
         updateBtns();
-        save();
+        saveCurrentDesign();
         msg('Redo');
     }
 
@@ -531,7 +529,8 @@ document.addEventListener('DOMContentLoaded', ()=>{
                 showBorder:false, borderColor:'#000000', borderWidth:1,
                 paddingTop: 0, paddingRight: 0, paddingBottom: 0, paddingLeft: 0,
                 thickness:2, format:'CODE128', displayValue:true,
-                fillColor:'#ffffff', decimals:2, asPercent:false
+                fillColor:'#ffffff', decimals:2, asPercent:false,
+                lineHeight: 1.2
             }
         };
 
@@ -559,6 +558,7 @@ document.addEventListener('DOMContentLoaded', ()=>{
         base.height = Number(base.height) || 1;
         base.zIndex = Number(base.zIndex) || 0;
         base.props.fontSize = Number(base.props.fontSize) || 16;
+        base.props.lineHeight = Number(base.props.lineHeight) || 1.2;
         base.props.decimals = Number(base.props.decimals) || 0;
         base.props.thickness = Number(base.props.thickness) || 2;
         base.props.borderWidth = Number(base.props.borderWidth) || 1;
@@ -587,8 +587,14 @@ document.addEventListener('DOMContentLoaded', ()=>{
             d.style.height = `${el.height}cm`;
             d.style.zIndex = el.zIndex || 0;
             d.style.fontSize = `${el.props.fontSize || 16}px`;
-            d.style.fontWeight = el.props.fontWeight || 'normal';
+            const fontWeight = el.props.fontWeight;
+            if(typeof fontWeight === 'number'){
+                d.style.fontWeight = fontWeight;
+            } else {
+                d.style.fontWeight = fontWeight || 'normal';
+            }
             d.style.fontFamily = el.props.fontFamily || 'Arial, sans-serif';
+            d.style.lineHeight = el.props.lineHeight !== undefined ? String(el.props.lineHeight) : '1.2';
             const justifyMap = { left: 'flex-start', center: 'center', right: 'flex-end' };
             const alignMap = { top: 'flex-start', middle: 'center', bottom: 'flex-end' };
             if(el.type !== 'line'){
@@ -786,8 +792,8 @@ document.addEventListener('DOMContentLoaded', ()=>{
             bindHtml = `<select data-prop="props.boundColumn"><option value="">-- No columns --</option></select>`;
         }
 
-        let h = `<div class="prop-grid"><label>X</label><input type="number" step="0.1" data-prop="x" value="${(Number(el.x)||0).toFixed(2)}"><label>Y</label><input type="number" step="0.1" data-prop="y" value="${(Number(el.y)||0).toFixed(2)}"></div>`;
-        h += `<div class="prop-grid"><label>Width</label><input type="number" step="0.1" data-prop="width" value="${(Number(el.width)||0).toFixed(2)}"><label>Height</label><input type="number" step="0.1" data-prop="height" value="${(Number(el.height)||0).toFixed(2)}"></div><hr>`;
+        let h = `<div class="prop-grid"><label>X</label><input type="number" step="0.01" data-prop="x" value="${(Number(el.x)||0).toFixed(2)}"><label>Y</label><input type="number" step="0.01" data-prop="y" value="${(Number(el.y)||0).toFixed(2)}"></div>`;
+        h += `<div class="prop-grid"><label>Width</label><input type="number" step="0.01" data-prop="width" value="${(Number(el.width)||0).toFixed(2)}"><label>Height</label><input type="number" step="0.01" data-prop="height" value="${(Number(el.height)||0).toFixed(2)}"></div><hr>`;
 
         if(el.type==='text') h += `<label>Text</label><textarea data-prop="props.text">${escapeHtml(el.props.text||'')}</textarea>`;
 
@@ -818,22 +824,34 @@ document.addEventListener('DOMContentLoaded', ()=>{
         }
 
         if(el.type==='text' || el.type==='data'){
-            h += `<hr><div class="prop-grid"><label>Font Size</label><input type="number" data-prop="props.fontSize" value="${el.props.fontSize||16}" min="6" max="200"><label>Font Family</label><select data-prop="props.fontFamily"><option value="Arial, sans-serif" ${(el.props.fontFamily||'Arial, sans-serif')==='Arial, sans-serif'?'selected':''}>Arial</option><option value="'Courier New', monospace" ${el.props.fontFamily==="'Courier New', monospace"?'selected':''}>Courier New</option><option value="Consolas, monospace" ${el.props.fontFamily==='Consolas, monospace'?'selected':''}>Consolas</option><option value="Georgia, serif" ${el.props.fontFamily==='Georgia, serif'?'selected':''}>Georgia</option><option value="'Times New Roman', serif" ${el.props.fontFamily==="'Times New Roman', serif"?'selected':''}>Times New Roman</option><option value="Verdana, sans-serif" ${el.props.fontFamily==='Verdana, sans-serif'?'selected':''}>Verdana</option><option value="'Trebuchet MS', sans-serif" ${el.props.fontFamily==="'Trebuchet MS', sans-serif"?'selected':''}>Trebuchet MS</option><option value="Impact, sans-serif" ${el.props.fontFamily==='Impact, sans-serif'?'selected':''}>Impact</option><option value="'Comic Sans MS', cursive" ${el.props.fontFamily==="'Comic Sans MS', cursive"?'selected':''}>Comic Sans MS</option></select></div>`;
-            h += `<div class="prop-grid"><label>Weight</label><select data-prop="props.fontWeight"><option value="normal" ${el.props.fontWeight==='normal'?'selected':''}>Normal</option><option value="bold" ${el.props.fontWeight==='bold'?'selected':''}>Bold</option></select><label>Align</label><select data-prop="props.textAlign"><option value="left" ${el.props.textAlign==='left'?'selected':''}>Left</option><option value="center" ${el.props.textAlign==='center'?'selected':''}>Center</option><option value="right" ${el.props.textAlign==='right'?'selected':''}>Right</option></select></div>`;
-
-            // padding sides as four fields, labels without units
-            h += `<div class="prop-grid"><label>Vertical Align</label><select data-prop="props.valign"><option value="top" ${el.props.valign==='top'?'selected':''}>Top</option><option value="middle" ${el.props.valign==='middle'?'selected':''}>Middle</option><option value="bottom" ${el.props.valign==='bottom'?'selected':''}>Bottom</option></select><label>Padding Top</label><input type="number" step="0.1" data-prop="props.paddingTop" value="${Number(el.props.paddingTop||0).toFixed(2)}" min="0"></div>`;
-            h += `<div class="prop-grid"><label></label><label>Padding Right</label><input type="number" step="0.1" data-prop="props.paddingRight" value="${Number(el.props.paddingRight||0).toFixed(2)}" min="0"></div>`;
-            h += `<div class="prop-grid"><label></label><label>Padding Bottom</label><input type="number" step="0.1" data-prop="props.paddingBottom" value="${Number(el.props.paddingBottom||0).toFixed(2)}" min="0"></div>`;
-            h += `<div class="prop-grid"><label></label><label>Padding Left</label><input type="number" step="0.1" data-prop="props.paddingLeft" value="${Number(el.props.paddingLeft||0).toFixed(2)}" min="0"></div>`;
+            const currentFontFamily = el.props.fontFamily || 'Arial, sans-serif';
+            h += `<hr><div class="prop-grid"><label>Font Size</label><input type="number" data-prop="props.fontSize" value="${el.props.fontSize||16}" min="6" max="200"><label>Font Family</label><select data-prop="props.fontFamily" id="font-family-select-${el.id}"><option value="Arial, sans-serif" ${currentFontFamily==='Arial, sans-serif'?'selected':''}>Arial</option><option value="'Courier New', monospace" ${currentFontFamily==="'Courier New', monospace"?'selected':''}>Courier New</option><option value="Consolas, monospace" ${currentFontFamily==='Consolas, monospace'?'selected':''}>Consolas</option><option value="Georgia, serif" ${currentFontFamily==='Georgia, serif'?'selected':''}>Georgia</option><option value="'Times New Roman', serif" ${currentFontFamily==="'Times New Roman', serif"?'selected':''}>Times New Roman</option><option value="Verdana, sans-serif" ${currentFontFamily==='Verdana, sans-serif'?'selected':''}>Verdana</option><option value="'Trebuchet MS', sans-serif" ${currentFontFamily==="'Trebuchet MS', sans-serif"?'selected':''}>Trebuchet MS</option><option value="Impact, sans-serif" ${currentFontFamily==='Impact, sans-serif'?'selected':''}>Impact</option><option value="'Comic Sans MS', cursive" ${currentFontFamily==="'Comic Sans MS', cursive"?'selected':''}>Comic Sans MS</option><option value="'Winky Rough', sans-serif" ${currentFontFamily==="'Winky Rough', sans-serif"?'selected':''}>Winky Rough</option></select></div>`;
+            h += `<div class="prop-grid"><label>Weight</label><select data-prop="props.fontWeight" id="font-weight-select-${el.id}">${generateWeightOptions(currentFontFamily, el.props.fontWeight)}</select><label>Line Height</label><input type="number" step="0.1" data-prop="props.lineHeight" value="${el.props.lineHeight!==undefined?el.props.lineHeight:1.2}" min="0.5" max="3"></div>`;
+            h += `<div class="prop-grid"><label>H. Align</label><select data-prop="props.textAlign"><option value="left" ${el.props.textAlign==='left'?'selected':''}>Left</option><option value="center" ${el.props.textAlign==='center'?'selected':''}>Center</option><option value="right" ${el.props.textAlign==='right'?'selected':''}>Right</option></select><label>V. Align</label><select data-prop="props.valign"><option value="top" ${el.props.valign==='top'?'selected':''}>Top</option><option value="middle" ${el.props.valign==='middle'?'selected':''}>Middle</option><option value="bottom" ${el.props.valign==='bottom'?'selected':''}>Bottom</option></select></div>`;
+            h += `<div class="prop-grid"><label>Rotation°</label><input type="number" step="1" data-prop="props.rotation" value="${el.props.rotation||0}"><label></label></div>`;
+            h += `<hr><div class="prop-grid"><label>Padding Top</label><input type="number" step="0.1" data-prop="props.paddingTop" value="${Number(el.props.paddingTop||0).toFixed(2)}" min="0"><label>Padding Right</label><input type="number" step="0.1" data-prop="props.paddingRight" value="${Number(el.props.paddingRight||0).toFixed(2)}" min="0"></div>`;
+            h += `<div class="prop-grid"><label>Padding Bottom</label><input type="number" step="0.1" data-prop="props.paddingBottom" value="${Number(el.props.paddingBottom||0).toFixed(2)}" min="0"><label>Padding Left</label><input type="number" step="0.1" data-prop="props.paddingLeft" value="${Number(el.props.paddingLeft||0).toFixed(2)}" min="0"></div>`;
         }
 
-        // border + rotation
+        // border
         h += `<hr><div class="prop-grid"><label>Show Border</label><input type="checkbox" data-prop="props.showBorder" ${el.props.showBorder?'checked':''}><label>Border Color</label><input type="color" data-prop="props.borderColor" value="${el.props.borderColor||'#000000'}"></div>`;
-        h += `<div class="prop-grid"><label>Border Width</label><input type="number" data-prop="props.borderWidth" value="${el.props.borderWidth||1}" min="0"><label>Rotation°</label><input type="number" step="1" data-prop="props.rotation" value="${el.props.rotation||0}"></div>`;
+        h += `<div class="prop-grid"><label>Border Width</label><input type="number" data-prop="props.borderWidth" value="${el.props.borderWidth||1}" min="0"><label></label></div>`;
         if(el.type!=='box') h += `<hr><label>Color</label><input type="color" data-prop="props.color" value="${el.props.color||'#000000'}">`;
         h += `<hr><button id="btn-delete">Delete Element</button>`;
         pp.innerHTML = h;
+        
+        // Add listener to update weight options when font family changes
+        if(el.type === 'text' || el.type === 'data'){
+            const fontFamilySelect = pp.querySelector(`#font-family-select-${el.id}`);
+            const weightSelect = pp.querySelector(`#font-weight-select-${el.id}`);
+            if(fontFamilySelect && weightSelect){
+                fontFamilySelect.addEventListener('change', function(){
+                    const newFontFamily = this.value;
+                    const currentWeight = el.props.fontWeight || 'normal';
+                    weightSelect.innerHTML = generateWeightOptions(newFontFamily, currentWeight);
+                });
+            }
+        }
     }
 
     function multiPropsPanel(elems){
@@ -851,21 +869,90 @@ document.addEventListener('DOMContentLoaded', ()=>{
             return val === undefined ? '' : val;
         }
 
+        const commonFontFamily = common('props.fontFamily') || 'Arial, sans-serif';
+        const commonWeight = common('props.fontWeight') || 'normal';
         let h = `<div style="font-weight:600;margin-bottom:6px">${elems.length} elements selected</div>`;
-        h += `<div class="prop-grid"><label>X</label><input type="number" step="0.1" data-prop="multi.x" value="${common('x')}"><label>Y</label><input type="number" step="0.1" data-prop="multi.y" value="${common('y')}"></div>`;
-        h += `<div class="prop-grid"><label>Width</label><input type="number" step="0.1" data-prop="multi.width" value="${common('width')}"><label>Height</label><input type="number" step="0.1" data-prop="multi.height" value="${common('height')}"></div><hr>`;
-        h += `<div class="prop-grid"><label>Font Size</label><input type="number" data-prop="multi.props.fontSize" value="${common('props.fontSize')}" min="6"><label>Font Weight</label><select data-prop="multi.props.fontWeight"><option value="">—</option><option value="normal" ${common('props.fontWeight')==='normal'?'selected':''}>Normal</option><option value="bold" ${common('props.fontWeight')==='bold'?'selected':''}>Bold</option></select></div>`;
-        h += `<div class="prop-grid"><label>Align</label><select data-prop="multi.props.textAlign"><option value="">—</option><option value="left" ${common('props.textAlign')==='left'?'selected':''}>Left</option><option value="center" ${common('props.textAlign')==='center'?'selected':''}>Center</option><option value="right" ${common('props.textAlign')==='right'?'selected':''}>Right</option></select><label>Vertical Align</label><select data-prop="multi.props.valign"><option value="">—</option><option value="top" ${common('props.valign')==='top'?'selected':''}>Top</option><option value="middle" ${common('props.valign')==='middle'?'selected':''}>Middle</option><option value="bottom" ${common('props.valign')==='bottom'?'selected':''}>Bottom</option></select></div>`;
+        h += `<div class="prop-grid"><label>X</label><input type="number" step="0.01" data-prop="multi.x" value="${common('x')}"><label>Y</label><input type="number" step="0.01" data-prop="multi.y" value="${common('y')}"></div>`;
+        h += `<div class="prop-grid"><label>Width</label><input type="number" step="0.01" data-prop="multi.width" value="${common('width')}"><label>Height</label><input type="number" step="0.01" data-prop="multi.height" value="${common('height')}"></div><hr>`;
+        h += `<div class="prop-grid"><label>Font Size</label><input type="number" data-prop="multi.props.fontSize" value="${common('props.fontSize')}" min="6"><label>Font Family</label><select data-prop="multi.props.fontFamily" id="multi-font-family-select"><option value="Arial, sans-serif" ${commonFontFamily==='Arial, sans-serif'?'selected':''}>Arial</option><option value="'Courier New', monospace" ${commonFontFamily==="'Courier New', monospace"?'selected':''}>Courier New</option><option value="Consolas, monospace" ${commonFontFamily==='Consolas, monospace'?'selected':''}>Consolas</option><option value="Georgia, serif" ${commonFontFamily==='Georgia, serif'?'selected':''}>Georgia</option><option value="'Times New Roman', serif" ${commonFontFamily==="'Times New Roman', serif"?'selected':''}>Times New Roman</option><option value="Verdana, sans-serif" ${commonFontFamily==='Verdana, sans-serif'?'selected':''}>Verdana</option><option value="'Trebuchet MS', sans-serif" ${commonFontFamily==="'Trebuchet MS', sans-serif"?'selected':''}>Trebuchet MS</option><option value="Impact, sans-serif" ${commonFontFamily==='Impact, sans-serif'?'selected':''}>Impact</option><option value="'Comic Sans MS', cursive" ${commonFontFamily==="'Comic Sans MS', cursive"?'selected':''}>Comic Sans MS</option><option value="'Winky Rough', sans-serif" ${commonFontFamily==="'Winky Rough', sans-serif"?'selected':''}>Winky Rough</option></select></div>`;
+        h += `<div class="prop-grid"><label>Font Weight</label><select data-prop="multi.props.fontWeight" id="multi-font-weight-select">${generateWeightOptions(commonFontFamily, commonWeight)}</select><label>Line Height</label><input type="number" step="0.1" data-prop="multi.props.lineHeight" value="${common('props.lineHeight')}" min="0.5" max="3"></div>`;
+        h += `<div class="prop-grid"><label>H. Align</label><select data-prop="multi.props.textAlign"><option value="">—</option><option value="left" ${common('props.textAlign')==='left'?'selected':''}>Left</option><option value="center" ${common('props.textAlign')==='center'?'selected':''}>Center</option><option value="right" ${common('props.textAlign')==='right'?'selected':''}>Right</option></select><label>V. Align</label><select data-prop="multi.props.valign"><option value="">—</option><option value="top" ${common('props.valign')==='top'?'selected':''}>Top</option><option value="middle" ${common('props.valign')==='middle'?'selected':''}>Middle</option><option value="bottom" ${common('props.valign')==='bottom'?'selected':''}>Bottom</option></select></div>`;
         h += `<div class="prop-grid"><label>Padding Top</label><input type="number" step="0.1" data-prop="multi.props.paddingTop" value="${common('props.paddingTop')}" min="0"><label>Padding Right</label><input type="number" step="0.1" data-prop="multi.props.paddingRight" value="${common('props.paddingRight')}" min="0"></div>`;
         h += `<div class="prop-grid"><label>Padding Bottom</label><input type="number" step="0.1" data-prop="multi.props.paddingBottom" value="${common('props.paddingBottom')}" min="0"><label>Padding Left</label><input type="number" step="0.1" data-prop="multi.props.paddingLeft" value="${common('props.paddingLeft')}" min="0"></div>`;
-        h += `<div class="prop-grid"><label>Rotation°</label><input type="number" step="1" data-prop="multi.props.rotation" value="${common('props.rotation')}"><label>Show Border</label><input type="checkbox" data-prop="multi.props.showBorder" ${common('props.showBorder')?'checked':''}></div>`;
+        h += `<hr><div class="prop-grid"><label>Rotation°</label><input type="number" step="1" data-prop="multi.props.rotation" value="${common('props.rotation')}"><label>Show Border</label><input type="checkbox" data-prop="multi.props.showBorder" ${common('props.showBorder')?'checked':''}></div>`;
         h += `<div class="prop-grid"><label>Border Color</label><input type="color" data-prop="multi.props.borderColor" value="${common('props.borderColor')||'#000000'}"><label>Border Width</label><input type="number" data-prop="multi.props.borderWidth" value="${common('props.borderWidth')}" min="0"></div>`;
         h += `<div class="prop-grid"><label>Color</label><input type="color" data-prop="multi.props.color" value="${common('props.color')||'#000000'}"><label></label></div>`;
         h += `<hr><button id="btn-delete">Delete Selected</button>`;
         pp.innerHTML = h;
+        
+        // Add listener to update weight options when font family changes (multi-select)
+        const multiFontFamilySelect = pp.querySelector('#multi-font-family-select');
+        const multiWeightSelect = pp.querySelector('#multi-font-weight-select');
+        if(multiFontFamilySelect && multiWeightSelect){
+            multiFontFamilySelect.addEventListener('change', function(){
+                const newFontFamily = this.value;
+                const currentWeight = commonWeight;
+                multiWeightSelect.innerHTML = generateWeightOptions(newFontFamily, currentWeight);
+            });
+        }
     }
 
     function escapeHtml(str){ if(str===null||str===undefined) return ''; return String(str).replaceAll('&','&amp;').replaceAll('<','&lt;').replaceAll('>','&gt;').replaceAll('"','&quot;'); }
+
+    // ---------- Font weights mapping ----------
+    function getFontWeights(fontFamily){
+        const fontWeights = {
+            'Arial, sans-serif': [100, 200, 300, 400, 500, 600, 700, 800, 900, 'normal', 'bold'],
+            "'Courier New', monospace": [400, 700, 'normal', 'bold'],
+            'Consolas, monospace': [400, 700, 'normal', 'bold'],
+            'Georgia, serif': [400, 700, 'normal', 'bold'],
+            "'Times New Roman', serif": [400, 700, 'normal', 'bold'],
+            'Verdana, sans-serif': [400, 700, 'normal', 'bold'],
+            "'Trebuchet MS', sans-serif": [400, 700, 'normal', 'bold'],
+            'Impact, sans-serif': [400, 'normal'],
+            "'Comic Sans MS', cursive": [400, 700, 'normal', 'bold'],
+            "'Winky Rough', sans-serif": [300, 400, 500, 600, 700, 800, 900, 'normal', 'bold']
+        };
+        return fontWeights[fontFamily] || [400, 700, 'normal', 'bold'];
+    }
+
+    function getWeightLabel(weight){
+        const labels = {
+            100: 'Thin (100)',
+            200: 'Extra Light (200)',
+            300: 'Light (300)',
+            400: 'Normal (400)',
+            500: 'Medium (500)',
+            600: 'Semi Bold (600)',
+            700: 'Bold (700)',
+            800: 'Extra Bold (800)',
+            900: 'Black (900)',
+            'normal': 'Normal',
+            'bold': 'Bold'
+        };
+        return labels[weight] || String(weight);
+    }
+
+    function generateWeightOptions(fontFamily, currentWeight){
+        const weights = getFontWeights(fontFamily);
+        return weights.map(w => {
+            const value = typeof w === 'number' ? w : w;
+            // Check if current weight matches: exact match, or numeric equivalents
+            let isSelected = false;
+            if(currentWeight === w){
+                isSelected = true;
+            } else if(w === 'normal' && (currentWeight === 400 || currentWeight === 'normal')){
+                isSelected = true;
+            } else if(w === 'bold' && (currentWeight === 700 || currentWeight === 'bold')){
+                isSelected = true;
+            } else if(typeof w === 'number' && typeof currentWeight === 'number' && w === currentWeight){
+                isSelected = true;
+            } else if(typeof w === 'number' && currentWeight === String(w)){
+                isSelected = true;
+            }
+            return `<option value="${value}" ${isSelected ? 'selected' : ''}>${getWeightLabel(w)}</option>`;
+        }).join('');
+    }
 
     // ---------- Improved column search ----------
     function searchColumns(query, columns){
@@ -959,7 +1046,8 @@ document.addEventListener('DOMContentLoaded', ()=>{
                 textAlign:'left',valign:'top',color:'#000000',boundColumn:'',prefix:'',suffix:'',
                 rotation:0,showBorder:false,borderColor:'#000',borderWidth:1,
                 paddingTop:0,paddingRight:0,paddingBottom:0,paddingLeft:0,
-                thickness:2,format:'CODE128',displayValue:true,fillColor:'#fff',decimals:2,asPercent:false
+                thickness:2,format:'CODE128',displayValue:true,fillColor:'#fff',decimals:2,asPercent:false,
+                lineHeight:1.2
             }
         };
         if(type==='qr'){ n.width=1;n.height=1 }
@@ -969,7 +1057,7 @@ document.addEventListener('DOMContentLoaded', ()=>{
         S.push(n);
         setSelection([n.id]);
         saveCurrentDesign();
-        save();
+        saveCurrentDesign();
     }
 
     function dupSelected(){
@@ -990,7 +1078,7 @@ document.addEventListener('DOMContentLoaded', ()=>{
         });
         setSelection(newIds);
         saveCurrentDesign();
-        save();
+        saveCurrentDesign();
     }
 
     function bringToFront(){
@@ -1001,7 +1089,7 @@ document.addEventListener('DOMContentLoaded', ()=>{
             const el = S.find(e=>e.id===id);
             if(el){ mz++; el.zIndex = mz; }
         });
-        render(); saveCurrentDesign(); save();
+        render(); saveCurrentDesign();
     }
 
     function sendToBack(){
@@ -1012,7 +1100,7 @@ document.addEventListener('DOMContentLoaded', ()=>{
             const el = S.find(e=>e.id===id);
             if(el){ el.zIndex = mn - (idx+1); }
         });
-        render(); saveCurrentDesign(); save();
+        render(); saveCurrentDesign();
     }
 
     function deleteSelected(){
@@ -1022,98 +1110,23 @@ document.addEventListener('DOMContentLoaded', ()=>{
         selectedIds = [];
         render(); updateProps(); updateBtns();
         saveCurrentDesign();
-        save();
-    }
-
-    // ---------- Save / Load ----------
-    async function save(){
-        // Save current design before saving all profiles
         saveCurrentDesign();
-        const payloadObj = { 
-            version: 2, 
-            timestamp: Date.now(), 
-            profiles: profiles,
-            currentProfile: currentProfile,
-            currentDesign: currentDesign,
-            currentCanvas: currentCanvas
-        };
-        const payload = JSON.stringify(payloadObj);
-        try{ localStorage.setItem(KEY, payload); } catch(e){ console.warn('localStorage.setItem failed:',e) }
-        if(isGristAvailable()){
-            try{ await window.grist.setOption(KEY,payload); msg('Layout saved successfully!'); return true; }
-            catch(e){ console.warn('Grist.setOption failed',e); msg('Layout saved locally (Grist unavailable).',false,2000); return false; }
-        } else { msg('Layout saved locally.', false, 1500); return false; }
     }
 
-    async function load(fromFileContent){
-        let raw = null;
-        if(fromFileContent) raw = fromFileContent;
-        else if(isGristAvailable()){
-            try{ raw = await window.grist.getOption(KEY); if(raw && typeof raw === 'object' && raw.value !== undefined) raw = raw.value; }catch(e){ console.warn("Grist.getOption failed:",e); raw=null; }
-        }
-        if(!raw){
-            try{ raw = localStorage.getItem(KEY); }catch(e){ console.warn("localStorage.getItem failed:",e); raw=null; }
-        }
-        if(!raw){ 
-            // Try loading old format
-            try{ raw = localStorage.getItem('grist_label_layout_v1'); }catch(e){}
-            if(!raw){
-                msg('No saved layout found. Use Import or create elements.'); 
-                return false; 
-            }
-        }
+    // ---------- Import ----------
+    function importFromFile(fileContent){
         try{
-            let parsed = JSON.parse(raw);
+            let parsed = JSON.parse(fileContent);
+            let importedProfiles = null;
             
             // Handle new format (v2) with profiles
             if(parsed && parsed.version === 2 && parsed.profiles){
-                profiles = parsed.profiles;
-                currentProfile = parsed.currentProfile || Object.keys(profiles)[0] || '8x5';
-                currentDesign = parsed.currentDesign || 'default';
-                currentCanvas = parsed.currentCanvas || 1;
-                
-                // Ensure current profile/design exist
-                if(!profiles[currentProfile]){
-                    currentProfile = Object.keys(profiles)[0] || '8x5';
-                }
-                if(!profiles[currentProfile].designs[currentDesign]){
-                    currentDesign = Object.keys(profiles[currentProfile].designs)[0] || 'default';
-                }
-                
-                // Migrate old format designs (array) to new format (canvas1/canvas2)
-                Object.keys(profiles).forEach(profKey => {
-                    const prof = profiles[profKey];
-                    Object.keys(prof.designs).forEach(desKey => {
-                        const des = prof.designs[desKey];
-                        if(Array.isArray(des)){
-                            // Migrate old array format to new canvas format
-                            prof.designs[desKey] = {
-                                canvas1: des.map(normalizeElement),
-                                canvas2: [],
-                                canvas2Enabled: false
-                            };
-                        } else if(!des.canvas1 || !des.canvas2){
-                            // Ensure both canvases exist
-                            prof.designs[desKey] = {
-                                canvas1: (des.canvas1 || []).map(normalizeElement),
-                                canvas2: (des.canvas2 || []).map(normalizeElement),
-                                canvas2Enabled: des.canvas2Enabled || false
-                            };
-                        }
-                    });
-                });
-                
-                loadCurrentDesign();
-                updateCanvasSize();
-                updateProfileSelector();
-                updateDesignSelector();
-                updateCanvasControls();
+                importedProfiles = parsed.profiles;
             }
             // Handle old format (v1) - migrate to new format
             else if(parsed && (parsed.data || Array.isArray(parsed) || parsed.layout)){
                 const oldData = parsed.data || (Array.isArray(parsed) ? parsed : parsed.layout);
-                // Migrate old layout to default profile/design, canvas1
-                profiles = {
+                importedProfiles = {
                     '8x5': {
                         width: 8,
                         height: 5,
@@ -1126,28 +1139,73 @@ document.addEventListener('DOMContentLoaded', ()=>{
                         }
                     }
                 };
-                currentProfile = '8x5';
-                currentDesign = 'default';
-                currentCanvas = 1;
-                loadCurrentDesign();
-                updateCanvasSize();
-                updateProfileSelector();
-                updateDesignSelector();
-                updateCanvasControls();
-                msg('Layout migrated to new format');
             }
             else {
                 throw new Error('Unknown layout structure');
             }
             
-            selectedIds = [];
-            render(); updateProps(); updateBtns();
+            if(!importedProfiles) return false;
+            
+            // Add imported elements to current canvas/design
+            // Save current design first
+            saveCurrentDesign();
+            
+            // Get current profile and design
+            const currentProf = profiles[currentProfile];
+            if(!currentProf) return false;
+            const currentDes = currentProf.designs[currentDesign];
+            if(!currentDes) return false;
+            
+            // Get the first profile and first design from imported data
+            const firstImportedProfKey = Object.keys(importedProfiles)[0];
+            if(!firstImportedProfKey) return false;
+            
+            const importedProf = importedProfiles[firstImportedProfKey];
+            const firstImportedDesKey = Object.keys(importedProf.designs)[0];
+            if(!firstImportedDesKey) return false;
+            
+            const importedDes = importedProf.designs[firstImportedDesKey];
+            
+            // Migrate old format if needed
+            let designData = importedDes;
+            if(Array.isArray(importedDes)){
+                designData = {
+                    canvas1: importedDes.map(normalizeElement),
+                    canvas2: [],
+                    canvas2Enabled: false
+                };
+            } else if(!importedDes.canvas1 || !importedDes.canvas2){
+                designData = {
+                    canvas1: (importedDes.canvas1 || []).map(normalizeElement),
+                    canvas2: (importedDes.canvas2 || []).map(normalizeElement),
+                    canvas2Enabled: importedDes.canvas2Enabled || false
+                };
+            }
+            
+            // Get the canvas data to import (use the same canvas number as current)
+            const importedCanvasData = designData[`canvas${currentCanvas}`] || [];
+            
+            // Add imported elements to current canvas
+            // Generate new IDs to avoid conflicts
+            const maxZ = S.length > 0 ? Math.max(...S.map(e => e.zIndex || 0)) : 0;
+            importedCanvasData.forEach((el, idx) => {
+                const newEl = deepCopy(normalizeElement(el));
+                newEl.id = `el_${Date.now()}_${idx}`;
+                newEl.zIndex = (maxZ + idx + 1);
+                S.push(newEl);
+            });
+            
+            // Save the updated design
+            saveCurrentDesign();
+            
+            render();
+            updateProps();
             resetHistory();
-            msg('Layout loaded successfully!');
+            msg(`Imported ${importedCanvasData.length} element(s) to current canvas!`);
             return true;
         }catch(e){
-            console.error('Parse error while loading layout:',e);
-            msg('Error loading layout: invalid JSON', true, 4000);
+            console.error('Parse error while importing layout:',e);
+            msg('Error importing layout: invalid JSON', true, 4000);
             return false;
         }
     }
@@ -1217,8 +1275,14 @@ document.addEventListener('DOMContentLoaded', ()=>{
                 d.style.height = `${el.height}cm`;
                 d.style.zIndex = el.zIndex || 0;
                 d.style.fontSize = `${el.props.fontSize || 16}px`;
-                d.style.fontWeight = el.props.fontWeight || 'normal';
+                const fontWeight = el.props.fontWeight;
+                if(typeof fontWeight === 'number'){
+                    d.style.fontWeight = fontWeight;
+                } else {
+                    d.style.fontWeight = fontWeight || 'normal';
+                }
                 d.style.fontFamily = el.props.fontFamily || 'Arial, sans-serif';
+                d.style.lineHeight = el.props.lineHeight !== undefined ? String(el.props.lineHeight) : '1.2';
                 const justifyMap = { left: 'flex-start', center: 'center', right: 'flex-end' };
                 const alignMap = { top: 'flex-start', middle: 'center', bottom: 'flex-end' };
                 if(el.type !== 'line'){
@@ -1528,13 +1592,13 @@ document.addEventListener('DOMContentLoaded', ()=>{
             render();
             updateProps();
             updateBtns();
-            save();
+            saveCurrentDesign();
             e.preventDefault();
             return;
         }
 
         if(drag || resizeMode){
-            save();
+            saveCurrentDesign();
         }
         drag = false; resizeMode = false; ctx = {};
     });
@@ -1569,7 +1633,7 @@ document.addEventListener('DOMContentLoaded', ()=>{
                             case 'ArrowRight': el.x = Math.min(W - el.width, el.x + step); break;
                         }
                     });
-                    render(); updateProps(); save();
+                    render(); updateProps(); saveCurrentDesign();
                 }
             }
         }
@@ -1624,15 +1688,20 @@ document.addEventListener('DOMContentLoaded', ()=>{
                 if(keyPath.includes('.')){
                     const [o,k] = keyPath.split('.');
                     if(!el[o]) el[o] = {};
-                    if(['fontSize','decimals','thickness','borderWidth','rotation','paddingTop','paddingRight','paddingBottom','paddingLeft','x','y','width','height'].includes(k)) el[o][k] = Number(value);
+                    if(['fontSize','lineHeight','decimals','thickness','borderWidth','rotation','paddingTop','paddingRight','paddingBottom','paddingLeft','x','y','width','height'].includes(k)) el[o][k] = Number(value);
                     else if(['showBorder','displayValue','asPercent'].includes(k)) el[o][k] = !!value;
+                    else if(k === 'fontWeight'){
+                        // Handle fontWeight: can be number (100-900) or string ('normal', 'bold')
+                        const numVal = Number(value);
+                        el[o][k] = (!isNaN(numVal) && numVal >= 100 && numVal <= 900) ? numVal : value;
+                    }
                     else el[o][k] = value;
                 } else {
                     if(['x','y','width','height','zIndex'].includes(keyPath)) el[keyPath] = Number(value);
                     else el[keyPath] = value;
                 }
             });
-            render(); updateProps(); save();
+            render(); updateProps(); saveCurrentDesign();
             return;
         }
 
@@ -1646,6 +1715,11 @@ document.addEventListener('DOMContentLoaded', ()=>{
                 if(!el[o]) el[o] = {};
                 if(['fontSize','decimals','thickness','borderWidth','rotation','paddingTop','paddingRight','paddingBottom','paddingLeft','x','y','width','height'].includes(k)) el[o][k] = Number(v);
                 else if(['showBorder','displayValue','asPercent'].includes(k)) el[o][k] = !!v;
+                else if(k === 'fontWeight'){
+                    // Handle fontWeight: can be number (100-900) or string ('normal', 'bold')
+                    const numVal = Number(v);
+                    el[o][k] = (!isNaN(numVal) && numVal >= 100 && numVal <= 900) ? numVal : v;
+                }
                 else el[o][k] = v;
             } else {
                 if(['x','y','width','height','zIndex'].includes(p)) el[p] = Number(v);
@@ -1666,7 +1740,7 @@ document.addEventListener('DOMContentLoaded', ()=>{
         }
         render(); 
         saveCurrentDesign(); 
-        save();
+        saveCurrentDesign();
     });
 
     pp.addEventListener('click', (e)=>{
@@ -1676,11 +1750,6 @@ document.addEventListener('DOMContentLoaded', ()=>{
     });
 
     // ---------- Buttons ----------
-    document.getElementById('btn-save').addEventListener('click', ()=> save());
-    document.getElementById('btn-load').addEventListener('click', async ()=>{
-        const ok = await load();
-        if(!ok){ fileInput.value = ''; fileInput.click(); }
-    });
     document.getElementById('btn-print').addEventListener('click', ()=>{
         printBothCanvases();
     });
@@ -1690,7 +1759,7 @@ document.addEventListener('DOMContentLoaded', ()=>{
             S=[]; selectedIds=[];
             render(); updateProps(); updateBtns();
             saveCurrentDesign();
-            save();
+            saveCurrentDesign();
         }
     });
     bd.addEventListener('click', dupSelected);
@@ -1708,11 +1777,11 @@ document.addEventListener('DOMContentLoaded', ()=>{
     // Profile/Design management
     profileSelector.addEventListener('change', (e)=>{
         switchProfile(e.target.value);
-        save();
+        saveCurrentDesign();
     });
     designSelector.addEventListener('change', (e)=>{
         switchDesign(e.target.value);
-        save();
+        saveCurrentDesign();
     });
     btnAddProfile.addEventListener('click', ()=>{
         addProfile();
@@ -1728,7 +1797,7 @@ document.addEventListener('DOMContentLoaded', ()=>{
     });
     canvasSelector.addEventListener('change', (e)=>{
         switchCanvas(parseInt(e.target.value));
-        save();
+        saveCurrentDesign();
     });
     canvas2Enabled.addEventListener('change', (e)=>{
         toggleCanvas2(e.target.checked);
@@ -1737,7 +1806,7 @@ document.addEventListener('DOMContentLoaded', ()=>{
         const f = ev.target.files && ev.target.files[0];
         if(!f) return;
         const reader = new FileReader();
-        reader.onload = function(e){ load(e.target.result); };
+        reader.onload = function(e){ importFromFile(e.target.result); };
         reader.readAsText(f);
     });
 
@@ -1764,22 +1833,13 @@ document.addEventListener('DOMContentLoaded', ()=>{
         }catch(e){}
     } else { R = {}; C = []; }
 
-    // ---------- Initial load & history init ----------
+    // ---------- Initial setup & history init ----------
     // Initialize canvas size immediately
     updateCanvasSize();
     updateProfileSelector();
     updateDesignSelector();
     updateCanvasControls();
-    
-    setTimeout(()=>{ 
-        load().then(()=> {
-            updateCanvasSize();
-            updateProfileSelector();
-            updateDesignSelector();
-            updateCanvasControls();
-            fit();
-        }); 
-    }, 120);
+    fit();
     resetHistory();
 
 }); // DOMContentLoaded
