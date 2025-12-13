@@ -21,6 +21,10 @@
         #toolbar .divider{width:1px;height:24px;background:#e0e0e0;margin:0 4px}
         #main-content{display:flex;flex-grow:1;overflow:hidden}
         #sidebar{width:320px;flex-shrink:0;background:#fdfdfd;border-right:1px solid #e0e0e0;padding:12px;overflow-y:auto;display:flex;flex-direction:column;gap:16px}
+        .profile-section{background:#f5f5f5;padding:10px;border-radius:6px;border:1px solid #e0e0e0}
+        .profile-section select{margin-bottom:8px}
+        .profile-section .button-row{display:flex;gap:4px;margin-top:8px}
+        .profile-section .button-row button{flex:1;font-size:12px;padding:4px 8px}
         #sidebar h3{font-size:16px;font-weight:600;border-bottom:1px solid #eee;padding-bottom:6px;margin-bottom:4px}
         .sidebar-section{display:flex;flex-direction:column;gap:8px}
         .sidebar-section .add-buttons{display:grid;grid-template-columns:1fr 1fr;gap:8px}
@@ -33,10 +37,10 @@
         .button-group{display:flex;gap:4px}
         #canvas-container{flex-grow:1;display:flex;justify-content:center;align-items:center;overflow:auto;background:#e0e0e0;padding:20px;position:relative}
         #canvas-wrapper{display:inline-block;transform-origin:center center;position:relative}
-        #label-canvas{width:8cm;height:5cm;background:#fff;box-shadow:0 4px 12px rgba(0,0,0,.15);position:relative;overflow:hidden}
+        #label-canvas{background:#fff;box-shadow:0 4px 12px rgba(0,0,0,.15);position:relative;overflow:hidden}
         #marquee{position:absolute;border:1px dashed #007aff;background:rgba(0,122,255,0.08);pointer-events:none;display:none;z-index:9999}
         @media print{
-            @page{size:8cm 5cm;margin:0}
+            @page{margin:0}
             html,body{margin:0!important;padding:0!important;width:8cm!important;height:5cm!important;overflow:visible!important;background:#fff!important}
             #toolbar,#sidebar,#marquee,.status-message{display:none!important}
             #main-content{width:8cm!important;height:5cm!important;overflow:visible!important;display:block!important;padding:0!important;margin:0!important}
@@ -79,6 +83,26 @@
 
     <div id="main-content">
         <div id="sidebar">
+            <div class="sidebar-section profile-section">
+                <h3>Label Profile</h3>
+                <label>Size:</label>
+                <select id="profile-selector">
+                    <option value="8x5">8 × 5 cm</option>
+                </select>
+                <label>Design:</label>
+                <select id="design-selector">
+                    <option value="default">Default</option>
+                </select>
+                <div class="button-row">
+                    <button id="btn-add-profile">➕ Add Size</button>
+                    <button id="btn-add-design">➕ Add Design</button>
+                </div>
+                <div class="button-row">
+                    <button id="btn-remove-profile" style="background:#fbebeb;border-color:#d9a0a0;color:#c00">🗑️ Remove Size</button>
+                    <button id="btn-remove-design" style="background:#fbebeb;border-color:#d9a0a0;color:#c00">🗑️ Remove Design</button>
+                </div>
+            </div>
+            <hr>
             <div class="sidebar-section">
                 <h3>Add Element</h3>
                 <div class="add-buttons">
@@ -125,13 +149,29 @@ document.addEventListener('DOMContentLoaded', ()=>{
     let z = 1;
     let R = {}, C = [];
     let drag = false, resizeMode = false, ctx = {};
-    const W = 8, H = 5;
-    const KEY = 'grist_label_layout_v1';
+    let W = 8, H = 5;                 // Current dimensions (dynamic)
+    const KEY = 'grist_label_layout_v2'; // Updated version for profiles
     const MAX_HISTORY = 100;
+    
+    // Profile management
+    let profiles = {
+        '8x5': {
+            width: 8,
+            height: 5,
+            designs: {
+                'default': []
+            }
+        }
+    };
+    let currentProfile = '8x5';
+    let currentDesign = 'default';
 
     // History stacks for undo/redo
     let history = [];
     let historyIndex = -1;
+
+    // Search debounce timer
+    let searchDebounceTimer = null;
 
     // DOM refs
     const cc = document.getElementById('canvas-container');
@@ -146,6 +186,12 @@ document.addEventListener('DOMContentLoaded', ()=>{
     const btnExport = document.getElementById('btn-export');
     const btnImport = document.getElementById('btn-import');
     const marquee = document.getElementById('marquee');
+    const profileSelector = document.getElementById('profile-selector');
+    const designSelector = document.getElementById('design-selector');
+    const btnAddProfile = document.getElementById('btn-add-profile');
+    const btnAddDesign = document.getElementById('btn-add-design');
+    const btnRemoveProfile = document.getElementById('btn-remove-profile');
+    const btnRemoveDesign = document.getElementById('btn-remove-design');
 
     // Marquee state
     let marqueeActive = false;
@@ -161,6 +207,175 @@ document.addEventListener('DOMContentLoaded', ()=>{
     function isGristAvailable(){ return (typeof window.grist !== 'undefined' && window.grist && typeof window.grist.getOption === 'function' && typeof window.grist.setOption === 'function'); }
 
     function deepCopy(obj){ return JSON.parse(JSON.stringify(obj)); }
+
+    // ---------- Profile Management ----------
+    function updateCanvasSize(){
+        const profile = profiles[currentProfile];
+        if(!profile) return;
+        W = profile.width;
+        H = profile.height;
+        lc.style.width = `${W}cm`;
+        lc.style.height = `${H}cm`;
+        updatePrintCSS();
+        fit();
+    }
+
+    function updatePrintCSS(){
+        const styleId = 'dynamic-print-css';
+        let styleEl = document.getElementById(styleId);
+        if(!styleEl){
+            styleEl = document.createElement('style');
+            styleEl.id = styleId;
+            document.head.appendChild(styleEl);
+        }
+        const profile = profiles[currentProfile];
+        if(profile){
+            styleEl.textContent = `
+                @media print{
+                    @page{size:${profile.width}cm ${profile.height}cm;margin:0}
+                    html,body{margin:0!important;padding:0!important;width:${profile.width}cm!important;height:${profile.height}cm!important;overflow:visible!important;background:#fff!important}
+                    #toolbar,#sidebar,#marquee,.status-message{display:none!important}
+                    #main-content{width:${profile.width}cm!important;height:${profile.height}cm!important;overflow:visible!important;display:block!important;padding:0!important;margin:0!important}
+                    #canvas-container{width:${profile.width}cm!important;height:${profile.height}cm!important;padding:0!important;margin:0!important;overflow:visible!important;background:#fff!important;display:block!important;position:static!important}
+                    #canvas-wrapper{position:static!important;width:${profile.width}cm!important;height:${profile.height}cm!important;margin:0!important;padding:0!important;transform:none!important;display:block!important}
+                    #label-canvas{position:static!important;width:${profile.width}cm!important;height:${profile.height}cm!important;transform:none!important;box-shadow:none!important;display:block!important;overflow:visible!important;background:#fff!important}
+                    .label-element{page-break-inside:avoid!important}
+                    .label-element.selected{border:1px solid transparent!important;box-shadow:none!important}
+                    .resize-handle{display:none!important}
+                }
+            `;
+        }
+    }
+
+    function updateProfileSelector(){
+        profileSelector.innerHTML = Object.keys(profiles).map(key => {
+            const p = profiles[key];
+            return `<option value="${key}" ${key===currentProfile?'selected':''}>${p.width} × ${p.height} cm</option>`;
+        }).join('');
+    }
+
+    function updateDesignSelector(){
+        const profile = profiles[currentProfile];
+        if(!profile) return;
+        designSelector.innerHTML = Object.keys(profile.designs).map(key => {
+            return `<option value="${key}" ${key===currentDesign?'selected':''}>${key}</option>`;
+        }).join('');
+    }
+
+    function switchProfile(profileKey){
+        if(!profiles[profileKey]) return;
+        // Save current design before switching
+        saveCurrentDesign();
+        // Switch profile
+        currentProfile = profileKey;
+        // Switch to first design in new profile
+        currentDesign = Object.keys(profiles[profileKey].designs)[0] || 'default';
+        // Load the design
+        loadCurrentDesign();
+        updateCanvasSize();
+        updateProfileSelector();
+        updateDesignSelector();
+        render();
+        updateProps();
+    }
+
+    function switchDesign(designKey){
+        const profile = profiles[currentProfile];
+        if(!profile || !profile.designs[designKey]) return;
+        // Save current design before switching
+        saveCurrentDesign();
+        // Switch design
+        currentDesign = designKey;
+        // Load the new design
+        loadCurrentDesign();
+        updateDesignSelector();
+        render();
+        updateProps();
+    }
+
+    function saveCurrentDesign(){
+        const profile = profiles[currentProfile];
+        if(!profile) return;
+        if(!profile.designs[currentDesign]) profile.designs[currentDesign] = [];
+        profile.designs[currentDesign] = deepCopy(S);
+    }
+
+    function loadCurrentDesign(){
+        const profile = profiles[currentProfile];
+        if(!profile) return;
+        if(!profile.designs[currentDesign]) profile.designs[currentDesign] = [];
+        S = profile.designs[currentDesign].map(normalizeElement);
+        selectedIds = [];
+    }
+
+    function addProfile(){
+        const width = prompt('Enter label width (cm):', '10');
+        if(!width || isNaN(parseFloat(width))) return;
+        const height = prompt('Enter label height (cm):', '7.5');
+        if(!height || isNaN(parseFloat(height))) return;
+        const w = parseFloat(width);
+        const h = parseFloat(height);
+        if(w <= 0 || h <= 0) { msg('Invalid dimensions', true); return; }
+        const key = `${w}x${h}`;
+        if(profiles[key]) { msg('Profile already exists', true); return; }
+        // Save current before switching
+        saveCurrentDesign();
+        // Create new profile
+        profiles[key] = {
+            width: w,
+            height: h,
+            designs: {
+                'default': []
+            }
+        };
+        switchProfile(key);
+        msg(`Profile ${w} × ${h} cm added`);
+        save();
+    }
+
+    function removeProfile(){
+        if(Object.keys(profiles).length <= 1){
+            msg('Cannot remove the last profile', true);
+            return;
+        }
+        if(!confirm(`Remove profile ${currentProfile}? All designs in this profile will be lost.`)) return;
+        delete profiles[currentProfile];
+        // Switch to first available profile
+        const firstKey = Object.keys(profiles)[0];
+        switchProfile(firstKey);
+        msg('Profile removed');
+        save();
+    }
+
+    function addDesign(){
+        const name = prompt('Enter design name:', 'Design ' + (Object.keys(profiles[currentProfile].designs).length + 1));
+        if(!name || !name.trim()) return;
+        const designKey = name.trim();
+        const profile = profiles[currentProfile];
+        if(profile.designs[designKey]) { msg('Design already exists', true); return; }
+        // Save current before switching
+        saveCurrentDesign();
+        // Create new empty design
+        profile.designs[designKey] = [];
+        switchDesign(designKey);
+        msg(`Design "${designKey}" added`);
+        save();
+    }
+
+    function removeDesign(){
+        const profile = profiles[currentProfile];
+        if(Object.keys(profile.designs).length <= 1){
+            msg('Cannot remove the last design', true);
+            return;
+        }
+        if(!confirm(`Remove design "${currentDesign}"?`)) return;
+        delete profile.designs[currentDesign];
+        // Switch to first available design
+        const firstKey = Object.keys(profile.designs)[0];
+        switchDesign(firstKey);
+        msg('Design removed');
+        save();
+    }
 
     // ---------- History (undo/redo) ----------
     function pushHistorySnapshot(){
@@ -556,6 +771,83 @@ document.addEventListener('DOMContentLoaded', ()=>{
 
     function escapeHtml(str){ if(str===null||str===undefined) return ''; return String(str).replaceAll('&','&amp;').replaceAll('<','&lt;').replaceAll('>','&gt;').replaceAll('"','&quot;'); }
 
+    // ---------- Improved column search ----------
+    function searchColumns(query, columns){
+        if(!query || !query.trim()) return columns.map(col => ({ col, score: 0 }));
+        const q = query.toLowerCase().trim();
+        const queryWords = q.split(/\s+/).filter(w => w.length > 0);
+        
+        return columns.map(col => {
+            const colLower = col.toLowerCase();
+            let score = 0;
+            
+            // Exact match (highest priority)
+            if(colLower === q){
+                score = 1000;
+            }
+            // Starts with query
+            else if(colLower.startsWith(q)){
+                score = 500;
+            }
+            // Contains query as whole substring
+            else if(colLower.includes(q)){
+                score = 300;
+            }
+            // All query words present in order (multi-word search)
+            else if(queryWords.length > 1){
+                const allWordsPresent = queryWords.every(word => colLower.includes(word));
+                if(allWordsPresent){
+                    // Check if words appear in order (bonus points)
+                    let lastIndex = -1;
+                    let inOrder = true;
+                    for(const word of queryWords){
+                        const idx = colLower.indexOf(word, lastIndex + 1);
+                        if(idx === -1){
+                            inOrder = false;
+                            break;
+                        }
+                        lastIndex = idx;
+                    }
+                    score = inOrder ? 250 : 200;
+                }
+            }
+            // Single word: check if it matches word boundaries or parts
+            else if(queryWords.length === 1){
+                const word = queryWords[0];
+                // Check word boundary matches (e.g., "name" matches "full_name" or "name_field")
+                const wordBoundaryRegex = new RegExp(`\\b${word.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}`, 'i');
+                if(wordBoundaryRegex.test(col)){
+                    score = 400;
+                }
+                // Check if word appears as part of another word
+                else if(colLower.includes(word)){
+                    score = 150;
+                }
+            }
+            
+            // Fuzzy matching: check if all characters of query appear in order in column name
+            if(score === 0){
+                let queryIdx = 0;
+                for(let i = 0; i < colLower.length && queryIdx < q.length; i++){
+                    if(colLower[i] === q[queryIdx]){
+                        queryIdx++;
+                    }
+                }
+                if(queryIdx === q.length){
+                    score = 50; // All characters found in order
+                }
+            }
+            
+            return { col, score };
+        })
+        .filter(result => result.score > 0)
+        .sort((a, b) => {
+            // Sort by score (descending), then alphabetically for same score
+            if(b.score !== a.score) return b.score - a.score;
+            return a.col.localeCompare(b.col);
+        });
+    }
+
     // ---------- Element operations (multi-aware) ----------
     function pushBeforeChange(){ pushHistorySnapshot(); }
     function pushAfterChange(){ /* placeholder */ }
@@ -582,6 +874,7 @@ document.addEventListener('DOMContentLoaded', ()=>{
         S.push(n);
         setSelection([n.id]);
         pushAfterChange();
+        saveCurrentDesign();
         save();
     }
 
@@ -603,6 +896,7 @@ document.addEventListener('DOMContentLoaded', ()=>{
         });
         setSelection(newIds);
         pushAfterChange();
+        saveCurrentDesign();
         save();
     }
 
@@ -614,7 +908,7 @@ document.addEventListener('DOMContentLoaded', ()=>{
             const el = S.find(e=>e.id===id);
             if(el){ mz++; el.zIndex = mz; }
         });
-        render(); save(); pushAfterChange();
+        render(); saveCurrentDesign(); save(); pushAfterChange();
     }
 
     function sendToBack(){
@@ -625,7 +919,7 @@ document.addEventListener('DOMContentLoaded', ()=>{
             const el = S.find(e=>e.id===id);
             if(el){ el.zIndex = mn - (idx+1); }
         });
-        render(); save(); pushAfterChange();
+        render(); saveCurrentDesign(); save(); pushAfterChange();
     }
 
     function deleteSelected(){
@@ -635,12 +929,21 @@ document.addEventListener('DOMContentLoaded', ()=>{
         selectedIds = [];
         render(); updateProps(); updateBtns();
         pushAfterChange();
+        saveCurrentDesign();
         save();
     }
 
     // ---------- Save / Load ----------
     async function save(){
-        const payloadObj = { version:1, timestamp: Date.now(), data: S };
+        // Save current design before saving all profiles
+        saveCurrentDesign();
+        const payloadObj = { 
+            version: 2, 
+            timestamp: Date.now(), 
+            profiles: profiles,
+            currentProfile: currentProfile,
+            currentDesign: currentDesign
+        };
         const payload = JSON.stringify(payloadObj);
         try{ localStorage.setItem(KEY, payload); } catch(e){ console.warn('localStorage.setItem failed:',e) }
         if(isGristAvailable()){
@@ -658,13 +961,61 @@ document.addEventListener('DOMContentLoaded', ()=>{
         if(!raw){
             try{ raw = localStorage.getItem(KEY); }catch(e){ console.warn("localStorage.getItem failed:",e); raw=null; }
         }
-        if(!raw){ msg('No saved layout found. Use Import or create elements.'); return false; }
+        if(!raw){ 
+            // Try loading old format
+            try{ raw = localStorage.getItem('grist_label_layout_v1'); }catch(e){}
+            if(!raw){
+                msg('No saved layout found. Use Import or create elements.'); 
+                return false; 
+            }
+        }
         try{
             let parsed = JSON.parse(raw);
-            if(parsed && parsed.data && Array.isArray(parsed.data)) S = parsed.data.map(normalizeElement);
-            else if(Array.isArray(parsed)) S = parsed.map(normalizeElement);
-            else if(parsed && parsed.layout && Array.isArray(parsed.layout)) S = parsed.layout.map(normalizeElement);
-            else throw new Error('Unknown layout structure');
+            
+            // Handle new format (v2) with profiles
+            if(parsed && parsed.version === 2 && parsed.profiles){
+                profiles = parsed.profiles;
+                currentProfile = parsed.currentProfile || Object.keys(profiles)[0] || '8x5';
+                currentDesign = parsed.currentDesign || 'default';
+                
+                // Ensure current profile/design exist
+                if(!profiles[currentProfile]){
+                    currentProfile = Object.keys(profiles)[0] || '8x5';
+                }
+                if(!profiles[currentProfile].designs[currentDesign]){
+                    currentDesign = Object.keys(profiles[currentProfile].designs)[0] || 'default';
+                }
+                
+                loadCurrentDesign();
+                updateCanvasSize();
+                updateProfileSelector();
+                updateDesignSelector();
+            }
+            // Handle old format (v1) - migrate to new format
+            else if(parsed && (parsed.data || Array.isArray(parsed) || parsed.layout)){
+                const oldData = parsed.data || (Array.isArray(parsed) ? parsed : parsed.layout);
+                // Migrate old layout to default profile/design
+                profiles = {
+                    '8x5': {
+                        width: 8,
+                        height: 5,
+                        designs: {
+                            'default': oldData.map(normalizeElement)
+                        }
+                    }
+                };
+                currentProfile = '8x5';
+                currentDesign = 'default';
+                loadCurrentDesign();
+                updateCanvasSize();
+                updateProfileSelector();
+                updateDesignSelector();
+                msg('Layout migrated to new format');
+            }
+            else {
+                throw new Error('Unknown layout structure');
+            }
+            
             selectedIds = [];
             render(); updateProps(); updateBtns();
             resetHistory();
@@ -678,7 +1029,14 @@ document.addEventListener('DOMContentLoaded', ()=>{
     }
 
     function exportToFile(){
-        const payloadObj = { version:1, timestamp:Date.now(), data: S };
+        saveCurrentDesign();
+        const payloadObj = { 
+            version: 2, 
+            timestamp: Date.now(), 
+            profiles: profiles,
+            currentProfile: currentProfile,
+            currentDesign: currentDesign
+        };
         const blob = new Blob([JSON.stringify(payloadObj,null,2)], { type:'application/json' });
         const url = URL.createObjectURL(blob);
         const a = document.createElement('a'); a.href = url; a.download = 'label-layout.json';
@@ -905,10 +1263,28 @@ document.addEventListener('DOMContentLoaded', ()=>{
 
         // Handle bound column search input
         if(prop === 'bind_search'){
-            const query = String(target.value || '').toLowerCase();
+            // Clear previous debounce timer
+            if(searchDebounceTimer) clearTimeout(searchDebounceTimer);
+            
+            const query = String(target.value || '').trim();
             const select = pp.querySelector('select[data-prop="props.boundColumn"]');
             if(!select) return;
-            select.innerHTML = `<option value="">-- Select Column --</option>${C.filter(col => col.toLowerCase().includes(query)).map(col => `<option value="${col}" ${select.value===col?'selected':''}>${col}</option>`).join('')}`;
+            
+            // Debounce search for better performance
+            searchDebounceTimer = setTimeout(() => {
+                if(!query){
+                    // No query - show all columns
+                    select.innerHTML = `<option value="">-- Select Column --</option>${C.map(col => `<option value="${col}" ${select.value===col?'selected':''}>${col}</option>`).join('')}`;
+                } else {
+                    // Use improved search
+                    const results = searchColumns(query, C);
+                    if(results.length === 0){
+                        select.innerHTML = `<option value="">-- No matches found --</option>`;
+                    } else {
+                        select.innerHTML = `<option value="">-- Select Column (${results.length} found) --</option>${results.map(({col}) => `<option value="${col}" ${select.value===col?'selected':''}>${col}</option>`).join('')}`;
+                    }
+                }
+            }, 150); // 150ms debounce
             return;
         }
 
@@ -962,7 +1338,10 @@ document.addEventListener('DOMContentLoaded', ()=>{
             const el = S.find(s=>s.id===id);
             if(el) applyPropToElement(el, prop, parsedValue);
         }
-        render(); save(); pushAfterChange();
+        render(); 
+        saveCurrentDesign(); 
+        save(); 
+        pushAfterChange();
     });
 
     pp.addEventListener('click', (e)=>{
@@ -989,6 +1368,7 @@ document.addEventListener('DOMContentLoaded', ()=>{
             S=[]; selectedIds=[];
             render(); updateProps(); updateBtns();
             pushAfterChange();
+            saveCurrentDesign();
             save();
         }
     });
@@ -1003,6 +1383,28 @@ document.addEventListener('DOMContentLoaded', ()=>{
 
     btnExport.addEventListener('click', ()=>{ exportToFile(); msg('Layout exported to file.'); });
     btnImport.addEventListener('click', ()=>{ fileInput.value=''; fileInput.click(); });
+
+    // Profile/Design management
+    profileSelector.addEventListener('change', (e)=>{
+        switchProfile(e.target.value);
+        save();
+    });
+    designSelector.addEventListener('change', (e)=>{
+        switchDesign(e.target.value);
+        save();
+    });
+    btnAddProfile.addEventListener('click', ()=>{
+        addProfile();
+    });
+    btnAddDesign.addEventListener('click', ()=>{
+        addDesign();
+    });
+    btnRemoveProfile.addEventListener('click', ()=>{
+        removeProfile();
+    });
+    btnRemoveDesign.addEventListener('click', ()=>{
+        removeDesign();
+    });
     fileInput.addEventListener('change', (ev)=>{
         const f = ev.target.files && ev.target.files[0];
         if(!f) return;
@@ -1035,7 +1437,19 @@ document.addEventListener('DOMContentLoaded', ()=>{
     } else { R = {}; C = []; }
 
     // ---------- Initial load & history init ----------
-    setTimeout(()=>{ load().then(()=> fit()); }, 120);
+    // Initialize canvas size immediately
+    updateCanvasSize();
+    updateProfileSelector();
+    updateDesignSelector();
+    
+    setTimeout(()=>{ 
+        load().then(()=> {
+            updateCanvasSize();
+            updateProfileSelector();
+            updateDesignSelector();
+            fit();
+        }); 
+    }, 120);
     resetHistory();
 
 }); // DOMContentLoaded
