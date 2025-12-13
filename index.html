@@ -54,6 +54,8 @@
         <div class="divider"></div>
         <button id="btn-print" title="Print Label">🖨️ Print</button>
         <div class="divider"></div>
+        <button id="btn-rotate-canvas" title="Rotate Canvas 90° (temporary, not for print)">🔄 Rotate</button>
+        <div class="divider"></div>
         <button id="btn-duplicate" title="Duplicate Selected Elements" disabled>📋 Duplicate</button>
         <button id="btn-bring-front" title="Bring to Front" disabled>⬆️ Front</button>
         <button id="btn-send-back" title="Send to Back" disabled>⬇️ Back</button>
@@ -93,6 +95,7 @@
                 <div class="add-buttons">
                     <button class="add-element" data-type="text">📝 Text</button>
                     <button class="add-element" data-type="data">🔗 Data Field</button>
+                    <button class="add-element" data-type="image">🖼️ Image</button>
                     <button class="add-element" data-type="qr">📱 QR Code</button>
                     <button class="add-element" data-type="barcode">📊 Barcode</button>
                     <button class="add-element" data-type="line">➖ Line</button>
@@ -147,6 +150,7 @@ document.addEventListener('DOMContentLoaded', ()=>{
     let z = 1;
     let R = {}, C = [];
     let drag = false, resizeMode = false, ctx = {};
+    let canvasRotation = 0;           // temporary canvas rotation (0, 90, 180, 270 degrees)
     let W = 8, H = 5;                 // Current dimensions (dynamic)
     const KEY = 'grist_label_layout_v2'; // Updated version for profiles
     const MAX_HISTORY = 100;
@@ -697,6 +701,66 @@ document.addEventListener('DOMContentLoaded', ()=>{
                     }
                     break;
                 }
+                case 'image': {
+                    const img = document.createElement('img');
+                    img.style.pointerEvents='none';
+                    img.style.width='100%';
+                    img.style.height='100%';
+                    img.style.objectFit = el.props.objectFit || 'contain';
+                    
+                    // Build Imgur URL from Grist column value
+                    let imageUrl = '';
+                    if(el.props.boundColumn && R && Object.prototype.hasOwnProperty.call(R, el.props.boundColumn)){
+                        const imgurId = R[el.props.boundColumn];
+                        if(imgurId){
+                            const id = String(imgurId).trim();
+                            if(id){
+                                // Construct Imgur URL: https://i.imgur.com/{id}.jpg
+                                // If the value already contains http/https, use it as-is
+                                if(id.startsWith('http://') || id.startsWith('https://')){
+                                    imageUrl = id;
+                                } else {
+                                    // Remove any existing extension and add .jpg
+                                    const cleanId = id.replace(/\.(jpg|jpeg|png|gif|webp)$/i, '');
+                                    imageUrl = `https://i.imgur.com/${cleanId}.jpg`;
+                                }
+                            }
+                        }
+                    }
+                    
+                    if(imageUrl){
+                        img.src = imageUrl;
+                        img.onerror = function(){
+                            img.style.display = 'none';
+                            const errorDiv = document.createElement('div');
+                            errorDiv.style.width = '100%';
+                            errorDiv.style.height = '100%';
+                            errorDiv.style.display = 'flex';
+                            errorDiv.style.alignItems = 'center';
+                            errorDiv.style.justifyContent = 'center';
+                            errorDiv.style.color = '#999';
+                            errorDiv.style.fontSize = '12px';
+                            errorDiv.textContent = 'Image not found';
+                            d.appendChild(errorDiv);
+                        };
+                    } else {
+                        // Show placeholder when no image
+                        img.style.display = 'none';
+                        const placeholder = document.createElement('div');
+                        placeholder.style.width = '100%';
+                        placeholder.style.height = '100%';
+                        placeholder.style.display = 'flex';
+                        placeholder.style.alignItems = 'center';
+                        placeholder.style.justifyContent = 'center';
+                        placeholder.style.color = '#ccc';
+                        placeholder.style.fontSize = '12px';
+                        placeholder.style.border = '1px dashed #ccc';
+                        placeholder.textContent = 'No image';
+                        d.appendChild(placeholder);
+                    }
+                    d.appendChild(img);
+                    break;
+                }
                 default:
                     d.innerText = el.props.text || '';
             }
@@ -797,7 +861,7 @@ document.addEventListener('DOMContentLoaded', ()=>{
 
         if(el.type==='text') h += `<label>Text</label><textarea data-prop="props.text">${escapeHtml(el.props.text||'')}</textarea>`;
 
-        if(el.type==='data' || el.type==='qr' || el.type==='barcode'){
+        if(el.type==='data' || el.type==='qr' || el.type==='barcode' || el.type==='image'){
             h += `<label>Bound Column</label>${bindHtml}`;
         }
 
@@ -821,6 +885,10 @@ document.addEventListener('DOMContentLoaded', ()=>{
 
         if(el.type==='box'){
             h += `<label>Border (px)</label><input type="number" data-prop="props.thickness" value="${el.props.thickness||2}" min="1"><label>Fill Color</label><input type="color" data-prop="props.fillColor" value="${el.props.fillColor||'#ffffff'}">`;
+        }
+
+        if(el.type==='image'){
+            h += `<hr><label>Object Fit</label><select data-prop="props.objectFit"><option value="contain" ${(el.props.objectFit||'contain')==='contain'?'selected':''}>Contain</option><option value="cover" ${el.props.objectFit==='cover'?'selected':''}>Cover</option><option value="fill" ${el.props.objectFit==='fill'?'selected':''}>Fill</option><option value="none" ${el.props.objectFit==='none'?'selected':''}>None</option><option value="scale-down" ${el.props.objectFit==='scale-down'?'selected':''}>Scale Down</option></select>`;
         }
 
         if(el.type==='text' || el.type==='data'){
@@ -1047,13 +1115,14 @@ document.addEventListener('DOMContentLoaded', ()=>{
                 rotation:0,showBorder:false,borderColor:'#000',borderWidth:1,
                 paddingTop:0,paddingRight:0,paddingBottom:0,paddingLeft:0,
                 thickness:2,format:'CODE128',displayValue:true,fillColor:'#fff',decimals:2,asPercent:false,
-                lineHeight:1.2
+                lineHeight:1.2,objectFit:'contain'
             }
         };
         if(type==='qr'){ n.width=1;n.height=1 }
         if(type==='barcode'){ n.width=2;n.height=.8 }
         if(type==='line'){ n.height=.02;n.width=2 }
         if(type==='box'){ n.width=1.5;n.height=1 }
+        if(type==='image'){ n.width=2;n.height=2; n.props.objectFit='contain' }
         S.push(n);
         setSelection([n.id]);
         saveCurrentDesign();
@@ -1435,26 +1504,40 @@ document.addEventListener('DOMContentLoaded', ()=>{
     }
 
     // ---------- Mouse interactions: marquee, selection, drag, resize ----------
+    // Allow starting marquee selection from outside the canvas
+    function startMarqueeSelection(e){
+        // start marquee - compute coordinates relative to canvas-container (so zoom & transform do not misplace)
+        const containerRect = cc.getBoundingClientRect();
+        marqueeActive = true;
+        marqueeStart.clientX = e.clientX;
+        marqueeStart.clientY = e.clientY;
+        // startX/startY in pixels relative to container
+        marqueeStart.startX = e.clientX - containerRect.left;
+        marqueeStart.startY = e.clientY - containerRect.top;
+        marqueeStart.containerRect = containerRect;
+        marquee.style.display = 'block';
+        marquee.style.left = `${marqueeStart.startX}px`;
+        marquee.style.top = `${marqueeStart.startY}px`;
+        marquee.style.width = '0px';
+        marquee.style.height = '0px';
+        e.preventDefault();
+    }
+
+    // Listen for mousedown on canvas-container (allows starting from outside canvas)
+    cc.addEventListener('mousedown', (e)=>{
+        const t = e.target;
+        // If clicking on the background (container or canvas), start marquee selection
+        if(t === cc || t === lc){
+            startMarqueeSelection(e);
+            return;
+        }
+    });
+
     lc.addEventListener('mousedown', (e)=>{
         const t = e.target;
         // If clicking on the background of label-canvas, start marquee selection
         if(t === lc){
-            // start marquee - compute coordinates relative to canvas-container (so zoom & transform do not misplace)
-            const containerRect = cc.getBoundingClientRect();
-            marqueeActive = true;
-            marqueeStart.clientX = e.clientX;
-            marqueeStart.clientY = e.clientY;
-            // startX/startY in pixels relative to container
-            marqueeStart.startX = e.clientX - containerRect.left;
-            marqueeStart.startY = e.clientY - containerRect.top;
-            marqueeStart.containerRect = containerRect;
-            marquee.style.display = 'block';
-            marquee.style.left = `${marqueeStart.startX}px`;
-            marquee.style.top = `${marqueeStart.startY}px`;
-            marquee.style.width = '0px';
-            marquee.style.height = '0px';
-            // do not immediately clear selection; selection will be applied on mouseup (unless ctrl/meta is not pressed - behavior preserved)
-            e.preventDefault();
+            startMarqueeSelection(e);
             return;
         }
 
@@ -1749,9 +1832,24 @@ document.addEventListener('DOMContentLoaded', ()=>{
         }
     });
 
+    // ---------- Canvas Rotation ----------
+    function applyCanvasRotation(){
+        if(cw){
+            if(canvasRotation === 0){
+                cw.style.transform = '';
+            } else {
+                cw.style.transform = `rotate(${canvasRotation}deg)`;
+            }
+        }
+    }
+
     // ---------- Buttons ----------
     document.getElementById('btn-print').addEventListener('click', ()=>{
         printBothCanvases();
+    });
+    document.getElementById('btn-rotate-canvas').addEventListener('click', ()=>{
+        canvasRotation = (canvasRotation + 90) % 360;
+        applyCanvasRotation();
     });
     document.getElementById('btn-clear').addEventListener('click', ()=>{
         if(confirm('Are you sure you want to clear the layout?')){
