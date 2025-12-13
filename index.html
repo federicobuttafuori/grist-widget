@@ -121,6 +121,19 @@
             </div>
             <hr>
             <div class="sidebar-section">
+                <h3>Canvas</h3>
+                <label>Canvas:</label>
+                <select id="canvas-selector">
+                    <option value="1">Canvas 1</option>
+                    <option value="2" disabled>Canvas 2</option>
+                </select>
+                <div style="display:flex;align-items:center;gap:8px;margin-top:8px">
+                    <input type="checkbox" id="canvas2-enabled" style="width:auto;flex:none">
+                    <label for="canvas2-enabled" style="font-size:14px;margin:0;font-weight:normal;cursor:pointer">Enable Canvas 2</label>
+                </div>
+            </div>
+            <hr>
+            <div class="sidebar-section">
                 <h3>Import/Export</h3>
                 <div style="display:flex;gap:8px">
                     <button id="btn-export">⬇️ Export</button>
@@ -159,12 +172,17 @@ document.addEventListener('DOMContentLoaded', ()=>{
             width: 8,
             height: 5,
             designs: {
-                'default': []
+                'default': {
+                    canvas1: [],
+                    canvas2: [],
+                    canvas2Enabled: false
+                }
             }
         }
     };
     let currentProfile = '8x5';
     let currentDesign = 'default';
+    let currentCanvas = 1; // 1 or 2
 
     // History stacks for undo/redo
     let history = [];
@@ -192,6 +210,8 @@ document.addEventListener('DOMContentLoaded', ()=>{
     const btnAddDesign = document.getElementById('btn-add-design');
     const btnRemoveProfile = document.getElementById('btn-remove-profile');
     const btnRemoveDesign = document.getElementById('btn-remove-design');
+    const canvasSelector = document.getElementById('canvas-selector');
+    const canvas2Enabled = document.getElementById('canvas2-enabled');
 
     // Marquee state
     let marqueeActive = false;
@@ -260,6 +280,29 @@ document.addEventListener('DOMContentLoaded', ()=>{
         designSelector.innerHTML = Object.keys(profile.designs).map(key => {
             return `<option value="${key}" ${key===currentDesign?'selected':''}>${key}</option>`;
         }).join('');
+        updateCanvasControls();
+    }
+
+    function updateCanvasControls(){
+        const profile = profiles[currentProfile];
+        if(!profile || !profile.designs[currentDesign]) return;
+        const design = profile.designs[currentDesign];
+        const enabled = design.canvas2Enabled || false;
+        canvas2Enabled.checked = enabled;
+        
+        // Update canvas selector options
+        const canvas2Option = canvasSelector.querySelector('option[value="2"]');
+        if(canvas2Option){
+            canvas2Option.disabled = !enabled;
+            if(!enabled && currentCanvas === 2){
+                // If disabling canvas 2 and we're on it, switch to canvas 1
+                currentCanvas = 1;
+                loadCurrentDesign();
+                render();
+                updateProps();
+            }
+        }
+        canvasSelector.value = currentCanvas.toString();
     }
 
     function switchProfile(profileKey){
@@ -275,6 +318,7 @@ document.addEventListener('DOMContentLoaded', ()=>{
         updateCanvasSize();
         updateProfileSelector();
         updateDesignSelector();
+        updateCanvasControls();
         render();
         updateProps();
     }
@@ -289,22 +333,79 @@ document.addEventListener('DOMContentLoaded', ()=>{
         // Load the new design
         loadCurrentDesign();
         updateDesignSelector();
+        updateCanvasControls();
         render();
         updateProps();
+    }
+
+    function switchCanvas(canvasNum){
+        if(canvasNum !== 1 && canvasNum !== 2) return;
+        const profile = profiles[currentProfile];
+        if(!profile || !profile.designs[currentDesign]) return;
+        const design = profile.designs[currentDesign];
+        // If trying to switch to canvas 2 but it's disabled, don't allow
+        if(canvasNum === 2 && !(design.canvas2Enabled || false)){
+            msg('Canvas 2 is disabled. Enable it first.', true);
+            canvasSelector.value = '1';
+            return;
+        }
+        // Save current canvas before switching
+        saveCurrentDesign();
+        // Switch canvas
+        currentCanvas = canvasNum;
+        // Load the new canvas
+        loadCurrentDesign();
+        canvasSelector.value = canvasNum.toString();
+        render();
+        updateProps();
+    }
+
+    function toggleCanvas2(enabled){
+        const profile = profiles[currentProfile];
+        if(!profile || !profile.designs[currentDesign]) return;
+        const design = profile.designs[currentDesign];
+        design.canvas2Enabled = enabled;
+        // If disabling canvas 2 and we're on canvas 2, switch to canvas 1
+        if(!enabled && currentCanvas === 2){
+            saveCurrentDesign();
+            currentCanvas = 1;
+            loadCurrentDesign();
+            render();
+            updateProps();
+        }
+        updateCanvasControls();
+        save();
     }
 
     function saveCurrentDesign(){
         const profile = profiles[currentProfile];
         if(!profile) return;
-        if(!profile.designs[currentDesign]) profile.designs[currentDesign] = [];
-        profile.designs[currentDesign] = deepCopy(S);
+        if(!profile.designs[currentDesign]) {
+            profile.designs[currentDesign] = {
+                canvas1: [],
+                canvas2: [],
+                canvas2Enabled: false
+            };
+        }
+        const design = profile.designs[currentDesign];
+        const canvasKey = `canvas${currentCanvas}`;
+        design[canvasKey] = deepCopy(S);
     }
 
     function loadCurrentDesign(){
         const profile = profiles[currentProfile];
         if(!profile) return;
-        if(!profile.designs[currentDesign]) profile.designs[currentDesign] = [];
-        S = profile.designs[currentDesign].map(normalizeElement);
+        if(!profile.designs[currentDesign]) {
+            profile.designs[currentDesign] = {
+                canvas1: [],
+                canvas2: [],
+                canvas2Enabled: false
+            };
+        }
+        const design = profile.designs[currentDesign];
+        const canvasKey = `canvas${currentCanvas}`;
+        const canvasData = design[canvasKey] || [];
+        S = canvasData.map(normalizeElement);
         selectedIds = [];
     }
 
@@ -325,7 +426,11 @@ document.addEventListener('DOMContentLoaded', ()=>{
             width: w,
             height: h,
             designs: {
-                'default': []
+                'default': {
+                    canvas1: [],
+                    canvas2: [],
+                    canvas2Enabled: false
+                }
             }
         };
         switchProfile(key);
@@ -356,7 +461,11 @@ document.addEventListener('DOMContentLoaded', ()=>{
         // Save current before switching
         saveCurrentDesign();
         // Create new empty design
-        profile.designs[designKey] = [];
+        profile.designs[designKey] = {
+            canvas1: [],
+            canvas2: [],
+            canvas2Enabled: false
+        };
         switchDesign(designKey);
         msg(`Design "${designKey}" added`);
         save();
@@ -942,7 +1051,8 @@ document.addEventListener('DOMContentLoaded', ()=>{
             timestamp: Date.now(), 
             profiles: profiles,
             currentProfile: currentProfile,
-            currentDesign: currentDesign
+            currentDesign: currentDesign,
+            currentCanvas: currentCanvas
         };
         const payload = JSON.stringify(payloadObj);
         try{ localStorage.setItem(KEY, payload); } catch(e){ console.warn('localStorage.setItem failed:',e) }
@@ -977,6 +1087,7 @@ document.addEventListener('DOMContentLoaded', ()=>{
                 profiles = parsed.profiles;
                 currentProfile = parsed.currentProfile || Object.keys(profiles)[0] || '8x5';
                 currentDesign = parsed.currentDesign || 'default';
+                currentCanvas = parsed.currentCanvas || 1;
                 
                 // Ensure current profile/design exist
                 if(!profiles[currentProfile]){
@@ -986,30 +1097,60 @@ document.addEventListener('DOMContentLoaded', ()=>{
                     currentDesign = Object.keys(profiles[currentProfile].designs)[0] || 'default';
                 }
                 
+                // Migrate old format designs (array) to new format (canvas1/canvas2)
+                Object.keys(profiles).forEach(profKey => {
+                    const prof = profiles[profKey];
+                    Object.keys(prof.designs).forEach(desKey => {
+                        const des = prof.designs[desKey];
+                        if(Array.isArray(des)){
+                            // Migrate old array format to new canvas format
+                            prof.designs[desKey] = {
+                                canvas1: des.map(normalizeElement),
+                                canvas2: [],
+                                canvas2Enabled: false
+                            };
+                        } else if(!des.canvas1 || !des.canvas2){
+                            // Ensure both canvases exist
+                            prof.designs[desKey] = {
+                                canvas1: (des.canvas1 || []).map(normalizeElement),
+                                canvas2: (des.canvas2 || []).map(normalizeElement),
+                                canvas2Enabled: des.canvas2Enabled || false
+                            };
+                        }
+                    });
+                });
+                
                 loadCurrentDesign();
                 updateCanvasSize();
                 updateProfileSelector();
                 updateDesignSelector();
+                updateCanvasControls();
             }
             // Handle old format (v1) - migrate to new format
             else if(parsed && (parsed.data || Array.isArray(parsed) || parsed.layout)){
                 const oldData = parsed.data || (Array.isArray(parsed) ? parsed : parsed.layout);
-                // Migrate old layout to default profile/design
+                // Migrate old layout to default profile/design, canvas1
                 profiles = {
                     '8x5': {
                         width: 8,
                         height: 5,
                         designs: {
-                            'default': oldData.map(normalizeElement)
+                            'default': {
+                                canvas1: oldData.map(normalizeElement),
+                                canvas2: [],
+                                canvas2Enabled: false
+                            }
                         }
                     }
                 };
                 currentProfile = '8x5';
                 currentDesign = 'default';
+                currentCanvas = 1;
                 loadCurrentDesign();
                 updateCanvasSize();
                 updateProfileSelector();
                 updateDesignSelector();
+                updateCanvasControls();
                 msg('Layout migrated to new format');
             }
             else {
@@ -1035,12 +1176,215 @@ document.addEventListener('DOMContentLoaded', ()=>{
             timestamp: Date.now(), 
             profiles: profiles,
             currentProfile: currentProfile,
-            currentDesign: currentDesign
+            currentDesign: currentDesign,
+            currentCanvas: currentCanvas
         };
         const blob = new Blob([JSON.stringify(payloadObj,null,2)], { type:'application/json' });
         const url = URL.createObjectURL(blob);
         const a = document.createElement('a'); a.href = url; a.download = 'label-layout.json';
         document.body.appendChild(a); a.click(); a.remove(); URL.revokeObjectURL(url);
+    }
+
+    function printBothCanvases(){
+        const profile = profiles[currentProfile];
+        if(!profile || !profile.designs[currentDesign]) return;
+        const design = profile.designs[currentDesign];
+        const canvas2Enabled = design.canvas2Enabled || false;
+        
+        // Save current canvas
+        saveCurrentDesign();
+        
+        // Store original state
+        const prevSel = deepCopy(selectedIds);
+        const prevCanvas = currentCanvas;
+        const prevS = deepCopy(S);
+        
+        // Create print container
+        const printContainer = document.createElement('div');
+        printContainer.className = 'print-container';
+        printContainer.style.position = 'absolute';
+        printContainer.style.left = '-9999px';
+        printContainer.style.top = '0';
+        printContainer.style.width = `${profile.width}cm`;
+        printContainer.style.height = canvas2Enabled ? `${profile.height * 2}cm` : `${profile.height}cm`;
+        
+        // Helper function to render canvas to print page
+        function renderCanvasToPage(canvasNum){
+            const canvasData = design[`canvas${canvasNum}`] || [];
+            const tempS = canvasData.map(normalizeElement);
+            
+            const page = document.createElement('div');
+            page.className = 'print-page';
+            page.style.width = `${profile.width}cm`;
+            page.style.height = `${profile.height}cm`;
+            page.style.position = 'relative';
+            page.style.background = '#fff';
+            page.style.overflow = 'hidden';
+            page.style.pageBreakAfter = (canvasNum === 1 && canvas2Enabled) ? 'always' : 'auto';
+            
+            // Render elements
+            const sorted = tempS.slice().sort((a,b)=> (a.zIndex||0) - (b.zIndex||0));
+            sorted.forEach(el=>{
+                const d = document.createElement('div');
+                d.classList.add('label-element');
+                d.style.position = 'absolute';
+                d.style.left = `${el.x}cm`;
+                d.style.top = `${el.y}cm`;
+                d.style.width = `${el.width}cm`;
+                d.style.height = `${el.height}cm`;
+                d.style.zIndex = el.zIndex || 0;
+                d.style.fontSize = `${el.props.fontSize || 16}px`;
+                d.style.fontWeight = el.props.fontWeight || 'normal';
+                d.style.fontFamily = el.props.fontFamily || 'Arial, sans-serif';
+                const justifyMap = { left: 'flex-start', center: 'center', right: 'flex-end' };
+                const alignMap = { top: 'flex-start', middle: 'center', bottom: 'flex-end' };
+                if(el.type !== 'line'){
+                    d.style.display = 'flex';
+                    d.style.alignItems = alignMap[el.props.valign] || 'flex-start';
+                    d.style.justifyContent = justifyMap[el.props.textAlign] || 'flex-start';
+                    d.style.whiteSpace = 'normal';
+                }
+                d.style.textAlign = el.props.textAlign || 'left';
+                d.style.color = el.props.color || '#000000';
+                d.style.boxSizing = 'border-box';
+                const rotation = Number(el.props.rotation) || 0;
+                d.style.transform = `rotate(${rotation}deg)`;
+                d.style.transformOrigin = 'center center';
+                
+                if((el.type === 'text' || el.type === 'data')){
+                    const pt = Number.isFinite(Number(el.props.paddingTop)) ? Number(el.props.paddingTop) : 0;
+                    const pr = Number.isFinite(Number(el.props.paddingRight)) ? Number(el.props.paddingRight) : 0;
+                    const pb = Number.isFinite(Number(el.props.paddingBottom)) ? Number(el.props.paddingBottom) : 0;
+                    const pl = Number.isFinite(Number(el.props.paddingLeft)) ? Number(el.props.paddingLeft) : 0;
+                    d.style.padding = `${pt}cm ${pr}cm ${pb}cm ${pl}cm`;
+                }
+                
+                if(el.props.showBorder && el.type !== 'box'){
+                    d.style.border = `${Number(el.props.borderWidth)||1}px solid ${el.props.borderColor||'#000'}`;
+                } else {
+                    if(el.type !== 'box') d.style.border = '1px solid transparent';
+                }
+                
+                // Content
+                switch(el.type){
+                    case 'text': {
+                        const span = document.createElement('div');
+                        span.style.display='block';
+                        span.style.width='100%';
+                        span.style.pointerEvents='none';
+                        span.style.overflow='hidden';
+                        span.style.wordWrap='break-word';
+                        span.textContent = el.props.text || 'Static Text';
+                        d.appendChild(span);
+                        break;
+                    }
+                    case 'data': {
+                        const span = document.createElement('div');
+                        span.style.display='block';
+                        span.style.width='100%';
+                        span.style.pointerEvents='none';
+                        span.style.overflow='hidden';
+                        span.style.wordWrap='break-word';
+                        span.textContent = getData(el);
+                        d.appendChild(span);
+                        break;
+                    }
+                    case 'line':
+                        d.style.backgroundColor = el.props.color || '#000000';
+                        d.style.height = `${el.props.thickness || 2}px`;
+                        d.style.width = `${el.width}cm`;
+                        break;
+                    case 'box':
+                        d.style.border = `${el.props.thickness || 2}px solid ${el.props.color || '#000000'}`;
+                        d.style.backgroundColor = el.props.fillColor || 'transparent';
+                        break;
+                    case 'qr': {
+                        const c = getData(el);
+                        const q = document.createElement('img');
+                        const dpi = 37.795276;
+                        const qs = Math.min(el.width, el.height) * dpi;
+                        q.src = `https://api.qrserver.com/v1/create-qr-code/?size=${Math.round(qs)}x${Math.round(qs)}&data=${encodeURIComponent(c)}`;
+                        q.style.pointerEvents='none';
+                        q.style.width='100%';
+                        q.style.height='100%';
+                        q.style.objectFit='contain';
+                        d.appendChild(q);
+                        break;
+                    }
+                    case 'barcode': {
+                        const c = getData(el) || '';
+                        const sv = document.createElementNS('http://www.w3.org/2000/svg','svg');
+                        sv.style.pointerEvents='none';
+                        sv.setAttribute('width','100%');
+                        sv.setAttribute('height','100%');
+                        d.appendChild(sv);
+                        try{
+                            const pxHeight = Math.max(30, (el.height * 37.795276) - 10);
+                            JsBarcode(sv, String(c), {
+                                format: el.props.format || "CODE128",
+                                displayValue: el.props.displayValue !== false,
+                                width: 2, height: pxHeight, margin:0
+                            });
+                        }catch(err){
+                            sv.innerHTML = `<text x="10" y="20" fill="red" font-size="12">Invalid barcode</text>`;
+                        }
+                        break;
+                    }
+                }
+                page.appendChild(d);
+            });
+            
+            return page;
+        }
+        
+        // Add canvas 1
+        const page1 = renderCanvasToPage(1);
+        printContainer.appendChild(page1);
+        
+        // Add canvas 2 if enabled
+        if(canvas2Enabled){
+            const page2 = renderCanvasToPage(2);
+            printContainer.appendChild(page2);
+        }
+        
+        // Add to body temporarily
+        document.body.appendChild(printContainer);
+        
+        // Update print CSS for multiple pages
+        const styleId = 'dynamic-print-css';
+        let styleEl = document.getElementById(styleId);
+        if(!styleEl){
+            styleEl = document.createElement('style');
+            styleEl.id = styleId;
+            document.head.appendChild(styleEl);
+        }
+        styleEl.textContent = `
+            @media print{
+                @page{size:${profile.width}cm ${profile.height}cm;margin:0}
+                html,body{margin:0!important;padding:0!important;background:#fff!important;width:${profile.width}cm!important;height:auto!important}
+                #toolbar,#sidebar,#marquee,.status-message{display:none!important}
+                .print-page{width:${profile.width}cm!important;height:${profile.height}cm!important;page-break-after:always!important;page-break-inside:avoid!important;overflow:visible!important;background:#fff!important;position:relative!important;margin:0!important;padding:0!important;display:block!important}
+                .print-page:last-child{page-break-after:auto!important}
+                .print-container{display:block!important;position:static!important;left:auto!important;top:auto!important}
+                #main-content,#canvas-container,#canvas-wrapper,#label-canvas{display:none!important}
+            }
+        `;
+        
+        // Print
+        window.print();
+        
+        // Restore state after a delay
+        setTimeout(()=>{
+            currentCanvas = prevCanvas;
+            S = prevS;
+            selectedIds = prevSel;
+            render();
+            updateProps();
+            if(printContainer.parentNode){
+                document.body.removeChild(printContainer);
+            }
+            updatePrintCSS(); // Restore normal print CSS
+        }, 100);
     }
 
     // ---------- Mouse interactions: marquee, selection, drag, resize ----------
@@ -1357,10 +1701,7 @@ document.addEventListener('DOMContentLoaded', ()=>{
         if(!ok){ fileInput.value = ''; fileInput.click(); }
     });
     document.getElementById('btn-print').addEventListener('click', ()=>{
-        const prevSel = deepCopy(selectedIds);
-        selectedIds = []; render();
-        window.print();
-        setTimeout(()=>{ selectedIds = prevSel; render(); }, 100);
+        printBothCanvases();
     });
     document.getElementById('btn-clear').addEventListener('click', ()=>{
         if(confirm('Are you sure you want to clear the layout?')){
@@ -1405,6 +1746,13 @@ document.addEventListener('DOMContentLoaded', ()=>{
     btnRemoveDesign.addEventListener('click', ()=>{
         removeDesign();
     });
+    canvasSelector.addEventListener('change', (e)=>{
+        switchCanvas(parseInt(e.target.value));
+        save();
+    });
+    canvas2Enabled.addEventListener('change', (e)=>{
+        toggleCanvas2(e.target.checked);
+    });
     fileInput.addEventListener('change', (ev)=>{
         const f = ev.target.files && ev.target.files[0];
         if(!f) return;
@@ -1441,12 +1789,14 @@ document.addEventListener('DOMContentLoaded', ()=>{
     updateCanvasSize();
     updateProfileSelector();
     updateDesignSelector();
+    updateCanvasControls();
     
     setTimeout(()=>{ 
         load().then(()=> {
             updateCanvasSize();
             updateProfileSelector();
             updateDesignSelector();
+            updateCanvasControls();
             fit();
         }); 
     }, 120);
