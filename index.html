@@ -379,6 +379,17 @@ document.addEventListener('DOMContentLoaded', ()=>{
         const design = profile.designs[currentDesign];
         const canvasKey = `canvas${currentCanvas}`;
         design[canvasKey] = deepCopy(S);
+        
+        // Save to localStorage
+        try {
+            const payloadObj = { 
+                version: 2, 
+                profiles: profiles 
+            };
+            localStorage.setItem(KEY, JSON.stringify(payloadObj));
+        } catch(e) {
+            console.warn('Failed to save to localStorage:', e);
+        }
     }
 
     function loadCurrentDesign(){
@@ -1932,11 +1943,36 @@ document.addEventListener('DOMContentLoaded', ()=>{
     } else { R = {}; C = []; }
 
     // ---------- Initial setup & history init ----------
+    // Load from localStorage on startup
+    try {
+        const saved = localStorage.getItem(KEY);
+        if(saved){
+            const parsed = JSON.parse(saved);
+            if(parsed && parsed.version === 2 && parsed.profiles){
+                profiles = parsed.profiles;
+                // Restore current profile and design
+                const profileKeys = Object.keys(profiles);
+                if(profileKeys.length > 0){
+                    currentProfile = profileKeys[0];
+                    const designKeys = Object.keys(profiles[currentProfile].designs);
+                    if(designKeys.length > 0){
+                        currentDesign = designKeys[0];
+                    }
+                }
+            }
+        }
+    } catch(e) {
+        console.warn('Failed to load from localStorage:', e);
+    }
+    
     // Initialize canvas size immediately
     updateCanvasSize();
     updateProfileSelector();
     updateDesignSelector();
     updateCanvasControls();
+    loadCurrentDesign();
+    render();
+    updateProps();
     fit();
     resetHistory();
 
