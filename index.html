@@ -30,7 +30,6 @@
         .sidebar-section .add-buttons{display:grid;grid-template-columns:1fr 1fr;gap:8px}
         .prop-grid{display:grid;grid-template-columns:90px 1fr;gap:8px;align-items:center}
         .prop-grid label{font-size:14px;font-weight:500}
-        .prop-full{grid-column:1/-1}
         #properties-panel{font-size:14px}
         #btn-delete{background:#fbebeb;border-color:#d9a0a0;color:#c00;margin-top:12px}
         #btn-delete:hover{background:#f7dada}
@@ -39,18 +38,6 @@
         #canvas-wrapper{display:inline-block;transform-origin:center center;position:relative}
         #label-canvas{background:#fff;box-shadow:0 4px 12px rgba(0,0,0,.15);position:relative;overflow:hidden}
         #marquee{position:absolute;border:1px dashed #007aff;background:rgba(0,122,255,0.08);pointer-events:none;display:none;z-index:9999}
-        @media print{
-            @page{margin:0}
-            html,body{margin:0!important;padding:0!important;width:8cm!important;height:5cm!important;overflow:visible!important;background:#fff!important}
-            #toolbar,#sidebar,#marquee,.status-message{display:none!important}
-            #main-content{width:8cm!important;height:5cm!important;overflow:visible!important;display:block!important;padding:0!important;margin:0!important}
-            #canvas-container{width:8cm!important;height:5cm!important;padding:0!important;margin:0!important;overflow:visible!important;background:#fff!important;display:block!important;position:static!important}
-            #canvas-wrapper{position:static!important;width:8cm!important;height:5cm!important;margin:0!important;padding:0!important;transform:none!important;display:block!important}
-            #label-canvas{position:static!important;width:8cm!important;height:5cm!important;transform:none!important;box-shadow:none!important;display:block!important;overflow:visible!important;background:#fff!important}
-            .label-element{page-break-inside:avoid!important}
-            .label-element.selected{border:1px solid transparent!important;box-shadow:none!important}
-            .resize-handle{display:none!important}
-        }
         .label-element{position:absolute;cursor:move;border:1px solid transparent;font-size:16px;line-height:1.2;overflow:hidden;word-wrap:break-word;user-select:none;transform-origin:center center}
         .label-element.selected{border:2px dashed #007aff;box-shadow:0 0 0 1px rgba(0,122,255,.1)}
         .resize-handle{position:absolute;width:12px;height:12px;background:#007aff;border:2px solid #fff;border-radius:50%;bottom:-6px;right:-6px;cursor:nwse-resize;display:none;box-shadow:0 2px 4px rgba(0,0,0,.2)}
@@ -959,7 +946,6 @@ document.addEventListener('DOMContentLoaded', ()=>{
 
     // ---------- Element operations (multi-aware) ----------
     function pushBeforeChange(){ pushHistorySnapshot(); }
-    function pushAfterChange(){ /* placeholder */ }
 
     function add(type){
         pushBeforeChange();
@@ -982,7 +968,6 @@ document.addEventListener('DOMContentLoaded', ()=>{
         if(type==='box'){ n.width=1.5;n.height=1 }
         S.push(n);
         setSelection([n.id]);
-        pushAfterChange();
         saveCurrentDesign();
         save();
     }
@@ -1004,7 +989,6 @@ document.addEventListener('DOMContentLoaded', ()=>{
             newIds.push(copy.id);
         });
         setSelection(newIds);
-        pushAfterChange();
         saveCurrentDesign();
         save();
     }
@@ -1017,7 +1001,7 @@ document.addEventListener('DOMContentLoaded', ()=>{
             const el = S.find(e=>e.id===id);
             if(el){ mz++; el.zIndex = mz; }
         });
-        render(); saveCurrentDesign(); save(); pushAfterChange();
+        render(); saveCurrentDesign(); save();
     }
 
     function sendToBack(){
@@ -1028,7 +1012,7 @@ document.addEventListener('DOMContentLoaded', ()=>{
             const el = S.find(e=>e.id===id);
             if(el){ el.zIndex = mn - (idx+1); }
         });
-        render(); saveCurrentDesign(); save(); pushAfterChange();
+        render(); saveCurrentDesign(); save();
     }
 
     function deleteSelected(){
@@ -1037,7 +1021,6 @@ document.addEventListener('DOMContentLoaded', ()=>{
         S = S.filter(e => !selectedIds.includes(e.id));
         selectedIds = [];
         render(); updateProps(); updateBtns();
-        pushAfterChange();
         saveCurrentDesign();
         save();
     }
@@ -1552,7 +1535,6 @@ document.addEventListener('DOMContentLoaded', ()=>{
 
         if(drag || resizeMode){
             save();
-            pushAfterChange();
         }
         drag = false; resizeMode = false; ctx = {};
     });
@@ -1587,7 +1569,7 @@ document.addEventListener('DOMContentLoaded', ()=>{
                             case 'ArrowRight': el.x = Math.min(W - el.width, el.x + step); break;
                         }
                     });
-                    render(); updateProps(); save(); pushAfterChange();
+                    render(); updateProps(); save();
                 }
             }
         }
@@ -1650,7 +1632,7 @@ document.addEventListener('DOMContentLoaded', ()=>{
                     else el[keyPath] = value;
                 }
             });
-            render(); updateProps(); save(); pushAfterChange();
+            render(); updateProps(); save();
             return;
         }
 
@@ -1684,8 +1666,7 @@ document.addEventListener('DOMContentLoaded', ()=>{
         }
         render(); 
         saveCurrentDesign(); 
-        save(); 
-        pushAfterChange();
+        save();
     });
 
     pp.addEventListener('click', (e)=>{
@@ -1708,7 +1689,6 @@ document.addEventListener('DOMContentLoaded', ()=>{
             pushBeforeChange();
             S=[]; selectedIds=[];
             render(); updateProps(); updateBtns();
-            pushAfterChange();
             saveCurrentDesign();
             save();
         }
