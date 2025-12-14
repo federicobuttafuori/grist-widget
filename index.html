@@ -1172,12 +1172,12 @@ document.addEventListener('DOMContentLoaded', ()=>{
         }
 
         if(el.type==='line'){
-            h += `<label>Thickness (px)</label><input type="number" data-prop="props.thickness" value="${el.props.thickness||2}" min="1">`;
+            h += `<label>Thickness (px)</label><input type="number" step="1" data-prop="props.thickness" value="${el.props.thickness||2}" min="1">`;
                 h += `<hr><div class="prop-grid"><label>Rotation°</label><input type="number" step="1" data-prop="props.rotation" value="${el.props.rotation||0}"><label></label></div>`;
         }
 
         if(el.type==='box'){
-            h += `<label>Border (px)</label><input type="number" data-prop="props.thickness" value="${el.props.thickness||2}" min="1"><label>Fill Color</label><input type="color" data-prop="props.fillColor" value="${el.props.fillColor||'#ffffff'}">`;
+            h += `<label>Border (px)</label><input type="number" step="1" data-prop="props.thickness" value="${el.props.thickness||2}" min="1"><label>Fill Color</label><input type="color" data-prop="props.fillColor" value="${el.props.fillColor||'#ffffff'}">`;
         }
 
             if(el.type==='image'){
