@@ -426,7 +426,10 @@
             try {
                 const payloadObj = { 
                     version: 2, 
-                    profiles: profiles 
+                    profiles: profiles,
+                    currentProfile: currentProfile,
+                    currentDesign: currentDesign,
+                    currentCanvas: currentCanvas
                 };
                 localStorage.setItem(KEY, JSON.stringify(payloadObj));
             } catch(e) {
@@ -1268,11 +1271,44 @@
         function sendToBack(){
             if(selectedIds.length===0) return;
             pushBeforeChange();
-            let mn = S.length>0 ? Math.min(...S.map(e=>e.zIndex||0)) : 0;
+            // Calculate minimum zIndex excluding selected elements
+            const unselected = S.filter(e => !selectedIds.includes(e.id));
+            let mn = unselected.length > 0 ? Math.min(...unselected.map(e=>e.zIndex||0)) : 0;
+            
+            // If minimum is 0 or less, normalize all zIndex to be >= 0 first
+            if(mn <= 0){
+                const allMinZ = Math.min(...S.map(e=>e.zIndex||0));
+                if(allMinZ < 0){
+                    // Shift all elements up to make minimum 0
+                    const shift = Math.abs(allMinZ);
+                    S.forEach(e => {
+                        if(!selectedIds.includes(e.id)){
+                            e.zIndex = (e.zIndex || 0) + shift;
+                        }
+                    });
+                    mn = shift;
+                } else {
+                    mn = 0;
+                }
+            }
+            
+            // Set selected elements to be just below the minimum (starting from mn-1)
             selectedIds.forEach((id, idx)=>{
                 const el = S.find(e=>e.id===id);
-                if(el){ el.zIndex = mn - (idx+1); }
+                if(el){ 
+                    el.zIndex = mn - (idx + 1);
+                }
             });
+            
+            // Normalize all zIndex to be >= 0 to avoid rendering issues
+            const finalMinZ = Math.min(...S.map(e=>e.zIndex||0));
+            if(finalMinZ < 0){
+                const shift = Math.abs(finalMinZ);
+                S.forEach(e => {
+                    e.zIndex = (e.zIndex || 0) + shift;
+                });
+            }
+            
             render(); saveCurrentDesign();
         }
 
@@ -1329,15 +1365,22 @@
                 const currentDes = currentProf.designs[currentDesign];
                 if(!currentDes) return false;
                 
-                // Get the first profile and first design from imported data
-                const firstImportedProfKey = Object.keys(importedProfiles)[0];
-                if(!firstImportedProfKey) return false;
+                // Get the profile and design from imported data
+                // Use saved currentProfile/currentDesign if available, otherwise use first
+                let importedProfKey = parsed.currentProfile;
+                if(!importedProfKey || !importedProfiles[importedProfKey]){
+                    importedProfKey = Object.keys(importedProfiles)[0];
+                }
+                if(!importedProfKey) return false;
                 
-                const importedProf = importedProfiles[firstImportedProfKey];
-                const firstImportedDesKey = Object.keys(importedProf.designs)[0];
-                if(!firstImportedDesKey) return false;
+                const importedProf = importedProfiles[importedProfKey];
+                let importedDesKey = parsed.currentDesign;
+                if(!importedDesKey || !importedProf.designs[importedDesKey]){
+                    importedDesKey = Object.keys(importedProf.designs)[0];
+                }
+                if(!importedDesKey) return false;
                 
-                const importedDes = importedProf.designs[firstImportedDesKey];
+                const importedDes = importedProf.designs[importedDesKey];
                 
                 // Migrate old format if needed
                 // Don't normalize yet - preserve original zIndex values
@@ -1356,8 +1399,10 @@
                     };
                 }
                 
-                // Get the canvas data to import (use the same canvas number as current)
-                const importedCanvasData = designData[`canvas${currentCanvas}`] || [];
+                // Get the canvas data to import
+                // Use saved currentCanvas if available, otherwise use current canvas
+                const importedCanvas = (parsed.currentCanvas === 1 || parsed.currentCanvas === 2) ? parsed.currentCanvas : currentCanvas;
+                const importedCanvasData = designData[`canvas${importedCanvas}`] || [];
                 
                 // Add imported elements to current canvas
                 // Generate new IDs to avoid conflicts, but preserve original zIndex values
@@ -1393,7 +1438,27 @@
         }
 
         function exportToFile(){
+            // Ensure current design is saved before exporting
+            // This saves the current S array to the current design
             saveCurrentDesign();
+            
+            // Verify current profile and design exist
+            const profile = profiles[currentProfile];
+            if(!profile){
+                msg('Error: Current profile not found', true);
+                return;
+            }
+            if(!profile.designs[currentDesign]){
+                msg('Error: Current design not found', true);
+                return;
+            }
+            
+            // Double-check: ensure current design has the current canvas data
+            const design = profile.designs[currentDesign];
+            const canvasKey = `canvas${currentCanvas}`;
+            // Update the design with current S array to ensure it's saved
+            design[canvasKey] = deepCopy(S);
+            
             const payloadObj = { 
                 version: 2, 
                 timestamp: Date.now(), 
@@ -1404,8 +1469,13 @@
             };
             const blob = new Blob([JSON.stringify(payloadObj,null,2)], { type:'application/json' });
             const url = URL.createObjectURL(blob);
-            const a = document.createElement('a'); a.href = url; a.download = 'label-layout.json';
-            document.body.appendChild(a); a.click(); a.remove(); URL.revokeObjectURL(url);
+            const a = document.createElement('a'); 
+            a.href = url; 
+            a.download = `label-layout-${currentProfile}-${currentDesign}.json`;
+            document.body.appendChild(a); 
+            a.click(); 
+            a.remove(); 
+            URL.revokeObjectURL(url);
         }
 
         function printBothCanvases(){
@@ -1472,6 +1542,9 @@
                         d.style.alignItems = alignMap[el.props.valign] || 'flex-start';
                         d.style.justifyContent = justifyMap[el.props.textAlign] || 'flex-start';
                         d.style.whiteSpace = 'normal';
+                    } else {
+                        d.style.display = 'block';
+                        d.style.whiteSpace = '';
                     }
                     d.style.textAlign = el.props.textAlign || 'left';
                     d.style.color = el.props.color || '#000000';
@@ -1486,6 +1559,8 @@
                         const pb = Number.isFinite(Number(el.props.paddingBottom)) ? Number(el.props.paddingBottom) : 0;
                         const pl = Number.isFinite(Number(el.props.paddingLeft)) ? Number(el.props.paddingLeft) : 0;
                         d.style.padding = `${pt}cm ${pr}cm ${pb}cm ${pl}cm`;
+                    } else {
+                        d.style.padding = '';
                     }
                     
                     if(el.props.showBorder && el.type !== 'box'){
@@ -1524,6 +1599,11 @@
                             d.style.height = `${el.props.thickness || 2}px`;
                             d.style.width = `${el.width}cm`;
                             d.style.border = 'none'; // No border for lines - thickness controls height
+                            d.style.display = 'block'; // Ensure block display for lines
+                            d.style.margin = '0'; // Remove any margins
+                            d.style.padding = '0'; // Remove any padding
+                            d.style.overflow = 'visible'; // Ensure visibility
+                            d.style.minHeight = `${el.props.thickness || 2}px`; // Ensure minimum height
                             break;
                         case 'box':
                             d.style.border = `${el.props.thickness || 2}px solid ${el.props.color || '#000000'}`;
@@ -1559,6 +1639,66 @@
                             }catch(err){
                                 sv.innerHTML = `<text x="10" y="20" fill="red" font-size="12">Invalid barcode</text>`;
                             }
+                            break;
+                        }
+                        case 'image': {
+                            const img = document.createElement('img');
+                            img.style.pointerEvents='none';
+                            img.style.width='100%';
+                            img.style.height='100%';
+                            img.style.objectFit = el.props.objectFit || 'contain';
+                            
+                            // Build Imgur URL from Grist column value
+                            let imageUrl = '';
+                            if(el.props.boundColumn && R && Object.prototype.hasOwnProperty.call(R, el.props.boundColumn)){
+                                const imgurId = R[el.props.boundColumn];
+                                if(imgurId){
+                                    const id = String(imgurId).trim();
+                                    if(id){
+                                        // Construct Imgur URL: https://i.imgur.com/{id}.jpg
+                                        // If the value already contains http/https, use it as-is
+                                        if(id.startsWith('http://') || id.startsWith('https://')){
+                                            imageUrl = id;
+                                        } else {
+                                            // Remove any existing extension and add .jpg
+                                            const cleanId = id.replace(/\.(jpg|jpeg|png|gif|webp)$/i, '');
+                                            imageUrl = `https://i.imgur.com/${cleanId}.jpg`;
+                                        }
+                                    }
+                                }
+                            }
+                            
+                            if(imageUrl){
+                                img.src = imageUrl;
+                                img.onerror = function(){
+                                    img.style.display = 'none';
+                                    const errorDiv = document.createElement('div');
+                                    errorDiv.style.width = '100%';
+                                    errorDiv.style.height = '100%';
+                                    errorDiv.style.display = 'flex';
+                                    errorDiv.style.alignItems = 'center';
+                                    errorDiv.style.justifyContent = 'center';
+                                    errorDiv.style.color = '#999';
+                                    errorDiv.style.fontSize = '12px';
+                                    errorDiv.textContent = 'Image not found';
+                                    d.appendChild(errorDiv);
+                                };
+                            } else {
+                                // Show placeholder when no image
+                                img.style.display = 'none';
+                                const placeholder = document.createElement('div');
+                                placeholder.style.width = '100%';
+                                placeholder.style.height = '100%';
+                                placeholder.style.display = 'flex';
+                                placeholder.style.alignItems = 'center';
+                                placeholder.style.justifyContent = 'center';
+                                placeholder.style.color = '#ccc';
+                                placeholder.style.fontSize = '12px';
+                                placeholder.style.border = '1px dashed #ccc';
+                                placeholder.textContent = 'No image';
+                                d.appendChild(placeholder);
+                            }
+                            d.appendChild(img);
                             break;
                         }
                     }
@@ -2133,13 +2273,37 @@
                 const parsed = JSON.parse(saved);
                 if(parsed && parsed.version === 2 && parsed.profiles){
                     profiles = parsed.profiles;
-                    // Restore current profile and design
-                    const profileKeys = Object.keys(profiles);
-                    if(profileKeys.length > 0){
-                        currentProfile = profileKeys[0];
-                        const designKeys = Object.keys(profiles[currentProfile].designs);
-                        if(designKeys.length > 0){
-                            currentDesign = designKeys[0];
+                    // Restore current profile, design and canvas if saved
+                    if(parsed.currentProfile && profiles[parsed.currentProfile]){
+                        currentProfile = parsed.currentProfile;
+                        const profile = profiles[currentProfile];
+                        if(parsed.currentDesign && profile.designs[parsed.currentDesign]){
+                            currentDesign = parsed.currentDesign;
+                        } else {
+                            // Fallback to first design if saved design doesn't exist
+                            const designKeys = Object.keys(profile.designs);
+                            if(designKeys.length > 0){
+                                currentDesign = designKeys[0];
+                            }
+                        }
+                        // Restore canvas (1 or 2)
+                        if(parsed.currentCanvas === 1 || parsed.currentCanvas === 2){
+                            currentCanvas = parsed.currentCanvas;
+                            // Verify canvas 2 is enabled if trying to restore to canvas 2
+                            const design = profile.designs[currentDesign];
+                            if(currentCanvas === 2 && !(design && design.canvas2Enabled)){
+                                currentCanvas = 1; // Fallback to canvas 1 if canvas 2 is not enabled
+                            }
+                        }
+                    } else {
+                        // Fallback: use first available profile and design
+                        const profileKeys = Object.keys(profiles);
+                        if(profileKeys.length > 0){
+                            currentProfile = profileKeys[0];
+                            const designKeys = Object.keys(profiles[currentProfile].designs);
+                            if(designKeys.length > 0){
+                                currentDesign = designKeys[0];
+                            }
                         }
                     }
                 }
