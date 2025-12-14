@@ -357,6 +357,14 @@
                 }
             }
             canvasSelector.value = currentCanvas.toString();
+            
+            // Aggiorna anche il selettore canvas nella mini toolbar se esiste
+            const miniCanvasSelect = document.getElementById('mini-canvas-selector');
+            if (miniCanvasSelect) {
+                // Mostra solo se canvas2 è abilitato
+                miniCanvasSelect.style.display = enabled ? 'block' : 'none';
+                miniCanvasSelect.value = currentCanvas.toString();
+            }
         }
 
         function switchProfile(profileKey){
@@ -2435,10 +2443,21 @@
                         designSelector.dispatchEvent(new Event('change'));
                     });
                     
+                    // Selettore canvas compatto (solo se canvas2 è abilitato)
+                    const canvasSelect = document.createElement('select');
+                    canvasSelect.id = 'mini-canvas-selector';
+                    canvasSelect.style.cssText = 'padding:6px 8px;font-size:13px;border:1px solid #ccc;border-radius:4px;background:#fff;min-width:80px;max-width:120px;display:none';
+                    canvasSelect.innerHTML = '<option value="1">Canvas 1</option><option value="2">Canvas 2</option>';
+                    canvasSelect.addEventListener('change', (e) => {
+                        canvasSelector.value = e.target.value;
+                        canvasSelector.dispatchEvent(new Event('change'));
+                    });
+                    
                     miniToolbar.appendChild(btnPrint);
                     miniToolbar.appendChild(btnRotate);
                     miniToolbar.appendChild(profileSelect);
                     miniToolbar.appendChild(designSelect);
+                    miniToolbar.appendChild(canvasSelect);
                     mainContent.insertBefore(miniToolbar, canvasContainer);
                 }
                 
@@ -2458,6 +2477,19 @@
                         miniDesignSelect.innerHTML = Object.keys(profile.designs).map(key => {
                             return `<option value="${key}" ${key===currentDesign?'selected':''}>${key}</option>`;
                         }).join('');
+                    }
+                }
+                
+                // Aggiorna il selettore canvas nella mini toolbar
+                const miniCanvasSelect = document.getElementById('mini-canvas-selector');
+                if (miniCanvasSelect) {
+                    const profile = profiles[currentProfile];
+                    if (profile && profile.designs[currentDesign]) {
+                        const design = profile.designs[currentDesign];
+                        const canvas2Enabled = design.canvas2Enabled || false;
+                        // Mostra solo se canvas2 è abilitato
+                        miniCanvasSelect.style.display = canvas2Enabled ? 'block' : 'none';
+                        miniCanvasSelect.value = currentCanvas.toString();
                     }
                 }
                 
