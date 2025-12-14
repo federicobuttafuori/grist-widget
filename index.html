@@ -666,7 +666,7 @@
                     fontSize: 16, fontWeight: 'normal', fontFamily: 'Arial, sans-serif',
                     textAlign: 'left', valign: 'top', color: '#000000',
                     boundColumn: '', prefix:'', suffix:'', rotation:0,
-                    showBorder:false, borderColor:'#000000', borderWidth:1,
+                    showBorder:false, borderColor:'#000000', borderWidth:1, borderTop:true, borderRight:true, borderBottom:true, borderLeft:true,
                     paddingTop: 0, paddingRight: 0, paddingBottom: 0, paddingLeft: 0,
                     thickness:2, format:'CODE128', displayValue:true,
                     fillColor:'#ffffff', decimals:2, asPercent:false,
@@ -710,6 +710,18 @@
             base.props.suffix = base.props.suffix || '';
             base.props.showBorder = !!base.props.showBorder;
             base.props.borderColor = base.props.borderColor || '#000000';
+            // Default border sides to true if showBorder is true, otherwise false
+            if(base.props.showBorder){
+                base.props.borderTop = base.props.borderTop !== undefined ? !!base.props.borderTop : true;
+                base.props.borderRight = base.props.borderRight !== undefined ? !!base.props.borderRight : true;
+                base.props.borderBottom = base.props.borderBottom !== undefined ? !!base.props.borderBottom : true;
+                base.props.borderLeft = base.props.borderLeft !== undefined ? !!base.props.borderLeft : true;
+            } else {
+                base.props.borderTop = false;
+                base.props.borderRight = false;
+                base.props.borderBottom = false;
+                base.props.borderLeft = false;
+            }
             return base;
         }
 
@@ -764,9 +776,17 @@
                     d.style.padding = '';
                 }
 
-                // border
+                // border - apply individual sides
                 if(el.props.showBorder && el.type !== 'box'){
-                    d.style.border = `${Number(el.props.borderWidth)||1}px solid ${el.props.borderColor||'#000'}`;
+                    const borderWidth = `${Number(el.props.borderWidth)||1}px`;
+                    const borderColor = el.props.borderColor || '#000';
+                    const borderStyle = 'solid';
+                    
+                    // Apply borders only to enabled sides
+                    d.style.borderTop = (el.props.borderTop !== false) ? `${borderWidth} ${borderStyle} ${borderColor}` : 'none';
+                    d.style.borderRight = (el.props.borderRight !== false) ? `${borderWidth} ${borderStyle} ${borderColor}` : 'none';
+                    d.style.borderBottom = (el.props.borderBottom !== false) ? `${borderWidth} ${borderStyle} ${borderColor}` : 'none';
+                    d.style.borderLeft = (el.props.borderLeft !== false) ? `${borderWidth} ${borderStyle} ${borderColor}` : 'none';
                 } else {
                     // Don't apply transparent border to lines - they use thickness for height
                     if(el.type !== 'box' && el.type !== 'line') d.style.border = '1px solid transparent';
@@ -1043,6 +1063,9 @@
             // border
             h += `<hr><div class="prop-grid"><label>Show Border</label><input type="checkbox" data-prop="props.showBorder" ${el.props.showBorder?'checked':''}><label>Border Color</label><input type="color" data-prop="props.borderColor" value="${el.props.borderColor||'#000000'}"></div>`;
             h += `<div class="prop-grid"><label>Border Width</label><input type="number" data-prop="props.borderWidth" value="${el.props.borderWidth||1}" min="0"><label></label></div>`;
+            if(el.props.showBorder){
+                h += `<div class="prop-grid" style="margin-top:8px"><label style="font-size:12px">Border Sides:</label><div style="display:grid;grid-template-columns:1fr 1fr;gap:4px"><label style="font-size:12px;font-weight:normal;display:flex;align-items:center;gap:4px"><input type="checkbox" data-prop="props.borderTop" ${el.props.borderTop!==false?'checked':''}>Top</label><label style="font-size:12px;font-weight:normal;display:flex;align-items:center;gap:4px"><input type="checkbox" data-prop="props.borderRight" ${el.props.borderRight!==false?'checked':''}>Right</label><label style="font-size:12px;font-weight:normal;display:flex;align-items:center;gap:4px"><input type="checkbox" data-prop="props.borderBottom" ${el.props.borderBottom!==false?'checked':''}>Bottom</label><label style="font-size:12px;font-weight:normal;display:flex;align-items:center;gap:4px"><input type="checkbox" data-prop="props.borderLeft" ${el.props.borderLeft!==false?'checked':''}>Left</label></div></div>`;
+            }
             if(el.type!=='box') h += `<hr><label>Color</label><input type="color" data-prop="props.color" value="${el.props.color||'#000000'}">`;
             h += `<hr><button id="btn-delete">Delete Element</button>`;
             pp.innerHTML = h;
@@ -1088,6 +1111,9 @@
             h += `<div class="prop-grid"><label>Padding Bottom</label><input type="number" step="0.1" data-prop="multi.props.paddingBottom" value="${common('props.paddingBottom')}" min="0"><label>Padding Left</label><input type="number" step="0.1" data-prop="multi.props.paddingLeft" value="${common('props.paddingLeft')}" min="0"></div>`;
             h += `<hr><div class="prop-grid"><label>Rotation°</label><input type="number" step="1" data-prop="multi.props.rotation" value="${common('props.rotation')}"><label>Show Border</label><input type="checkbox" data-prop="multi.props.showBorder" ${common('props.showBorder')?'checked':''}></div>`;
             h += `<div class="prop-grid"><label>Border Color</label><input type="color" data-prop="multi.props.borderColor" value="${common('props.borderColor')||'#000000'}"><label>Border Width</label><input type="number" data-prop="multi.props.borderWidth" value="${common('props.borderWidth')}" min="0"></div>`;
+            if(common('props.showBorder')){
+                h += `<div class="prop-grid" style="margin-top:8px"><label style="font-size:12px">Border Sides:</label><div style="display:grid;grid-template-columns:1fr 1fr;gap:4px"><label style="font-size:12px;font-weight:normal;display:flex;align-items:center;gap:4px"><input type="checkbox" data-prop="multi.props.borderTop" ${common('props.borderTop')!==false?'checked':''}>Top</label><label style="font-size:12px;font-weight:normal;display:flex;align-items:center;gap:4px"><input type="checkbox" data-prop="multi.props.borderRight" ${common('props.borderRight')!==false?'checked':''}>Right</label><label style="font-size:12px;font-weight:normal;display:flex;align-items:center;gap:4px"><input type="checkbox" data-prop="multi.props.borderBottom" ${common('props.borderBottom')!==false?'checked':''}>Bottom</label><label style="font-size:12px;font-weight:normal;display:flex;align-items:center;gap:4px"><input type="checkbox" data-prop="multi.props.borderLeft" ${common('props.borderLeft')!==false?'checked':''}>Left</label></div></div>`;
+            }
             h += `<div class="prop-grid"><label>Color</label><input type="color" data-prop="multi.props.color" value="${common('props.color')||'#000000'}"><label></label></div>`;
             h += `<hr><button id="btn-delete">Delete Selected</button>`;
             pp.innerHTML = h;
@@ -1605,7 +1631,15 @@
                     }
                     
                     if(el.props.showBorder && el.type !== 'box'){
-                        d.style.border = `${Number(el.props.borderWidth)||1}px solid ${el.props.borderColor||'#000'}`;
+                        const borderWidth = `${Number(el.props.borderWidth)||1}px`;
+                        const borderColor = el.props.borderColor || '#000';
+                        const borderStyle = 'solid';
+                        
+                        // Apply borders only to enabled sides
+                        d.style.borderTop = (el.props.borderTop !== false) ? `${borderWidth} ${borderStyle} ${borderColor}` : 'none';
+                        d.style.borderRight = (el.props.borderRight !== false) ? `${borderWidth} ${borderStyle} ${borderColor}` : 'none';
+                        d.style.borderBottom = (el.props.borderBottom !== false) ? `${borderWidth} ${borderStyle} ${borderColor}` : 'none';
+                        d.style.borderLeft = (el.props.borderLeft !== false) ? `${borderWidth} ${borderStyle} ${borderColor}` : 'none';
                     } else {
                         // Don't apply transparent border to lines - they use thickness for height
                         if(el.type !== 'box' && el.type !== 'line') d.style.border = '1px solid transparent';
@@ -2178,7 +2212,7 @@
                         const [o,k] = keyPath.split('.');
                         if(!el[o]) el[o] = {};
                         if(['fontSize','lineHeight','decimals','thickness','borderWidth','rotation','paddingTop','paddingRight','paddingBottom','paddingLeft','x','y','width','height'].includes(k)) el[o][k] = Number(value);
-                        else if(['showBorder','displayValue','asPercent'].includes(k)) el[o][k] = !!value;
+                        else if(['showBorder','displayValue','asPercent','borderTop','borderRight','borderBottom','borderLeft'].includes(k)) el[o][k] = !!value;
                         else if(k === 'fontWeight'){
                             // Handle fontWeight: can be number (100-900) or string ('normal', 'bold')
                             const numVal = Number(value);
@@ -2203,7 +2237,7 @@
                     const [o,k] = p.split('.');
                     if(!el[o]) el[o] = {};
                     if(['fontSize','decimals','thickness','borderWidth','rotation','paddingTop','paddingRight','paddingBottom','paddingLeft','x','y','width','height'].includes(k)) el[o][k] = Number(v);
-                    else if(['showBorder','displayValue','asPercent'].includes(k)) el[o][k] = !!v;
+                    else if(['showBorder','displayValue','asPercent','borderTop','borderRight','borderBottom','borderLeft'].includes(k)) el[o][k] = !!v;
                     else if(k === 'fontWeight'){
                         // Handle fontWeight: can be number (100-900) or string ('normal', 'bold')
                         const numVal = Number(v);
