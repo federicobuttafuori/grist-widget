@@ -46,6 +46,11 @@
             .status-message{position:fixed;top:60px;right:20px;padding:12px 16px;background:#4CAF50;color:#fff;border-radius:4px;box-shadow:0 2px 8px rgba(0,0,0,.2);z-index:1000;animation:slideIn .3s ease-out}
             @keyframes slideIn{from{transform:translateX(400px);opacity:0}to{transform:translateX(0);opacity:1}}
             .status-message.error{background:#f44336}
+            #mini-toolbar{display:none;gap:8px;background:#fff;padding:8px;border-bottom:1px solid #e0e0e0;flex-direction:row;align-items:center;justify-content:center;flex-shrink:0}
+            #mini-toolbar button{padding:8px 12px;font-size:14px}
+            #mini-toolbar select{padding:6px 8px;font-size:13px;border:1px solid #ccc;border-radius:4px;background:#fff;min-width:100px;max-width:150px}
+            .widget-mode #canvas-container .label-element{pointer-events:none;cursor:default}
+            .widget-mode #canvas-container{cursor:default}
         </style>
     </head>
     <body>
@@ -184,6 +189,9 @@
         // Search debounce timer
         let searchDebounceTimer = null;
 
+        // Full screen detection
+        let isFullScreen = true; // Default: assume full screen
+
         // DOM refs
         const cc = document.getElementById('canvas-container');
         const cw = document.getElementById('canvas-wrapper');
@@ -291,18 +299,33 @@
         }
 
         function updateProfileSelector(){
-            profileSelector.innerHTML = Object.keys(profiles).map(key => {
+            const options = Object.keys(profiles).map(key => {
                 const p = profiles[key];
                 return `<option value="${key}" ${key===currentProfile?'selected':''}>${p.width} × ${p.height} cm</option>`;
             }).join('');
+            profileSelector.innerHTML = options;
+            
+            // Aggiorna anche il selettore nella mini toolbar se esiste
+            const miniProfileSelect = document.getElementById('mini-profile-selector');
+            if (miniProfileSelect) {
+                miniProfileSelect.innerHTML = options;
+            }
         }
 
     function updateDesignSelector(){
         const profile = profiles[currentProfile];
         if(!profile) return;
-        designSelector.innerHTML = Object.keys(profile.designs).map(key => {
+        const options = Object.keys(profile.designs).map(key => {
             return `<option value="${key}" ${key===currentDesign?'selected':''}>${key}</option>`;
         }).join('');
+        designSelector.innerHTML = options;
+        
+        // Aggiorna anche il selettore nella mini toolbar se esiste
+        const miniDesignSelect = document.getElementById('mini-design-selector');
+        if (miniDesignSelect) {
+            miniDesignSelect.innerHTML = options;
+        }
+        
         updateCanvasControls();
         // Sync button heights with select
         setTimeout(() => {
@@ -1803,6 +1826,9 @@
 
         // Listen for mousedown on canvas-container (allows starting from outside canvas)
         cc.addEventListener('mousedown', (e)=>{
+            // Disabilita interazioni quando non è in full screen
+            if (!isFullScreen) return;
+            
             const t = e.target;
             // If clicking on the background (container or canvas), start marquee selection
             if(t === cc || t === lc){
@@ -1812,6 +1838,9 @@
         });
 
         lc.addEventListener('mousedown', (e)=>{
+            // Disabilita interazioni quando non è in full screen
+            if (!isFullScreen) return;
+            
             const t = e.target;
             // If clicking on the background of label-canvas, start marquee selection
             if(t === lc){
@@ -1855,6 +1884,15 @@
         });
 
         window.addEventListener('mousemove', (e)=>{
+            // Disabilita interazioni quando non è in full screen
+            if (!isFullScreen && (drag || resizeMode || marqueeActive)) {
+                drag = false;
+                resizeMode = false;
+                marqueeActive = false;
+                marquee.style.display = 'none';
+                return;
+            }
+            
             // marquee active handling: draw marquee relative to container (so zoom/transform doesn't misplace)
             if(marqueeActive){
                 const containerRect = marqueeStart.containerRect || cc.getBoundingClientRect();
@@ -1952,6 +1990,15 @@
         });
 
         window.addEventListener('mouseup', (e)=>{
+            // Disabilita interazioni quando non è in full screen
+            if (!isFullScreen) {
+                drag = false;
+                resizeMode = false;
+                marqueeActive = false;
+                marquee.style.display = 'none';
+                return;
+            }
+            
             if(marqueeActive){
                 // compute selection rectangle intersection using label-canvas bounding rect (this respects zoom)
                 const rect = lc.getBoundingClientRect();
@@ -2185,13 +2232,36 @@
 
         // ---------- Canvas Rotation ----------
         function applyCanvasRotation(){
-            if(cw){
-                if(canvasRotation === 0){
-                    cw.style.transform = '';
+            // Applica la rotazione combinata con lo zoom esistente
+            setZoom(z); // Questo ora combina rotazione e zoom
+            
+            // Aggiusta lo zoom dopo la rotazione per fittare il canvas
+            setTimeout(() => {
+                if (!isFullScreen) {
+                    // In modalità widget, calcola lo zoom considerando la rotazione
+                    const miniToolbar = document.getElementById('mini-toolbar');
+                    const toolbarHeight = miniToolbar ? miniToolbar.offsetHeight : 0;
+                    const availableHeight = window.innerHeight - toolbarHeight;
+                    const availableWidth = window.innerWidth;
+                    
+                    // Quando ruotato di 90° o 270°, le dimensioni effettive si scambiano
+                    const effectiveWidth = (canvasRotation === 90 || canvasRotation === 270) ? H : W;
+                    const effectiveHeight = (canvasRotation === 90 || canvasRotation === 270) ? W : H;
+                    
+                    const hw = (availableWidth - 40) / (effectiveWidth * 37.795276);
+                    const vw = (availableHeight - 40) / (effectiveHeight * 37.795276);
+                    setZoom(Math.min(hw, vw, 1.5));
                 } else {
-                    cw.style.transform = `rotate(${canvasRotation}deg)`;
+                    // In full screen, calcola lo zoom considerando la rotazione
+                    const cr = cc.getBoundingClientRect();
+                    // Quando ruotato di 90° o 270°, le dimensioni effettive si scambiano
+                    const effectiveWidth = (canvasRotation === 90 || canvasRotation === 270) ? H : W;
+                    const effectiveHeight = (canvasRotation === 90 || canvasRotation === 270) ? W : H;
+                    const hw = (cr.width - 40) / (effectiveWidth * 37.795276);
+                    const vw = (cr.height - 40) / (effectiveHeight * 37.795276);
+                    setZoom(Math.min(hw, vw, 1.5));
                 }
-            }
+            }, 50);
         }
 
         // ---------- Buttons ----------
@@ -2269,9 +2339,143 @@
             if((e.ctrlKey||e.metaKey) && e.key.toLowerCase() === 'e'){ e.preventDefault(); exportToFile(); msg('Layout exported to file.'); }
         });
 
+        // Listen for window resize to detect full screen mode changes
+        window.addEventListener('resize', () => {
+            checkFullScreenMode();
+            // Also fit canvas when resizing in widget mode
+            if (!isFullScreen) {
+                setTimeout(() => {
+                    fit();
+                }, 50);
+            }
+        });
+
         // ---------- Zoom / fit ----------
-        function setZoom(nz){ z = Math.max(.1, Math.min(3, nz)); cw.style.transform = `scale(${z})`; zd.textContent = `${Math.round(z*100)}%`; }
+        function setZoom(nz){ 
+            z = Math.max(.1, Math.min(3, nz)); 
+            // Combina zoom e rotazione del canvas
+            if(canvasRotation === 0){
+                cw.style.transform = `scale(${z})`;
+            } else {
+                cw.style.transform = `rotate(${canvasRotation}deg) scale(${z})`;
+            }
+            zd.textContent = `${Math.round(z*100)}%`; 
+        }
         function fit(){ const cr = cc.getBoundingClientRect(); const hw = (cr.width-40)/(W*37.795276); const vw = (cr.height-40)/(H*37.795276); setZoom(Math.min(hw,vw,1.5)); }
+
+        // ---------- Full screen detection & UI visibility ----------
+        function checkFullScreenMode() {
+            // Se la finestra è molto piccola, probabilmente è in modalità widget
+            // Soglia: se width < 600px o height < 400px, consideralo widget mode
+            const isWidget = window.innerWidth < 600 || window.innerHeight < 400;
+            isFullScreen = !isWidget;
+            updateUIVisibility();
+        }
+
+        function updateUIVisibility() {
+            const toolbar = document.getElementById('toolbar');
+            const sidebar = document.getElementById('sidebar');
+            const mainContent = document.getElementById('main-content');
+            const canvasContainer = document.getElementById('canvas-container');
+            
+            if (isFullScreen) {
+                // Mostra tutta la UI
+                toolbar.style.display = 'flex';
+                sidebar.style.display = 'flex';
+                mainContent.style.flexDirection = 'row';
+                mainContent.style.justifyContent = '';
+                mainContent.style.alignItems = '';
+                
+                // Rimuovi classe widget-mode per abilitare interazioni
+                document.body.classList.remove('widget-mode');
+                
+                // Nascondi mini toolbar se esiste
+                const miniToolbar = document.getElementById('mini-toolbar');
+                if (miniToolbar) {
+                    miniToolbar.style.display = 'none';
+                }
+            } else {
+                // Nascondi tutto tranne print, rotate e canvas
+                toolbar.style.display = 'none';
+                sidebar.style.display = 'none';
+                mainContent.style.flexDirection = 'column';
+                mainContent.style.justifyContent = 'flex-start';
+                mainContent.style.alignItems = 'stretch';
+                
+                // Aggiungi classe widget-mode al body per disabilitare interazioni
+                document.body.classList.add('widget-mode');
+                
+                // Crea una mini toolbar con print, rotate e selettore profilo
+                let miniToolbar = document.getElementById('mini-toolbar');
+                if (!miniToolbar) {
+                    miniToolbar = document.createElement('div');
+                    miniToolbar.id = 'mini-toolbar';
+                    const btnPrint = document.getElementById('btn-print').cloneNode(true);
+                    btnPrint.id = 'mini-btn-print';
+                    btnPrint.addEventListener('click', () => document.getElementById('btn-print').click());
+                    const btnRotate = document.getElementById('btn-rotate-canvas').cloneNode(true);
+                    btnRotate.id = 'mini-btn-rotate';
+                    btnRotate.addEventListener('click', () => document.getElementById('btn-rotate-canvas').click());
+                    
+                    // Selettore profilo compatto
+                    const profileSelect = document.createElement('select');
+                    profileSelect.id = 'mini-profile-selector';
+                    profileSelect.style.cssText = 'padding:6px 8px;font-size:13px;border:1px solid #ccc;border-radius:4px;background:#fff;min-width:100px;max-width:150px';
+                    profileSelect.addEventListener('change', (e) => {
+                        profileSelector.value = e.target.value;
+                        profileSelector.dispatchEvent(new Event('change'));
+                    });
+                    
+                    // Selettore design compatto
+                    const designSelect = document.createElement('select');
+                    designSelect.id = 'mini-design-selector';
+                    designSelect.style.cssText = 'padding:6px 8px;font-size:13px;border:1px solid #ccc;border-radius:4px;background:#fff;min-width:100px;max-width:150px';
+                    designSelect.addEventListener('change', (e) => {
+                        designSelector.value = e.target.value;
+                        designSelector.dispatchEvent(new Event('change'));
+                    });
+                    
+                    miniToolbar.appendChild(btnPrint);
+                    miniToolbar.appendChild(btnRotate);
+                    miniToolbar.appendChild(profileSelect);
+                    miniToolbar.appendChild(designSelect);
+                    mainContent.insertBefore(miniToolbar, canvasContainer);
+                }
+                
+                // Aggiorna i selettori nella mini toolbar
+                const miniProfileSelect = document.getElementById('mini-profile-selector');
+                if (miniProfileSelect) {
+                    miniProfileSelect.innerHTML = Object.keys(profiles).map(key => {
+                        const p = profiles[key];
+                        return `<option value="${key}" ${key===currentProfile?'selected':''}>${p.width} × ${p.height} cm</option>`;
+                    }).join('');
+                }
+                
+                const miniDesignSelect = document.getElementById('mini-design-selector');
+                if (miniDesignSelect) {
+                    const profile = profiles[currentProfile];
+                    if (profile) {
+                        miniDesignSelect.innerHTML = Object.keys(profile.designs).map(key => {
+                            return `<option value="${key}" ${key===currentDesign?'selected':''}>${key}</option>`;
+                        }).join('');
+                    }
+                }
+                
+                miniToolbar.style.display = 'flex';
+                
+                // Fit canvas to window after layout update (considerando la toolbar)
+                setTimeout(() => {
+                    // Calcola lo spazio disponibile per il canvas (escludendo la toolbar)
+                    const toolbarHeight = miniToolbar ? miniToolbar.offsetHeight : 0;
+                    const availableHeight = window.innerHeight - toolbarHeight;
+                    const availableWidth = window.innerWidth;
+                    const cr = cc.getBoundingClientRect();
+                    const hw = (availableWidth - 40) / (W * 37.795276);
+                    const vw = (availableHeight - 40) / (H * 37.795276);
+                    setZoom(Math.min(hw, vw, 1.5));
+                }, 50);
+            }
+        }
 
         // ---------- Grist integration (optional) ----------
         if(isGristAvailable()){
@@ -2345,6 +2549,9 @@
         updateProps();
         fit();
         resetHistory();
+        
+        // Check full screen mode on initial load
+        checkFullScreenMode();
         
         // Sync button heights with select on initial load
         setTimeout(() => {
