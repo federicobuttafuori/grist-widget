@@ -1,83 +1,83 @@
-    <!DOCTYPE html>
-    <html lang="en">
-    <head>
-        <meta charset="utf-8"/>
-        <meta name="viewport" content="width=device-width,initial-scale=1"/>
-        <title>Grist Label Designer — Marquee Fix</title>
-        <script src="https://docs.getgrist.com/grist-plugin-api.js"></script>
-        <script src="https://cdn.jsdelivr.net/npm/jsbarcode@3.11.5/dist/JsBarcode.all.min.js"></script>
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8"/>
+    <meta name="viewport" content="width=device-width,initial-scale=1"/>
+    <title>Grist Label Designer — Marquee Fix</title>
+    <script src="https://docs.getgrist.com/grist-plugin-api.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/jsbarcode@3.11.5/dist/JsBarcode.all.min.js"></script>
         <link rel="preconnect" href="https://fonts.googleapis.com">
         <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
         <link href="https://fonts.googleapis.com/css2?family=Oswald:wght@200;300;400;500;600;700&family=Roboto+Condensed:wght@300;400;700&display=swap" rel="stylesheet">
-        <style>
-            *{box-sizing:border-box;margin:0;padding:0}
-            html,body{height:100vh;width:100vw;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;display:flex;flex-direction:column;overflow:hidden;background:#f0f0f0;color:#333}
-            button{padding:6px 10px;border:1px solid #ccc;background:#fff;border-radius:4px;cursor:pointer;font-size:14px;transition:all .2s}
-            button:hover{background:#f9f9f9;border-color:#aaa}
-            button:active{background:#e0e0e0}
-            button:disabled{opacity:.5;cursor:not-allowed}
-            input,select,textarea{width:100%;padding:6px;border:1px solid #ccc;border-radius:4px;font-size:14px}
-            textarea{resize:vertical;min-height:60px}
-            hr{border:none;border-top:1px solid #eee;margin:12px 0}
-            #toolbar{flex-shrink:0;padding:8px;background:#fff;border-bottom:1px solid #e0e0e0;display:flex;gap:8px;align-items:center;flex-wrap:wrap}
-            #toolbar .zoom-label{font-size:14px;margin-left:auto}
-            #toolbar .divider{width:1px;height:24px;background:#e0e0e0;margin:0 4px}
-            #main-content{display:flex;flex-grow:1;overflow:hidden}
-            #sidebar{width:320px;flex-shrink:0;background:#fdfdfd;border-right:1px solid #e0e0e0;padding:12px;overflow-y:auto;display:flex;flex-direction:column;gap:16px}
+    <style>
+        *{box-sizing:border-box;margin:0;padding:0}
+        html,body{height:100vh;width:100vw;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;display:flex;flex-direction:column;overflow:hidden;background:#f0f0f0;color:#333}
+        button{padding:6px 10px;border:1px solid #ccc;background:#fff;border-radius:4px;cursor:pointer;font-size:14px;transition:all .2s}
+        button:hover{background:#f9f9f9;border-color:#aaa}
+        button:active{background:#e0e0e0}
+        button:disabled{opacity:.5;cursor:not-allowed}
+        input,select,textarea{width:100%;padding:6px;border:1px solid #ccc;border-radius:4px;font-size:14px}
+        textarea{resize:vertical;min-height:60px}
+        hr{border:none;border-top:1px solid #eee;margin:12px 0}
+        #toolbar{flex-shrink:0;padding:8px;background:#fff;border-bottom:1px solid #e0e0e0;display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+        #toolbar .zoom-label{font-size:14px;margin-left:auto}
+        #toolbar .divider{width:1px;height:24px;background:#e0e0e0;margin:0 4px}
+        #main-content{display:flex;flex-grow:1;overflow:hidden}
+        #sidebar{width:320px;flex-shrink:0;background:#fdfdfd;border-right:1px solid #e0e0e0;padding:12px;overflow-y:auto;display:flex;flex-direction:column;gap:16px}
             .profile-section{background:#f5f5f5;padding:10px;border-radius:6px;border:1px solid #e0e0e0}
             .profile-section select{margin-bottom:8px}
             .profile-section .button-row{display:flex;gap:4px;margin-top:8px}
             .profile-section .button-row button{flex:1;font-size:12px;padding:4px 8px}
-            #sidebar h3{font-size:16px;font-weight:600;border-bottom:1px solid #eee;padding-bottom:6px;margin-bottom:4px}
-            .sidebar-section{display:flex;flex-direction:column;gap:8px}
-            .sidebar-section .add-buttons{display:grid;grid-template-columns:1fr 1fr;gap:8px}
-            .prop-grid{display:grid;grid-template-columns:90px 1fr;gap:8px;align-items:center}
-            .prop-grid label{font-size:14px;font-weight:500}
-            #properties-panel{font-size:14px}
-            #btn-delete{background:#fbebeb;border-color:#d9a0a0;color:#c00;margin-top:12px}
-            #btn-delete:hover{background:#f7dada}
-            .button-group{display:flex;gap:4px}
-            #canvas-container{flex-grow:1;display:flex;justify-content:center;align-items:center;overflow:auto;background:#e0e0e0;padding:20px;position:relative}
-            #canvas-wrapper{display:inline-block;transform-origin:center center;position:relative}
+        #sidebar h3{font-size:16px;font-weight:600;border-bottom:1px solid #eee;padding-bottom:6px;margin-bottom:4px}
+        .sidebar-section{display:flex;flex-direction:column;gap:8px}
+        .sidebar-section .add-buttons{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+        .prop-grid{display:grid;grid-template-columns:90px 1fr;gap:8px;align-items:center}
+        .prop-grid label{font-size:14px;font-weight:500}
+        #properties-panel{font-size:14px}
+        #btn-delete{background:#fbebeb;border-color:#d9a0a0;color:#c00;margin-top:12px}
+        #btn-delete:hover{background:#f7dada}
+        .button-group{display:flex;gap:4px}
+        #canvas-container{flex-grow:1;display:flex;justify-content:center;align-items:center;overflow:auto;background:#e0e0e0;padding:20px;position:relative}
+        #canvas-wrapper{display:inline-block;transform-origin:center center;position:relative}
             #label-canvas{background:#fff;box-shadow:0 4px 12px rgba(0,0,0,.15);position:relative;overflow:hidden}
-            #marquee{position:absolute;border:1px dashed #007aff;background:rgba(0,122,255,0.08);pointer-events:none;display:none;z-index:9999}
-            .label-element{position:absolute;cursor:move;border:1px solid transparent;font-size:16px;line-height:1.2;overflow:hidden;word-wrap:break-word;user-select:none;transform-origin:center center}
-            .label-element.selected{border:2px dashed #007aff;box-shadow:0 0 0 1px rgba(0,122,255,.1)}
-            .resize-handle{position:absolute;width:12px;height:12px;background:#007aff;border:2px solid #fff;border-radius:50%;bottom:-6px;right:-6px;cursor:nwse-resize;display:none;box-shadow:0 2px 4px rgba(0,0,0,.2)}
-            .label-element.selected .resize-handle{display:block}
-            .label-element img,.label-element svg{width:100%;height:100%;object-fit:contain;pointer-events:none}
-            .status-message{position:fixed;top:60px;right:20px;padding:12px 16px;background:#4CAF50;color:#fff;border-radius:4px;box-shadow:0 2px 8px rgba(0,0,0,.2);z-index:1000;animation:slideIn .3s ease-out}
-            @keyframes slideIn{from{transform:translateX(400px);opacity:0}to{transform:translateX(0);opacity:1}}
-            .status-message.error{background:#f44336}
+        #marquee{position:absolute;border:1px dashed #007aff;background:rgba(0,122,255,0.08);pointer-events:none;display:none;z-index:9999}
+        .label-element{position:absolute;cursor:move;border:1px solid transparent;font-size:16px;line-height:1.2;overflow:hidden;word-wrap:break-word;user-select:none;transform-origin:center center}
+        .label-element.selected{border:2px dashed #007aff;box-shadow:0 0 0 1px rgba(0,122,255,.1)}
+        .resize-handle{position:absolute;width:12px;height:12px;background:#007aff;border:2px solid #fff;border-radius:50%;bottom:-6px;right:-6px;cursor:nwse-resize;display:none;box-shadow:0 2px 4px rgba(0,0,0,.2)}
+        .label-element.selected .resize-handle{display:block}
+        .label-element img,.label-element svg{width:100%;height:100%;object-fit:contain;pointer-events:none}
+        .status-message{position:fixed;top:60px;right:20px;padding:12px 16px;background:#4CAF50;color:#fff;border-radius:4px;box-shadow:0 2px 8px rgba(0,0,0,.2);z-index:1000;animation:slideIn .3s ease-out}
+        @keyframes slideIn{from{transform:translateX(400px);opacity:0}to{transform:translateX(0);opacity:1}}
+        .status-message.error{background:#f44336}
             #mini-toolbar{display:none;gap:8px;background:#fff;padding:8px;border-bottom:1px solid #e0e0e0;flex-direction:row;align-items:center;justify-content:center;flex-shrink:0}
             #mini-toolbar button{padding:8px 12px;font-size:14px}
             #mini-toolbar select{padding:6px 8px;font-size:13px;border:1px solid #ccc;border-radius:4px;background:#fff;min-width:100px;max-width:150px}
             .widget-mode #canvas-container .label-element{pointer-events:none;cursor:default}
             .widget-mode #canvas-container{cursor:default}
-        </style>
-    </head>
-    <body>
-        <div id="toolbar">
-            <button id="btn-clear" title="Clear Layout">🗑️ Clear</button>
-            <div class="divider"></div>
-            <button id="btn-print" title="Print Label">🖨️ Print</button>
+    </style>
+</head>
+<body>
+    <div id="toolbar">
+        <button id="btn-clear" title="Clear Layout">🗑️ Clear</button>
+        <div class="divider"></div>
+        <button id="btn-print" title="Print Label">🖨️ Print</button>
             <div class="divider"></div>
             <button id="btn-rotate-canvas" title="Rotate Canvas 90° (temporary, not for print)">🔄 Rotate</button>
-            <div class="divider"></div>
-            <button id="btn-duplicate" title="Duplicate Selected Elements" disabled>📋 Duplicate</button>
-            <button id="btn-bring-front" title="Bring to Front" disabled>⬆️ Front</button>
-            <button id="btn-send-back" title="Send to Back" disabled>⬇️ Back</button>
-            <span class="zoom-label">Zoom:</span>
-            <div class="button-group">
-                <button id="btn-zoom-out" title="Zoom Out">-</button>
-                <button id="btn-zoom-in" title="Zoom In">+</button>
-                <button id="btn-zoom-fit" title="Fit to Screen">Fit</button>
-            </div>
-            <span id="zoom-display">100%</span>
+        <div class="divider"></div>
+        <button id="btn-duplicate" title="Duplicate Selected Elements" disabled>📋 Duplicate</button>
+        <button id="btn-bring-front" title="Bring to Front" disabled>⬆️ Front</button>
+        <button id="btn-send-back" title="Send to Back" disabled>⬇️ Back</button>
+        <span class="zoom-label">Zoom:</span>
+        <div class="button-group">
+            <button id="btn-zoom-out" title="Zoom Out">-</button>
+            <button id="btn-zoom-in" title="Zoom In">+</button>
+            <button id="btn-zoom-fit" title="Fit to Screen">Fit</button>
         </div>
+        <span id="zoom-display">100%</span>
+    </div>
 
-        <div id="main-content">
-            <div id="sidebar">
+    <div id="main-content">
+        <div id="sidebar">
                 <div class="sidebar-section profile-section">
                     <h3>Label Profile</h3>
                     <label>Size:</label>
@@ -102,23 +102,23 @@
                     </div>
                 </div>
                 <hr>
-                <div class="sidebar-section">
-                    <h3>Add Element</h3>
-                    <div class="add-buttons">
-                        <button class="add-element" data-type="text">📝 Text</button>
-                        <button class="add-element" data-type="data">🔗 Data Field</button>
+            <div class="sidebar-section">
+                <h3>Add Element</h3>
+                <div class="add-buttons">
+                    <button class="add-element" data-type="text">📝 Text</button>
+                    <button class="add-element" data-type="data">🔗 Data Field</button>
                         <button class="add-element" data-type="image">🖼️ Image</button>
-                        <button class="add-element" data-type="qr">📱 QR Code</button>
-                        <button class="add-element" data-type="barcode">📊 Barcode</button>
-                        <button class="add-element" data-type="line">➖ Line</button>
-                        <button class="add-element" data-type="box">⬜ Box</button>
-                    </div>
+                    <button class="add-element" data-type="qr">📱 QR Code</button>
+                    <button class="add-element" data-type="barcode">📊 Barcode</button>
+                    <button class="add-element" data-type="line">➖ Line</button>
+                    <button class="add-element" data-type="box">⬜ Box</button>
                 </div>
-                <hr>
-                <div class="sidebar-section">
-                    <h3>Properties</h3>
-                    <div id="properties-panel">Select an element to edit its properties.</div>
-                </div>
+            </div>
+            <hr>
+            <div class="sidebar-section">
+                <h3>Properties</h3>
+                <div id="properties-panel">Select an element to edit its properties.</div>
+            </div>
                 <hr>
                 <div class="sidebar-section">
                     <h3>Canvas</h3>
@@ -132,42 +132,42 @@
                         <label for="canvas2-enabled" style="font-size:14px;margin:0;font-weight:normal;cursor:pointer">Enable Canvas 2</label>
                     </div>
                 </div>
-                <hr>
-                <div class="sidebar-section">
-                    <h3>Import/Export</h3>
-                    <div style="display:flex;gap:8px">
-                        <button id="btn-export">⬇️ Export</button>
-                        <button id="btn-import">⬆️ Import</button>
-                    </div>
-                    <small>Tip: Ctrl/Cmd+E exports layout. Ctrl/Cmd+Z = undo, Ctrl/Cmd+Shift+Z = redo</small>
+            <hr>
+            <div class="sidebar-section">
+                <h3>Import/Export</h3>
+                <div style="display:flex;gap:8px">
+                    <button id="btn-export">⬇️ Export</button>
+                    <button id="btn-import">⬆️ Import</button>
                 </div>
-            </div>
-
-            <div id="canvas-container">
-                <div id="canvas-wrapper">
-                    <div id="label-canvas"></div>
-                </div>
-                <div id="marquee"></div>
+                <small>Tip: Ctrl/Cmd+E exports layout. Ctrl/Cmd+Z = undo, Ctrl/Cmd+Shift+Z = redo</small>
             </div>
         </div>
 
-        <input id="file-import" type="file" accept="application/json" style="display:none" />
+        <div id="canvas-container">
+            <div id="canvas-wrapper">
+                <div id="label-canvas"></div>
+            </div>
+            <div id="marquee"></div>
+        </div>
+    </div>
 
-    <script>
-    document.addEventListener('DOMContentLoaded', ()=>{
+    <input id="file-import" type="file" accept="application/json" style="display:none" />
 
-        // ---------- State ----------
-        let S = [];                       // elements array
-        let selectedIds = [];             // array of selected element ids (multi-select)
-        let z = 1;
-        let R = {}, C = [];
-        let drag = false, resizeMode = false, ctx = {};
+<script>
+document.addEventListener('DOMContentLoaded', ()=>{
+
+    // ---------- State ----------
+    let S = [];                       // elements array
+    let selectedIds = [];             // array of selected element ids (multi-select)
+    let z = 1;
+    let R = {}, C = [];
+    let drag = false, resizeMode = false, ctx = {};
         let canvasRotation = 0;           // temporary canvas rotation (0, 90, 180, 270 degrees)
         let W = 8, H = 5;                 // Current dimensions (dynamic)
         const KEY = 'grist_label_layout_v2'; // Updated version for profiles
         const FONT_FAVORITES_KEY = 'grist_label_font_favorites'; // Key for font favorites
-        const MAX_HISTORY = 100;
-        
+    const MAX_HISTORY = 100;
+
         // All available fonts for labels
         const ALL_FONTS = [
             { value: 'Arial, sans-serif', name: 'Arial' },
@@ -279,19 +279,19 @@
         // Full screen detection
         let isFullScreen = true; // Default: assume full screen
 
-        // DOM refs
-        const cc = document.getElementById('canvas-container');
-        const cw = document.getElementById('canvas-wrapper');
-        const lc = document.getElementById('label-canvas');
-        const pp = document.getElementById('properties-panel');
-        const zd = document.getElementById('zoom-display');
-        const bd = document.getElementById('btn-duplicate');
-        const bf = document.getElementById('btn-bring-front');
-        const bs = document.getElementById('btn-send-back');
-        const fileInput = document.getElementById('file-import');
-        const btnExport = document.getElementById('btn-export');
-        const btnImport = document.getElementById('btn-import');
-        const marquee = document.getElementById('marquee');
+    // DOM refs
+    const cc = document.getElementById('canvas-container');
+    const cw = document.getElementById('canvas-wrapper');
+    const lc = document.getElementById('label-canvas');
+    const pp = document.getElementById('properties-panel');
+    const zd = document.getElementById('zoom-display');
+    const bd = document.getElementById('btn-duplicate');
+    const bf = document.getElementById('btn-bring-front');
+    const bs = document.getElementById('btn-send-back');
+    const fileInput = document.getElementById('file-import');
+    const btnExport = document.getElementById('btn-export');
+    const btnImport = document.getElementById('btn-import');
+    const marquee = document.getElementById('marquee');
         const profileSelector = document.getElementById('profile-selector');
         const designSelector = document.getElementById('design-selector');
         const btnAddProfile = document.getElementById('btn-add-profile');
@@ -301,18 +301,18 @@
         const canvasSelector = document.getElementById('canvas-selector');
         const canvas2Enabled = document.getElementById('canvas2-enabled');
 
-        // Marquee state
-        let marqueeActive = false;
-        let marqueeStart = { clientX:0, clientY:0, startX:0, startY:0, containerRect:null };
+    // Marquee state
+    let marqueeActive = false;
+    let marqueeStart = { clientX:0, clientY:0, startX:0, startY:0, containerRect:null };
 
-        // ---------- Utilities ----------
-        function msg(m, error=false, timeout=3000){
-            const x = document.querySelector('.status-message'); if(x) x.remove();
-            const s = document.createElement('div'); s.className = 'status-message' + (error ? ' error' : ''); s.textContent = m;
-            document.body.appendChild(s); setTimeout(()=>{ if(s.parentNode) s.parentNode.removeChild(s) }, timeout);
-        }
+    // ---------- Utilities ----------
+    function msg(m, error=false, timeout=3000){
+        const x = document.querySelector('.status-message'); if(x) x.remove();
+        const s = document.createElement('div'); s.className = 'status-message' + (error ? ' error' : ''); s.textContent = m;
+        document.body.appendChild(s); setTimeout(()=>{ if(s.parentNode) s.parentNode.removeChild(s) }, timeout);
+    }
 
-        function isGristAvailable(){ return (typeof window.grist !== 'undefined' && window.grist && typeof window.grist.getOption === 'function' && typeof window.grist.setOption === 'function'); }
+    function isGristAvailable(){ return (typeof window.grist !== 'undefined' && window.grist && typeof window.grist.getOption === 'function' && typeof window.grist.setOption === 'function'); }
 
         // Calculate bounding box for rotated element
         function getRotatedBounds(el){
@@ -344,7 +344,7 @@
             };
         }
 
-        function deepCopy(obj){ return JSON.parse(JSON.stringify(obj)); }
+    function deepCopy(obj){ return JSON.parse(JSON.stringify(obj)); }
 
         // ---------- Profile Management ----------
         function updateCanvasSize(){
@@ -700,7 +700,7 @@
             saveCurrentDesign();
         }
 
-        // ---------- History (undo/redo) ----------
+    // ---------- History (undo/redo) ----------
         function getHistoryKey(){
             return `${currentProfile}-${currentDesign}-${currentCanvas}`;
         }
@@ -716,110 +716,115 @@
             return historyStacks[key];
         }
         
-        function pushHistorySnapshot(){
+    function pushHistorySnapshot(){
             const stack = getHistoryStack();
             if(stack.historyIndex < stack.history.length - 1) {
                 stack.history = stack.history.slice(0, stack.historyIndex + 1);
             }
             stack.history.push({
-                data: deepCopy(S),
-                sel: deepCopy(selectedIds)
-            });
+            data: deepCopy(S),
+            sel: deepCopy(selectedIds)
+        });
             if(stack.history.length > MAX_HISTORY) stack.history.shift();
             stack.historyIndex = stack.history.length - 1;
-        }
+    }
 
-        function resetHistory(){
+    function resetHistory(){
             const stack = getHistoryStack();
             stack.history = [];
             stack.historyIndex = -1;
-            pushHistorySnapshot();
-        }
+        pushHistorySnapshot();
+    }
 
-        function undo(){
+    function undo(){
             const stack = getHistoryStack();
             if(stack.historyIndex <= 0) { msg('Nothing to undo'); return; }
             stack.historyIndex--;
             const snap = stack.history[stack.historyIndex];
-            S = deepCopy(snap.data);
-            selectedIds = deepCopy(snap.sel);
-            render();
-            updateProps();
-            updateBtns();
+        S = deepCopy(snap.data);
+        selectedIds = deepCopy(snap.sel);
+        render();
+        updateProps();
+        updateBtns();
             saveCurrentDesign();
-            msg('Undo');
-        }
+        msg('Undo');
+    }
 
-        function redo(){
+    function redo(){
             const stack = getHistoryStack();
             if(stack.historyIndex >= stack.history.length - 1) { msg('Nothing to redo'); return; }
             stack.historyIndex++;
             const snap = stack.history[stack.historyIndex];
-            S = deepCopy(snap.data);
-            selectedIds = deepCopy(snap.sel);
-            render();
-            updateProps();
-            updateBtns();
+        S = deepCopy(snap.data);
+        selectedIds = deepCopy(snap.sel);
+        render();
+        updateProps();
+        updateBtns();
             saveCurrentDesign();
-            msg('Redo');
-        }
+        msg('Redo');
+    }
 
-        // ---------- Element normalization ----------
-        function normalizeElement(el){
-            if(!el) return null;
-            const defaults = {
-                id: `el_${Date.now()}`,
-                type: 'text',
-                x: 0.5, y: 0.5, width: 1.5, height: 0.5, zIndex: 0,
-                props: {
-                    text: 'Sample Text',
-                    fontSize: 16, fontWeight: 'normal', fontFamily: 'Arial, sans-serif',
-                    textAlign: 'left', valign: 'top', color: '#000000',
-                    boundColumn: '', prefix:'', suffix:'', rotation:0,
+    // ---------- Element normalization ----------
+    function normalizeElement(el){
+        if(!el) return null;
+        const defaults = {
+            id: `el_${Date.now()}`,
+            type: 'text',
+            x: 0.5, y: 0.5, width: 1.5, height: 0.5, zIndex: 0,
+            props: {
+                text: 'Sample Text',
+                fontSize: 16, fontWeight: 'normal', fontFamily: 'Arial, sans-serif',
+                textAlign: 'left', valign: 'top', color: '#000000',
+                boundColumn: '', prefix:'', suffix:'', rotation:0,
                     showBorder:false, borderColor:'#000000', borderWidth:1, borderTop:true, borderRight:true, borderBottom:true, borderLeft:true,
-                    paddingTop: 0, paddingRight: 0, paddingBottom: 0, paddingLeft: 0,
-                    thickness:2, format:'CODE128', displayValue:true,
+                    borderRadiusTopLeft:0, borderRadiusTopRight:0, borderRadiusBottomRight:0, borderRadiusBottomLeft:0,
+                paddingTop: 0, paddingRight: 0, paddingBottom: 0, paddingLeft: 0,
+                thickness:2, format:'CODE128', displayValue:true,
                     fillColor:'#ffffff', decimals:2, asPercent:false,
                     lineHeight: 1.2
-                }
-            };
-
-            // Merge top-level / props
-            const base = Object.assign({}, defaults, el);
-            base.props = Object.assign({}, defaults.props, el && el.props ? el.props : {});
-
-            // If old single padding exists (legacy data), convert to sides
-            if(base.props.padding !== undefined && !isNaN(Number(base.props.padding))){
-                const v = Number(base.props.padding);
-                base.props.paddingTop = base.props.paddingTop !== undefined ? Number(base.props.paddingTop) : v;
-                base.props.paddingRight = base.props.paddingRight !== undefined ? Number(base.props.paddingRight) : v;
-                base.props.paddingBottom = base.props.paddingBottom !== undefined ? Number(base.props.paddingBottom) : v;
-                base.props.paddingLeft = base.props.paddingLeft !== undefined ? Number(base.props.paddingLeft) : v;
-            } else {
-                base.props.paddingTop = Number(base.props.paddingTop) || 0;
-                base.props.paddingRight = Number(base.props.paddingRight) || 0;
-                base.props.paddingBottom = Number(base.props.paddingBottom) || 0;
-                base.props.paddingLeft = Number(base.props.paddingLeft) || 0;
             }
+        };
 
-            base.x = Number(base.x) || 0;
-            base.y = Number(base.y) || 0;
-            base.width = Number(base.width) || 1;
-            base.height = Number(base.height) || 1;
-            base.zIndex = Number(base.zIndex) || 0;
-            base.props.fontSize = Number(base.props.fontSize) || 16;
+        // Merge top-level / props
+        const base = Object.assign({}, defaults, el);
+        base.props = Object.assign({}, defaults.props, el && el.props ? el.props : {});
+
+        // If old single padding exists (legacy data), convert to sides
+        if(base.props.padding !== undefined && !isNaN(Number(base.props.padding))){
+            const v = Number(base.props.padding);
+            base.props.paddingTop = base.props.paddingTop !== undefined ? Number(base.props.paddingTop) : v;
+            base.props.paddingRight = base.props.paddingRight !== undefined ? Number(base.props.paddingRight) : v;
+            base.props.paddingBottom = base.props.paddingBottom !== undefined ? Number(base.props.paddingBottom) : v;
+            base.props.paddingLeft = base.props.paddingLeft !== undefined ? Number(base.props.paddingLeft) : v;
+        } else {
+            base.props.paddingTop = Number(base.props.paddingTop) || 0;
+            base.props.paddingRight = Number(base.props.paddingRight) || 0;
+            base.props.paddingBottom = Number(base.props.paddingBottom) || 0;
+            base.props.paddingLeft = Number(base.props.paddingLeft) || 0;
+        }
+
+        base.x = Number(base.x) || 0;
+        base.y = Number(base.y) || 0;
+        base.width = Number(base.width) || 1;
+        base.height = Number(base.height) || 1;
+        base.zIndex = Number(base.zIndex) || 0;
+        base.props.fontSize = Number(base.props.fontSize) || 16;
             base.props.lineHeight = Number(base.props.lineHeight) || 1.2;
-            base.props.decimals = Number(base.props.decimals) || 0;
-            base.props.thickness = Number(base.props.thickness) || 2;
-            base.props.borderWidth = Number(base.props.borderWidth) || 1;
-            base.props.displayValue = (base.props.displayValue !== false);
-            base.props.asPercent = !!base.props.asPercent;
-            base.props.rotation = Number(base.props.rotation) || 0;
-            base.props.valign = base.props.valign || 'top';
-            base.props.prefix = base.props.prefix || '';
-            base.props.suffix = base.props.suffix || '';
-            base.props.showBorder = !!base.props.showBorder;
-            base.props.borderColor = base.props.borderColor || '#000000';
+        base.props.decimals = Number(base.props.decimals) || 0;
+        base.props.thickness = Number(base.props.thickness) || 2;
+        base.props.borderWidth = Number(base.props.borderWidth) || 1;
+            base.props.borderRadiusTopLeft = Number(base.props.borderRadiusTopLeft) || 0;
+            base.props.borderRadiusTopRight = Number(base.props.borderRadiusTopRight) || 0;
+            base.props.borderRadiusBottomRight = Number(base.props.borderRadiusBottomRight) || 0;
+            base.props.borderRadiusBottomLeft = Number(base.props.borderRadiusBottomLeft) || 0;
+        base.props.displayValue = (base.props.displayValue !== false);
+        base.props.asPercent = !!base.props.asPercent;
+        base.props.rotation = Number(base.props.rotation) || 0;
+        base.props.valign = base.props.valign || 'top';
+        base.props.prefix = base.props.prefix || '';
+        base.props.suffix = base.props.suffix || '';
+        base.props.showBorder = !!base.props.showBorder;
+        base.props.borderColor = base.props.borderColor || '#000000';
             // Default border sides to true if showBorder is true, otherwise false
             if(base.props.showBorder){
                 base.props.borderTop = base.props.borderTop !== undefined ? !!base.props.borderTop : true;
@@ -832,67 +837,67 @@
                 base.props.borderBottom = false;
                 base.props.borderLeft = false;
             }
-            return base;
-        }
+        return base;
+    }
 
-        // ---------- Rendering ----------
-        function render(){
-            lc.innerHTML = '';
-            const sorted = S.slice().sort((a,b)=> (a.zIndex||0) - (b.zIndex||0));
-            sorted.forEach(el=>{
-                const d = document.createElement('div');
-                d.classList.add('label-element');
-                d.dataset.id = el.id;
-                d.style.left = `${el.x}cm`;
-                d.style.top = `${el.y}cm`;
-                d.style.width = `${el.width}cm`;
-                d.style.height = `${el.height}cm`;
-                d.style.zIndex = el.zIndex || 0;
-                d.style.fontSize = `${el.props.fontSize || 16}px`;
+    // ---------- Rendering ----------
+    function render(){
+        lc.innerHTML = '';
+        const sorted = S.slice().sort((a,b)=> (a.zIndex||0) - (b.zIndex||0));
+        sorted.forEach(el=>{
+            const d = document.createElement('div');
+            d.classList.add('label-element');
+            d.dataset.id = el.id;
+            d.style.left = `${el.x}cm`;
+            d.style.top = `${el.y}cm`;
+            d.style.width = `${el.width}cm`;
+            d.style.height = `${el.height}cm`;
+            d.style.zIndex = el.zIndex || 0;
+            d.style.fontSize = `${el.props.fontSize || 16}px`;
                 const fontWeight = el.props.fontWeight;
                 if(typeof fontWeight === 'number'){
                     d.style.fontWeight = fontWeight;
                 } else {
                     d.style.fontWeight = fontWeight || 'normal';
                 }
-                d.style.fontFamily = el.props.fontFamily || 'Arial, sans-serif';
+            d.style.fontFamily = el.props.fontFamily || 'Arial, sans-serif';
                 d.style.lineHeight = el.props.lineHeight !== undefined ? String(el.props.lineHeight) : '1.2';
-                const justifyMap = { left: 'flex-start', center: 'center', right: 'flex-end' };
-                const alignMap = { top: 'flex-start', middle: 'center', bottom: 'flex-end' };
-                if(el.type !== 'line'){
-                    d.style.display = 'flex';
-                    d.style.alignItems = alignMap[el.props.valign] || 'flex-start';
-                    d.style.justifyContent = justifyMap[el.props.textAlign] || 'flex-start';
+            const justifyMap = { left: 'flex-start', center: 'center', right: 'flex-end' };
+            const alignMap = { top: 'flex-start', middle: 'center', bottom: 'flex-end' };
+            if(el.type !== 'line'){
+                d.style.display = 'flex';
+                d.style.alignItems = alignMap[el.props.valign] || 'flex-start';
+                d.style.justifyContent = justifyMap[el.props.textAlign] || 'flex-start';
                     // Use pre-wrap to preserve line breaks from textarea
                     if(el.type === 'text' || el.type === 'data'){
                         d.style.whiteSpace = 'pre-wrap';
                     } else {
-                        d.style.whiteSpace = 'normal';
+                d.style.whiteSpace = 'normal';
                     }
-                } else {
-                    d.style.display = '';
-                    d.style.whiteSpace = '';
-                }
-                d.style.textAlign = el.props.textAlign || 'left';
-                d.style.color = el.props.color || '#000000';
-                d.style.boxSizing = 'border-box';
-                const rotation = Number(el.props.rotation) || 0;
-                d.style.transform = `rotate(${rotation}deg)`;
-                d.style.transformOrigin = 'center center';
+            } else {
+                d.style.display = '';
+                d.style.whiteSpace = '';
+            }
+            d.style.textAlign = el.props.textAlign || 'left';
+            d.style.color = el.props.color || '#000000';
+            d.style.boxSizing = 'border-box';
+            const rotation = Number(el.props.rotation) || 0;
+            d.style.transform = `rotate(${rotation}deg)`;
+            d.style.transformOrigin = 'center center';
 
-                // padding sides applied in cm if element is text or data (default 0)
-                if((el.type === 'text' || el.type === 'data')){
-                    const pt = Number.isFinite(Number(el.props.paddingTop)) ? Number(el.props.paddingTop) : 0;
-                    const pr = Number.isFinite(Number(el.props.paddingRight)) ? Number(el.props.paddingRight) : 0;
-                    const pb = Number.isFinite(Number(el.props.paddingBottom)) ? Number(el.props.paddingBottom) : 0;
-                    const pl = Number.isFinite(Number(el.props.paddingLeft)) ? Number(el.props.paddingLeft) : 0;
-                    d.style.padding = `${pt}cm ${pr}cm ${pb}cm ${pl}cm`;
-                } else {
-                    d.style.padding = '';
-                }
+            // padding sides applied in cm if element is text or data (default 0)
+            if((el.type === 'text' || el.type === 'data')){
+                const pt = Number.isFinite(Number(el.props.paddingTop)) ? Number(el.props.paddingTop) : 0;
+                const pr = Number.isFinite(Number(el.props.paddingRight)) ? Number(el.props.paddingRight) : 0;
+                const pb = Number.isFinite(Number(el.props.paddingBottom)) ? Number(el.props.paddingBottom) : 0;
+                const pl = Number.isFinite(Number(el.props.paddingLeft)) ? Number(el.props.paddingLeft) : 0;
+                d.style.padding = `${pt}cm ${pr}cm ${pb}cm ${pl}cm`;
+            } else {
+                d.style.padding = '';
+            }
 
                 // border - apply individual sides
-                if(el.props.showBorder && el.type !== 'box'){
+            if(el.props.showBorder && el.type !== 'box'){
                     const borderWidth = `${Number(el.props.borderWidth)||1}px`;
                     const borderColor = el.props.borderColor || '#000';
                     const borderStyle = 'solid';
@@ -902,80 +907,91 @@
                     d.style.borderRight = (el.props.borderRight !== false) ? `${borderWidth} ${borderStyle} ${borderColor}` : 'none';
                     d.style.borderBottom = (el.props.borderBottom !== false) ? `${borderWidth} ${borderStyle} ${borderColor}` : 'none';
                     d.style.borderLeft = (el.props.borderLeft !== false) ? `${borderWidth} ${borderStyle} ${borderColor}` : 'none';
+                    
+                    // Apply border radius (individual corners)
+                    const brTL = Number(el.props.borderRadiusTopLeft) || 0;
+                    const brTR = Number(el.props.borderRadiusTopRight) || 0;
+                    const brBR = Number(el.props.borderRadiusBottomRight) || 0;
+                    const brBL = Number(el.props.borderRadiusBottomLeft) || 0;
+                    if(brTL > 0 || brTR > 0 || brBR > 0 || brBL > 0){
+                        d.style.borderRadius = `${brTL}px ${brTR}px ${brBR}px ${brBL}px`;
+            } else {
+                        d.style.borderRadius = '';
+                    }
                 } else {
                     // Don't apply transparent border to lines - they use thickness for height
                     if(el.type !== 'box' && el.type !== 'line') d.style.border = '1px solid transparent';
-                }
+            }
 
-                // content
-                switch(el.type){
-                    case 'text': {
-                        const span = document.createElement('div');
-                        span.style.display='block';
-                        span.style.width='100%';
-                        span.style.pointerEvents='none';
-                        span.style.overflow='hidden';
-                        span.style.wordWrap='break-word';
+            // content
+            switch(el.type){
+                case 'text': {
+                    const span = document.createElement('div');
+                    span.style.display='block';
+                    span.style.width='100%';
+                    span.style.pointerEvents='none';
+                    span.style.overflow='hidden';
+                    span.style.wordWrap='break-word';
                         span.style.whiteSpace='pre-wrap'; // Preserve line breaks
-                        span.textContent = el.props.text || 'Static Text';
-                        d.appendChild(span);
-                        break;
-                    }
-                    case 'data': {
-                        const span = document.createElement('div');
-                        span.style.display='block';
-                        span.style.width='100%';
-                        span.style.pointerEvents='none';
-                        span.style.overflow='hidden';
-                        span.style.wordWrap='break-word';
+                    span.textContent = el.props.text || 'Static Text';
+                    d.appendChild(span);
+                    break;
+                }
+                case 'data': {
+                    const span = document.createElement('div');
+                    span.style.display='block';
+                    span.style.width='100%';
+                    span.style.pointerEvents='none';
+                    span.style.overflow='hidden';
+                    span.style.wordWrap='break-word';
                         span.style.whiteSpace='pre-wrap'; // Preserve line breaks
-                        span.textContent = getData(el);
-                        d.appendChild(span);
-                        break;
-                    }
-                    case 'line':
-                        d.style.backgroundColor = el.props.color || '#000000';
-                        d.style.height = `${el.props.thickness || 2}px`;
-                        d.style.width = `${el.width}cm`;
+                    span.textContent = getData(el);
+                    d.appendChild(span);
+                    break;
+                }
+                case 'line':
+                    d.style.backgroundColor = el.props.color || '#000000';
+                    d.style.height = `${el.props.thickness || 2}px`;
+                    d.style.width = `${el.width}cm`;
                         d.style.border = 'none'; // No border for lines - thickness controls height
-                        break;
-                    case 'box':
-                        d.style.border = `${el.props.thickness || 2}px solid ${el.props.color || '#000000'}`;
-                        d.style.backgroundColor = el.props.fillColor || 'transparent';
-                        break;
-                    case 'qr': {
-                        const c = getData(el);
-                        const q = document.createElement('img');
-                        const dpi = 37.795276;
-                        const qs = Math.min(el.width, el.height) * dpi;
-                        q.src = `https://api.qrserver.com/v1/create-qr-code/?size=${Math.round(qs)}x${Math.round(qs)}&data=${encodeURIComponent(c)}`;
-                        q.style.pointerEvents='none';
-                        q.style.width='100%';
-                        q.style.height='100%';
-                        q.style.objectFit='contain';
-                        d.appendChild(q);
-                        break;
+                    break;
+                case 'box':
+                    d.style.border = `${el.props.thickness || 2}px solid ${el.props.color || '#000000'}`;
+                    d.style.backgroundColor = el.props.fillColor || 'transparent';
+                    break;
+                case 'qr': {
+                    const c = getData(el);
+                    const q = document.createElement('img');
+                    const dpi = 37.795276;
+                    const qs = Math.min(el.width, el.height) * dpi;
+                    q.src = `https://api.qrserver.com/v1/create-qr-code/?size=${Math.round(qs)}x${Math.round(qs)}&data=${encodeURIComponent(c)}`;
+                    q.style.pointerEvents='none';
+                    q.style.width='100%';
+                    q.style.height='100%';
+                    q.style.objectFit='contain';
+                    d.appendChild(q);
+                    break;
+                }
+                case 'barcode': {
+                    const c = getData(el) || '';
+                    const sv = document.createElementNS('http://www.w3.org/2000/svg','svg');
+                    sv.style.pointerEvents='none';
+                    sv.setAttribute('width','100%');
+                    sv.setAttribute('height','100%');
+                    d.appendChild(sv);
+                    try{
+                        const pxHeight = Math.max(30, (el.height * 37.795276) - 10);
+                        JsBarcode(sv, String(c), {
+                            format: el.props.format || "CODE128",
+                            displayValue: el.props.displayValue !== false,
+                            width: 2, height: pxHeight, margin:0
+                        });
+                    }catch(err){
+                        sv.innerHTML = `<text x="10" y="20" fill="red" font-size="12">Invalid barcode</text>`;
+                        console.error("Barcode Error:",err);
                     }
-                    case 'barcode': {
-                        const c = getData(el) || '';
-                        const sv = document.createElementNS('http://www.w3.org/2000/svg','svg');
-                        sv.style.pointerEvents='none';
-                        sv.setAttribute('width','100%');
-                        sv.setAttribute('height','100%');
-                        d.appendChild(sv);
-                        try{
-                            const pxHeight = Math.max(30, (el.height * 37.795276) - 10);
-                            JsBarcode(sv, String(c), {
-                                format: el.props.format || "CODE128",
-                                displayValue: el.props.displayValue !== false,
-                                width: 2, height: pxHeight, margin:0
-                            });
-                        }catch(err){
-                            sv.innerHTML = `<text x="10" y="20" fill="red" font-size="12">Invalid barcode</text>`;
-                            console.error("Barcode Error:",err);
-                        }
-                        break;
-                    }
+                    break;
+                }
                     case 'image': {
                         const img = document.createElement('img');
                         img.style.pointerEvents='none';
@@ -1036,132 +1052,132 @@
                         d.appendChild(img);
                         break;
                     }
-                    default:
-                        d.innerText = el.props.text || '';
-                }
+                default:
+                    d.innerText = el.props.text || '';
+            }
 
-                // selection visuals
-                if(selectedIds.includes(el.id)){
-                    d.classList.add('selected');
-                    const h = document.createElement('div');
-                    h.classList.add('resize-handle');
-                    d.appendChild(h);
-                }
+            // selection visuals
+            if(selectedIds.includes(el.id)){
+                d.classList.add('selected');
+                const h = document.createElement('div');
+                h.classList.add('resize-handle');
+                d.appendChild(h);
+            }
 
-                lc.appendChild(d);
+            lc.appendChild(d);
+        });
+    }
+
+    function getData(el){
+        const prefix = el.props.prefix || '';
+        const suffix = el.props.suffix || '';
+        if(el.props.boundColumn && R && Object.prototype.hasOwnProperty.call(R, el.props.boundColumn)){
+            let v = R[el.props.boundColumn];
+            if(el.type === 'data' && typeof v === 'number'){
+                const dec = (el.props.decimals !== undefined) ? Number(el.props.decimals) : 2;
+                const pct = !!el.props.asPercent;
+                return prefix + fmt(v,dec,pct) + suffix;
+            }
+            return prefix + String(v) + suffix;
+        }
+        return prefix + (el.props.text || 'SAMPLE') + suffix;
+    }
+
+    function fmt(v,d,p){
+        if(v===null||v===undefined||v==='') return '';
+        let n=parseFloat(v);
+        if(isNaN(n)) return String(v);
+        if(p) n=n*100;
+        n=n.toFixed(d);
+        return p?n+'%':n;
+    }
+
+    // ---------- Selection / Buttons / Props ----------
+    function updateBtns(){
+        const has = selectedIds.length>0;
+        bd.disabled = !has; bf.disabled = !has; bs.disabled = !has;
+    }
+
+    function setSelection(ids, append=false){
+        if(!Array.isArray(ids)) ids = ids ? [ids] : [];
+        if(append){
+            ids.forEach(id=>{
+                const i = selectedIds.indexOf(id);
+                if(i===-1) selectedIds.push(id);
+                else selectedIds.splice(i,1);
             });
+        } else {
+            selectedIds = ids;
         }
+        render();
+        updateProps();
+        updateBtns();
+    }
 
-        function getData(el){
-            const prefix = el.props.prefix || '';
-            const suffix = el.props.suffix || '';
-            if(el.props.boundColumn && R && Object.prototype.hasOwnProperty.call(R, el.props.boundColumn)){
-                let v = R[el.props.boundColumn];
-                if(el.type === 'data' && typeof v === 'number'){
-                    const dec = (el.props.decimals !== undefined) ? Number(el.props.decimals) : 2;
-                    const pct = !!el.props.asPercent;
-                    return prefix + fmt(v,dec,pct) + suffix;
-                }
-                return prefix + String(v) + suffix;
-            }
-            return prefix + (el.props.text || 'SAMPLE') + suffix;
+    function toggleSelection(id){
+        const i = selectedIds.indexOf(id);
+        if(i===-1) selectedIds.push(id);
+        else selectedIds.splice(i,1);
+        render();
+        updateProps();
+        updateBtns();
+    }
+
+    function updateProps(){
+        if(selectedIds.length===0){
+            pp.innerHTML = 'Select an element to edit its properties.';
+            return;
         }
-
-        function fmt(v,d,p){
-            if(v===null||v===undefined||v==='') return '';
-            let n=parseFloat(v);
-            if(isNaN(n)) return String(v);
-            if(p) n=n*100;
-            n=n.toFixed(d);
-            return p?n+'%':n;
+        if(selectedIds.length===1){
+            const el = S.find(x=>x.id===selectedIds[0]);
+            if(!el){ pp.innerHTML='Error: Element not found.'; return; }
+            singlePropsPanel(el);
+            return;
         }
+        multiPropsPanel(selectedIds.map(id=>S.find(e=>e.id===id)).filter(Boolean));
+    }
 
-        // ---------- Selection / Buttons / Props ----------
-        function updateBtns(){
-            const has = selectedIds.length>0;
-            bd.disabled = !has; bf.disabled = !has; bs.disabled = !has;
+    // ---------- Properties Panels ----------
+    function singlePropsPanel(el){
+        // bound column: render search input + select
+        let bindHtml = '';
+        if(C && C.length){
+            bindHtml = `<div style="display:flex;gap:8px;margin-bottom:8px"><input type="text" placeholder="Search columns..." data-prop="bind_search" style="flex:1"><select data-prop="props.boundColumn" style="flex:1"><option value="">-- Select Column --</option>${C.map(col=>`<option value="${col}" ${el.props.boundColumn===col?'selected':''}>${col}</option>`).join('')}</select></div>`;
+        } else {
+            bindHtml = `<select data-prop="props.boundColumn"><option value="">-- No columns --</option></select>`;
         }
-
-        function setSelection(ids, append=false){
-            if(!Array.isArray(ids)) ids = ids ? [ids] : [];
-            if(append){
-                ids.forEach(id=>{
-                    const i = selectedIds.indexOf(id);
-                    if(i===-1) selectedIds.push(id);
-                    else selectedIds.splice(i,1);
-                });
-            } else {
-                selectedIds = ids;
-            }
-            render();
-            updateProps();
-            updateBtns();
-        }
-
-        function toggleSelection(id){
-            const i = selectedIds.indexOf(id);
-            if(i===-1) selectedIds.push(id);
-            else selectedIds.splice(i,1);
-            render();
-            updateProps();
-            updateBtns();
-        }
-
-        function updateProps(){
-            if(selectedIds.length===0){
-                pp.innerHTML = 'Select an element to edit its properties.';
-                return;
-            }
-            if(selectedIds.length===1){
-                const el = S.find(x=>x.id===selectedIds[0]);
-                if(!el){ pp.innerHTML='Error: Element not found.'; return; }
-                singlePropsPanel(el);
-                return;
-            }
-            multiPropsPanel(selectedIds.map(id=>S.find(e=>e.id===id)).filter(Boolean));
-        }
-
-        // ---------- Properties Panels ----------
-        function singlePropsPanel(el){
-            // bound column: render search input + select
-            let bindHtml = '';
-            if(C && C.length){
-                bindHtml = `<div style="display:flex;gap:8px;margin-bottom:8px"><input type="text" placeholder="Search columns..." data-prop="bind_search" style="flex:1"><select data-prop="props.boundColumn" style="flex:1"><option value="">-- Select Column --</option>${C.map(col=>`<option value="${col}" ${el.props.boundColumn===col?'selected':''}>${col}</option>`).join('')}</select></div>`;
-            } else {
-                bindHtml = `<select data-prop="props.boundColumn"><option value="">-- No columns --</option></select>`;
-            }
 
             let h = `<div class="prop-grid"><label>X</label><input type="number" step="0.01" data-prop="x" value="${(Number(el.x)||0).toFixed(2)}"><label>Y</label><input type="number" step="0.01" data-prop="y" value="${(Number(el.y)||0).toFixed(2)}"></div>`;
             h += `<div class="prop-grid"><label>Width</label><input type="number" step="0.01" data-prop="width" value="${(Number(el.width)||0).toFixed(2)}"><label>Height</label><input type="number" step="0.01" data-prop="height" value="${(Number(el.height)||0).toFixed(2)}"></div><hr>`;
 
-            if(el.type==='text') h += `<label>Text</label><textarea data-prop="props.text">${escapeHtml(el.props.text||'')}</textarea>`;
+        if(el.type==='text') h += `<label>Text</label><textarea data-prop="props.text">${escapeHtml(el.props.text||'')}</textarea>`;
 
             if(el.type==='data' || el.type==='qr' || el.type==='barcode' || el.type==='image'){
-                h += `<label>Bound Column</label>${bindHtml}`;
-            }
+            h += `<label>Bound Column</label>${bindHtml}`;
+        }
 
-            if(el.type==='data'){
-                h += `<label>Prefix</label><input type="text" data-prop="props.prefix" value="${escapeHtml(el.props.prefix||'')}">`;
-                h += `<label>Suffix</label><input type="text" data-prop="props.suffix" value="${escapeHtml(el.props.suffix||'')}">`;
-                h += `<hr><div class="prop-grid"><label>Decimals</label><input type="number" data-prop="props.decimals" value="${el.props.decimals!==undefined?el.props.decimals:2}" min="0" max="10"><label>As Percent</label><input type="checkbox" data-prop="props.asPercent" ${el.props.asPercent?'checked':''}></div>`;
-            }
+        if(el.type==='data'){
+            h += `<label>Prefix</label><input type="text" data-prop="props.prefix" value="${escapeHtml(el.props.prefix||'')}">`;
+            h += `<label>Suffix</label><input type="text" data-prop="props.suffix" value="${escapeHtml(el.props.suffix||'')}">`;
+            h += `<hr><div class="prop-grid"><label>Decimals</label><input type="number" data-prop="props.decimals" value="${el.props.decimals!==undefined?el.props.decimals:2}" min="0" max="10"><label>As Percent</label><input type="checkbox" data-prop="props.asPercent" ${el.props.asPercent?'checked':''}></div>`;
+        }
 
-            if(el.type==='qr' || el.type==='barcode'){
-                h += `<label>Fallback Text</label><input type="text" data-prop="props.text" value="${escapeHtml(el.props.text||'')}">`;
-            }
+        if(el.type==='qr' || el.type==='barcode'){
+            h += `<label>Fallback Text</label><input type="text" data-prop="props.text" value="${escapeHtml(el.props.text||'')}">`;
+        }
 
-            if(el.type==='barcode'){
-                h += `<label>Format</label><select data-prop="props.format"><option value="CODE128" ${el.props.format==='CODE128'?'selected':''}>CODE128</option><option value="CODE39" ${el.props.format==='CODE39'?'selected':''}>CODE39</option><option value="EAN13" ${el.props.format==='EAN13'?'selected':''}>EAN13</option><option value="UPC" ${el.props.format==='UPC'?'selected':''}>UPC</option></select><label>Show Text</label><input type="checkbox" data-prop="props.displayValue" ${el.props.displayValue!==false?'checked':''}>`;
-            }
+        if(el.type==='barcode'){
+            h += `<label>Format</label><select data-prop="props.format"><option value="CODE128" ${el.props.format==='CODE128'?'selected':''}>CODE128</option><option value="CODE39" ${el.props.format==='CODE39'?'selected':''}>CODE39</option><option value="EAN13" ${el.props.format==='EAN13'?'selected':''}>EAN13</option><option value="UPC" ${el.props.format==='UPC'?'selected':''}>UPC</option></select><label>Show Text</label><input type="checkbox" data-prop="props.displayValue" ${el.props.displayValue!==false?'checked':''}>`;
+        }
 
-            if(el.type==='line'){
-                h += `<label>Thickness (px)</label><input type="number" data-prop="props.thickness" value="${el.props.thickness||2}" min="1">`;
+        if(el.type==='line'){
+            h += `<label>Thickness (px)</label><input type="number" data-prop="props.thickness" value="${el.props.thickness||2}" min="1">`;
                 h += `<hr><div class="prop-grid"><label>Rotation°</label><input type="number" step="1" data-prop="props.rotation" value="${el.props.rotation||0}"><label></label></div>`;
-            }
+        }
 
-            if(el.type==='box'){
-                h += `<label>Border (px)</label><input type="number" data-prop="props.thickness" value="${el.props.thickness||2}" min="1"><label>Fill Color</label><input type="color" data-prop="props.fillColor" value="${el.props.fillColor||'#ffffff'}">`;
-            }
+        if(el.type==='box'){
+            h += `<label>Border (px)</label><input type="number" data-prop="props.thickness" value="${el.props.thickness||2}" min="1"><label>Fill Color</label><input type="color" data-prop="props.fillColor" value="${el.props.fillColor||'#ffffff'}">`;
+        }
 
             if(el.type==='image'){
                 h += `<hr><label>Object Fit</label><select data-prop="props.objectFit"><option value="contain" ${(el.props.objectFit||'contain')==='contain'?'selected':''}>Contain</option><option value="cover" ${el.props.objectFit==='cover'?'selected':''}>Cover</option><option value="fill" ${el.props.objectFit==='fill'?'selected':''}>Fill</option><option value="none" ${el.props.objectFit==='none'?'selected':''}>None</option><option value="scale-down" ${el.props.objectFit==='scale-down'?'selected':''}>Scale Down</option></select>`;
@@ -1178,14 +1194,15 @@
             }
 
             // border
-            h += `<hr><div class="prop-grid"><label>Show Border</label><input type="checkbox" data-prop="props.showBorder" ${el.props.showBorder?'checked':''}><label>Border Color</label><input type="color" data-prop="props.borderColor" value="${el.props.borderColor||'#000000'}"></div>`;
+        h += `<hr><div class="prop-grid"><label>Show Border</label><input type="checkbox" data-prop="props.showBorder" ${el.props.showBorder?'checked':''}><label>Border Color</label><input type="color" data-prop="props.borderColor" value="${el.props.borderColor||'#000000'}"></div>`;
             h += `<div class="prop-grid"><label>Border Width</label><input type="number" data-prop="props.borderWidth" value="${el.props.borderWidth||1}" min="0"><label></label></div>`;
             if(el.props.showBorder){
                 h += `<div class="prop-grid" style="margin-top:8px"><label style="font-size:12px">Border Sides:</label><div style="display:grid;grid-template-columns:1fr 1fr;gap:4px"><label style="font-size:12px;font-weight:normal;display:flex;align-items:center;gap:4px"><input type="checkbox" data-prop="props.borderTop" ${el.props.borderTop!==false?'checked':''}>Top</label><label style="font-size:12px;font-weight:normal;display:flex;align-items:center;gap:4px"><input type="checkbox" data-prop="props.borderRight" ${el.props.borderRight!==false?'checked':''}>Right</label><label style="font-size:12px;font-weight:normal;display:flex;align-items:center;gap:4px"><input type="checkbox" data-prop="props.borderBottom" ${el.props.borderBottom!==false?'checked':''}>Bottom</label><label style="font-size:12px;font-weight:normal;display:flex;align-items:center;gap:4px"><input type="checkbox" data-prop="props.borderLeft" ${el.props.borderLeft!==false?'checked':''}>Left</label></div></div>`;
+                h += `<div style="margin-top:8px"><label style="font-size:12px;display:block;margin-bottom:6px">Border Radius (px):</label><div style="display:grid;grid-template-columns:1fr 1fr;gap:6px;max-width:200px"><div style="display:flex;flex-direction:column;gap:2px"><label style="font-size:11px;font-weight:normal;text-align:center">↖ Top Left</label><input type="number" data-prop="props.borderRadiusTopLeft" value="${Number(el.props.borderRadiusTopLeft||0)}" min="0" step="0.1" style="font-size:12px;padding:4px;text-align:center"></div><div style="display:flex;flex-direction:column;gap:2px"><label style="font-size:11px;font-weight:normal;text-align:center">↗ Top Right</label><input type="number" data-prop="props.borderRadiusTopRight" value="${Number(el.props.borderRadiusTopRight||0)}" min="0" step="0.1" style="font-size:12px;padding:4px;text-align:center"></div><div style="display:flex;flex-direction:column;gap:2px"><label style="font-size:11px;font-weight:normal;text-align:center">↙ Bottom Left</label><input type="number" data-prop="props.borderRadiusBottomLeft" value="${Number(el.props.borderRadiusBottomLeft||0)}" min="0" step="0.1" style="font-size:12px;padding:4px;text-align:center"></div><div style="display:flex;flex-direction:column;gap:2px"><label style="font-size:11px;font-weight:normal;text-align:center">↘ Bottom Right</label><input type="number" data-prop="props.borderRadiusBottomRight" value="${Number(el.props.borderRadiusBottomRight||0)}" min="0" step="0.1" style="font-size:12px;padding:4px;text-align:center"></div></div></div>`;
             }
-            if(el.type!=='box') h += `<hr><label>Color</label><input type="color" data-prop="props.color" value="${el.props.color||'#000000'}">`;
-            h += `<hr><button id="btn-delete">Delete Element</button>`;
-            pp.innerHTML = h;
+        if(el.type!=='box') h += `<hr><label>Color</label><input type="color" data-prop="props.color" value="${el.props.color||'#000000'}">`;
+        h += `<hr><button id="btn-delete">Delete Element</button>`;
+        pp.innerHTML = h;
             
             // Add listener to update weight options when font family changes
             if(el.type === 'text' || el.type === 'data'){
@@ -1277,26 +1294,26 @@
                     });
                 }
             }
-        }
+    }
 
-        function multiPropsPanel(elems){
-            function common(propPath){
-                const parts = propPath.split('.');
-                let val = undefined;
-                for(const el of elems){
-                    let cur = el;
-                    for(const p of parts){
-                        if(cur && Object.prototype.hasOwnProperty.call(cur,p)) cur = cur[p]; else { cur = undefined; break; }
-                    }
-                    if(val === undefined) val = cur;
-                    else if(String(val) !== String(cur)) return '';
+    function multiPropsPanel(elems){
+        function common(propPath){
+            const parts = propPath.split('.');
+            let val = undefined;
+            for(const el of elems){
+                let cur = el;
+                for(const p of parts){
+                    if(cur && Object.prototype.hasOwnProperty.call(cur,p)) cur = cur[p]; else { cur = undefined; break; }
                 }
-                return val === undefined ? '' : val;
+                if(val === undefined) val = cur;
+                else if(String(val) !== String(cur)) return '';
             }
+            return val === undefined ? '' : val;
+        }
 
             const commonFontFamily = common('props.fontFamily') || 'Arial, sans-serif';
             const commonWeight = common('props.fontWeight') || 'normal';
-            let h = `<div style="font-weight:600;margin-bottom:6px">${elems.length} elements selected</div>`;
+        let h = `<div style="font-weight:600;margin-bottom:6px">${elems.length} elements selected</div>`;
             h += `<div class="prop-grid"><label>X</label><input type="number" step="0.01" data-prop="multi.x" value="${common('x')}"><label>Y</label><input type="number" step="0.01" data-prop="multi.y" value="${common('y')}"></div>`;
             h += `<div class="prop-grid"><label>Width</label><input type="number" step="0.01" data-prop="multi.width" value="${common('width')}"><label>Height</label><input type="number" step="0.01" data-prop="multi.height" value="${common('height')}"></div><hr>`;
             h += `<div class="prop-grid"><label>Font Size</label><input type="number" step="1" data-prop="multi.props.fontSize" value="${common('props.fontSize')}" min="6"><label>Font Family</label><div style="display:flex;gap:4px;align-items:center"><select data-prop="multi.props.fontFamily" id="multi-font-family-select" style="flex:1">${generateFontOptions(commonFontFamily)}</select><button type="button" id="multi-font-favorite-btn" style="padding:4px 8px;font-size:16px;background:transparent;border:1px solid #ccc;border-radius:4px;cursor:pointer;flex-shrink:0" title="${fontFavorites.includes(commonFontFamily) ? 'Remove from favorites' : 'Add to favorites'}">${fontFavorites.includes(commonFontFamily) ? '⭐' : '☆'}</button></div></div>`;
@@ -1305,13 +1322,14 @@
             h += `<div class="prop-grid"><label>Padding Top</label><input type="number" step="0.01" data-prop="multi.props.paddingTop" value="${common('props.paddingTop')}" min="0"><label>Padding Right</label><input type="number" step="0.01" data-prop="multi.props.paddingRight" value="${common('props.paddingRight')}" min="0"></div>`;
             h += `<div class="prop-grid"><label>Padding Bottom</label><input type="number" step="0.01" data-prop="multi.props.paddingBottom" value="${common('props.paddingBottom')}" min="0"><label>Padding Left</label><input type="number" step="0.01" data-prop="multi.props.paddingLeft" value="${common('props.paddingLeft')}" min="0"></div>`;
             h += `<hr><div class="prop-grid"><label>Rotation°</label><input type="number" step="1" data-prop="multi.props.rotation" value="${common('props.rotation')}"><label>Show Border</label><input type="checkbox" data-prop="multi.props.showBorder" ${common('props.showBorder')?'checked':''}></div>`;
-            h += `<div class="prop-grid"><label>Border Color</label><input type="color" data-prop="multi.props.borderColor" value="${common('props.borderColor')||'#000000'}"><label>Border Width</label><input type="number" data-prop="multi.props.borderWidth" value="${common('props.borderWidth')}" min="0"></div>`;
+        h += `<div class="prop-grid"><label>Border Color</label><input type="color" data-prop="multi.props.borderColor" value="${common('props.borderColor')||'#000000'}"><label>Border Width</label><input type="number" data-prop="multi.props.borderWidth" value="${common('props.borderWidth')}" min="0"></div>`;
             if(common('props.showBorder')){
                 h += `<div class="prop-grid" style="margin-top:8px"><label style="font-size:12px">Border Sides:</label><div style="display:grid;grid-template-columns:1fr 1fr;gap:4px"><label style="font-size:12px;font-weight:normal;display:flex;align-items:center;gap:4px"><input type="checkbox" data-prop="multi.props.borderTop" ${common('props.borderTop')!==false?'checked':''}>Top</label><label style="font-size:12px;font-weight:normal;display:flex;align-items:center;gap:4px"><input type="checkbox" data-prop="multi.props.borderRight" ${common('props.borderRight')!==false?'checked':''}>Right</label><label style="font-size:12px;font-weight:normal;display:flex;align-items:center;gap:4px"><input type="checkbox" data-prop="multi.props.borderBottom" ${common('props.borderBottom')!==false?'checked':''}>Bottom</label><label style="font-size:12px;font-weight:normal;display:flex;align-items:center;gap:4px"><input type="checkbox" data-prop="multi.props.borderLeft" ${common('props.borderLeft')!==false?'checked':''}>Left</label></div></div>`;
+                h += `<div style="margin-top:8px"><label style="font-size:12px;display:block;margin-bottom:6px">Border Radius (px):</label><div style="display:grid;grid-template-columns:1fr 1fr;gap:6px;max-width:200px"><div style="display:flex;flex-direction:column;gap:2px"><label style="font-size:11px;font-weight:normal;text-align:center">↖ Top Left</label><input type="number" data-prop="multi.props.borderRadiusTopLeft" value="${common('props.borderRadiusTopLeft')||0}" min="0" step="0.1" style="font-size:12px;padding:4px;text-align:center"></div><div style="display:flex;flex-direction:column;gap:2px"><label style="font-size:11px;font-weight:normal;text-align:center">↗ Top Right</label><input type="number" data-prop="multi.props.borderRadiusTopRight" value="${common('props.borderRadiusTopRight')||0}" min="0" step="0.1" style="font-size:12px;padding:4px;text-align:center"></div><div style="display:flex;flex-direction:column;gap:2px"><label style="font-size:11px;font-weight:normal;text-align:center">↙ Bottom Left</label><input type="number" data-prop="multi.props.borderRadiusBottomLeft" value="${common('props.borderRadiusBottomLeft')||0}" min="0" step="0.1" style="font-size:12px;padding:4px;text-align:center"></div><div style="display:flex;flex-direction:column;gap:2px"><label style="font-size:11px;font-weight:normal;text-align:center">↘ Bottom Right</label><input type="number" data-prop="multi.props.borderRadiusBottomRight" value="${common('props.borderRadiusBottomRight')||0}" min="0" step="0.1" style="font-size:12px;padding:4px;text-align:center"></div></div></div>`;
             }
-            h += `<div class="prop-grid"><label>Color</label><input type="color" data-prop="multi.props.color" value="${common('props.color')||'#000000'}"><label></label></div>`;
-            h += `<hr><button id="btn-delete">Delete Selected</button>`;
-            pp.innerHTML = h;
+        h += `<div class="prop-grid"><label>Color</label><input type="color" data-prop="multi.props.color" value="${common('props.color')||'#000000'}"><label></label></div>`;
+        h += `<hr><button id="btn-delete">Delete Selected</button>`;
+        pp.innerHTML = h;
             
             // Add listener to update weight options when font family changes (multi-select)
             const multiFontFamilySelect = pp.querySelector('#multi-font-family-select');
@@ -1415,9 +1433,9 @@
                     multiFontFamilySelect.value = selectedValue;
                 });
             }
-        }
+    }
 
-        function escapeHtml(str){ if(str===null||str===undefined) return ''; return String(str).replaceAll('&','&amp;').replaceAll('<','&lt;').replaceAll('>','&gt;').replaceAll('"','&quot;'); }
+    function escapeHtml(str){ if(str===null||str===undefined) return ''; return String(str).replaceAll('&','&amp;').replaceAll('<','&lt;').replaceAll('>','&gt;').replaceAll('"','&quot;'); }
 
         // ---------- Font weights mapping ----------
         function getFontWeights(fontFamily){
@@ -1555,71 +1573,71 @@
             });
         }
 
-        // ---------- Element operations (multi-aware) ----------
-        function pushBeforeChange(){ pushHistorySnapshot(); }
+    // ---------- Element operations (multi-aware) ----------
+    function pushBeforeChange(){ pushHistorySnapshot(); }
 
-        function add(type){
-            pushBeforeChange();
-            const mz = S.length>0 ? Math.max(...S.map(e=>e.zIndex||0)) : 0;
-            const n = {
-                id: `el_${Date.now()}`,
-                type,
-                x:.5,y:.5,width:1.5,height:.5,zIndex:mz+1,
-                props:{
-                    text:'Sample Text',fontSize:16,fontWeight:'normal',fontFamily:'Arial, sans-serif',
-                    textAlign:'left',valign:'top',color:'#000000',boundColumn:'',prefix:'',suffix:'',
-                    rotation:0,showBorder:false,borderColor:'#000',borderWidth:1,
-                    paddingTop:0,paddingRight:0,paddingBottom:0,paddingLeft:0,
+    function add(type){
+        pushBeforeChange();
+        const mz = S.length>0 ? Math.max(...S.map(e=>e.zIndex||0)) : 0;
+        const n = {
+            id: `el_${Date.now()}`,
+            type,
+            x:.5,y:.5,width:1.5,height:.5,zIndex:mz+1,
+            props:{
+                text:'Sample Text',fontSize:16,fontWeight:'normal',fontFamily:'Arial, sans-serif',
+                textAlign:'left',valign:'top',color:'#000000',boundColumn:'',prefix:'',suffix:'',
+                rotation:0,showBorder:false,borderColor:'#000',borderWidth:1,
+                paddingTop:0,paddingRight:0,paddingBottom:0,paddingLeft:0,
                     thickness:2,format:'CODE128',displayValue:true,fillColor:'#fff',decimals:2,asPercent:false,
                     lineHeight:1.2,objectFit:'contain'
-                }
-            };
-            if(type==='qr'){ n.width=1;n.height=1 }
-            if(type==='barcode'){ n.width=2;n.height=.8 }
-            if(type==='line'){ n.height=.02;n.width=2 }
-            if(type==='box'){ n.width=1.5;n.height=1 }
+            }
+        };
+        if(type==='qr'){ n.width=1;n.height=1 }
+        if(type==='barcode'){ n.width=2;n.height=.8 }
+        if(type==='line'){ n.height=.02;n.width=2 }
+        if(type==='box'){ n.width=1.5;n.height=1 }
             if(type==='image'){ n.width=2;n.height=2; n.props.objectFit='contain' }
-            S.push(n);
-            setSelection([n.id]);
+        S.push(n);
+        setSelection([n.id]);
             saveCurrentDesign();
             saveCurrentDesign();
-        }
+    }
 
-        function dupSelected(){
-            if(selectedIds.length===0) return;
-            pushBeforeChange();
-            const mz = S.length>0 ? Math.max(...S.map(e=>e.zIndex||0)) : 0;
-            const newIds = [];
-            selectedIds.forEach((id, idx)=>{
-                const el = S.find(e=>e.id===id);
-                if(!el) return;
-                const copy = deepCopy(el);
-                copy.id = `el_${Date.now()}_${idx}`;
-                copy.x = Math.min(el.x + 0.2, W - el.width);
-                copy.y = Math.min(el.y + 0.2, H - el.height);
-                copy.zIndex = mz + idx + 1;
-                S.push(copy);
-                newIds.push(copy.id);
-            });
-            setSelection(newIds);
+    function dupSelected(){
+        if(selectedIds.length===0) return;
+        pushBeforeChange();
+        const mz = S.length>0 ? Math.max(...S.map(e=>e.zIndex||0)) : 0;
+        const newIds = [];
+        selectedIds.forEach((id, idx)=>{
+            const el = S.find(e=>e.id===id);
+            if(!el) return;
+            const copy = deepCopy(el);
+            copy.id = `el_${Date.now()}_${idx}`;
+            copy.x = Math.min(el.x + 0.2, W - el.width);
+            copy.y = Math.min(el.y + 0.2, H - el.height);
+            copy.zIndex = mz + idx + 1;
+            S.push(copy);
+            newIds.push(copy.id);
+        });
+        setSelection(newIds);
             saveCurrentDesign();
             saveCurrentDesign();
-        }
+    }
 
-        function bringToFront(){
-            if(selectedIds.length===0) return;
-            pushBeforeChange();
-            let mz = S.length>0 ? Math.max(...S.map(e=>e.zIndex||0)) : 0;
-            selectedIds.forEach(id=>{
-                const el = S.find(e=>e.id===id);
-                if(el){ mz++; el.zIndex = mz; }
-            });
+    function bringToFront(){
+        if(selectedIds.length===0) return;
+        pushBeforeChange();
+        let mz = S.length>0 ? Math.max(...S.map(e=>e.zIndex||0)) : 0;
+        selectedIds.forEach(id=>{
+            const el = S.find(e=>e.id===id);
+            if(el){ mz++; el.zIndex = mz; }
+        });
             render(); saveCurrentDesign();
-        }
+    }
 
-        function sendToBack(){
-            if(selectedIds.length===0) return;
-            pushBeforeChange();
+    function sendToBack(){
+        if(selectedIds.length===0) return;
+        pushBeforeChange();
             // Calculate minimum zIndex excluding selected elements
             const unselected = S.filter(e => !selectedIds.includes(e.id));
             let mn = unselected.length > 0 ? Math.min(...unselected.map(e=>e.zIndex||0)) : 0;
@@ -1642,8 +1660,8 @@
             }
             
             // Set selected elements to be just below the minimum (starting from mn-1)
-            selectedIds.forEach((id, idx)=>{
-                const el = S.find(e=>e.id===id);
+        selectedIds.forEach((id, idx)=>{
+            const el = S.find(e=>e.id===id);
                 if(el){ 
                     el.zIndex = mn - (idx + 1);
                 }
@@ -1659,14 +1677,14 @@
             }
             
             render(); saveCurrentDesign();
-        }
+    }
 
-        function deleteSelected(){
-            if(selectedIds.length===0) return;
-            pushBeforeChange();
-            S = S.filter(e => !selectedIds.includes(e.id));
-            selectedIds = [];
-            render(); updateProps(); updateBtns();
+    function deleteSelected(){
+        if(selectedIds.length===0) return;
+        pushBeforeChange();
+        S = S.filter(e => !selectedIds.includes(e.id));
+        selectedIds = [];
+        render(); updateProps(); updateBtns();
             saveCurrentDesign();
             saveCurrentDesign();
         }
@@ -1776,17 +1794,17 @@
                 
                 render();
                 updateProps();
-                resetHistory();
+            resetHistory();
                 msg(`Imported ${importedCanvasData.length} element(s) to current canvas!`);
-                return true;
-            }catch(e){
+            return true;
+        }catch(e){
                 console.error('Parse error while importing layout:',e);
                 msg('Error importing layout: invalid JSON', true, 4000);
-                return false;
-            }
+            return false;
         }
+    }
 
-        function exportToFile(){
+    function exportToFile(){
             // Ensure current design is saved before exporting
             // This saves the current S array to the current design
             saveCurrentDesign();
@@ -1816,8 +1834,8 @@
                 currentDesign: currentDesign,
                 currentCanvas: currentCanvas
             };
-            const blob = new Blob([JSON.stringify(payloadObj,null,2)], { type:'application/json' });
-            const url = URL.createObjectURL(blob);
+        const blob = new Blob([JSON.stringify(payloadObj,null,2)], { type:'application/json' });
+        const url = URL.createObjectURL(blob);
             const a = document.createElement('a'); 
             a.href = url; 
             a.download = `label-layout-${currentProfile}-${currentDesign}.json`;
@@ -1936,6 +1954,17 @@
                         d.style.borderRight = (el.props.borderRight !== false) ? `${borderWidth} ${borderStyle} ${borderColor}` : 'none';
                         d.style.borderBottom = (el.props.borderBottom !== false) ? `${borderWidth} ${borderStyle} ${borderColor}` : 'none';
                         d.style.borderLeft = (el.props.borderLeft !== false) ? `${borderWidth} ${borderStyle} ${borderColor}` : 'none';
+                        
+                        // Apply border radius (individual corners)
+                        const brTL = Number(el.props.borderRadiusTopLeft) || 0;
+                        const brTR = Number(el.props.borderRadiusTopRight) || 0;
+                        const brBR = Number(el.props.borderRadiusBottomRight) || 0;
+                        const brBL = Number(el.props.borderRadiusBottomLeft) || 0;
+                        if(brTL > 0 || brTR > 0 || brBR > 0 || brBL > 0){
+                            d.style.borderRadius = `${brTL}px ${brTR}px ${brBR}px ${brBL}px`;
+                        } else {
+                            d.style.borderRadius = '';
+                        }
                     } else {
                         // Don't apply transparent border to lines - they use thickness for height
                         if(el.type !== 'box' && el.type !== 'line') d.style.border = '1px solid transparent';
@@ -2142,9 +2171,9 @@
                 }
                 updatePrintCSS(); // Restore normal print CSS
             }, 100);
-        }
+    }
 
-        // ---------- Mouse interactions: marquee, selection, drag, resize ----------
+    // ---------- Mouse interactions: marquee, selection, drag, resize ----------
         // Allow starting marquee selection from outside the canvas
         function startMarqueeSelection(e){
             // start marquee - compute coordinates relative to canvas-container (so zoom & transform do not misplace)
@@ -2185,45 +2214,45 @@
             // If clicking on the background of label-canvas, start marquee selection
             if(t === lc){
                 startMarqueeSelection(e);
-                return;
-            }
+            return;
+        }
 
-            // clicked element
-            const te = t.closest('.label-element');
-            if(!te) return;
-            const id = te.dataset.id;
-            const clickedElement = S.find(x=>x.id===id);
-            if(!clickedElement) return;
+        // clicked element
+        const te = t.closest('.label-element');
+        if(!te) return;
+        const id = te.dataset.id;
+        const clickedElement = S.find(x=>x.id===id);
+        if(!clickedElement) return;
 
-            // selection logic
-            if(e.ctrlKey || e.metaKey){
+        // selection logic
+        if(e.ctrlKey || e.metaKey){
+            pushBeforeChange();
+            toggleSelection(id);
+        } else {
+            if(!selectedIds.includes(id)){
                 pushBeforeChange();
-                toggleSelection(id);
-            } else {
-                if(!selectedIds.includes(id)){
-                    pushBeforeChange();
-                    setSelection([id]);
-                }
+                setSelection([id]);
             }
+        }
 
-            const cr = lc.getBoundingClientRect();
-            const smx = (e.clientX - cr.left) / cr.width * W;
-            const smy = (e.clientY - cr.top) / cr.height * H;
+        const cr = lc.getBoundingClientRect();
+        const smx = (e.clientX - cr.left) / cr.width * W;
+        const smy = (e.clientY - cr.top) / cr.height * H;
 
-            if(t.classList.contains('resize-handle') && selectedIds.length <= 1){
-                resizeMode = true;
-                ctx = { el: clickedElement, startWidth: clickedElement.width, startHeight: clickedElement.height, startMouseX: smx, startMouseY: smy };
-            } else {
-                drag = true;
-                const movers = selectedIds.includes(id) ? selectedIds.slice() : [id];
-                const items = movers.map(iid => S.find(s => s.id === iid)).filter(Boolean);
-                ctx = { items: items.map(it => ({ id: it.id, startX: it.x, startY: it.y })), baseMouseX: smx, baseMouseY: smy };
-                pushBeforeChange();
-            }
-            e.preventDefault();
-        });
+        if(t.classList.contains('resize-handle') && selectedIds.length <= 1){
+            resizeMode = true;
+            ctx = { el: clickedElement, startWidth: clickedElement.width, startHeight: clickedElement.height, startMouseX: smx, startMouseY: smy };
+        } else {
+            drag = true;
+            const movers = selectedIds.includes(id) ? selectedIds.slice() : [id];
+            const items = movers.map(iid => S.find(s => s.id === iid)).filter(Boolean);
+            ctx = { items: items.map(it => ({ id: it.id, startX: it.x, startY: it.y })), baseMouseX: smx, baseMouseY: smy };
+            pushBeforeChange();
+        }
+        e.preventDefault();
+    });
 
-        window.addEventListener('mousemove', (e)=>{
+    window.addEventListener('mousemove', (e)=>{
             // Disabilita interazioni quando non è in full screen
             if (!isFullScreen && (drag || resizeMode || marqueeActive)) {
                 drag = false;
@@ -2233,33 +2262,33 @@
                 return;
             }
             
-            // marquee active handling: draw marquee relative to container (so zoom/transform doesn't misplace)
-            if(marqueeActive){
-                const containerRect = marqueeStart.containerRect || cc.getBoundingClientRect();
-                const curX = e.clientX - containerRect.left;
-                const curY = e.clientY - containerRect.top;
-                const left = Math.min(marqueeStart.startX, curX);
-                const top = Math.min(marqueeStart.startY, curY);
-                const width = Math.abs(curX - marqueeStart.startX);
-                const height = Math.abs(curY - marqueeStart.startY);
-                marquee.style.left = `${left}px`;
-                marquee.style.top = `${top}px`;
-                marquee.style.width = `${width}px`;
-                marquee.style.height = `${height}px`;
-                return;
-            }
+        // marquee active handling: draw marquee relative to container (so zoom/transform doesn't misplace)
+        if(marqueeActive){
+            const containerRect = marqueeStart.containerRect || cc.getBoundingClientRect();
+            const curX = e.clientX - containerRect.left;
+            const curY = e.clientY - containerRect.top;
+            const left = Math.min(marqueeStart.startX, curX);
+            const top = Math.min(marqueeStart.startY, curY);
+            const width = Math.abs(curX - marqueeStart.startX);
+            const height = Math.abs(curY - marqueeStart.startY);
+            marquee.style.left = `${left}px`;
+            marquee.style.top = `${top}px`;
+            marquee.style.width = `${width}px`;
+            marquee.style.height = `${height}px`;
+            return;
+        }
 
-            if(!drag && !resizeMode) return;
-            const cr = lc.getBoundingClientRect();
-            const mx = (e.clientX - cr.left) / cr.width * W;
-            const my = (e.clientY - cr.top) / cr.height * H;
+        if(!drag && !resizeMode) return;
+        const cr = lc.getBoundingClientRect();
+        const mx = (e.clientX - cr.left) / cr.width * W;
+        const my = (e.clientY - cr.top) / cr.height * H;
 
-            if(drag && ctx && ctx.items){
-                const dx = mx - ctx.baseMouseX;
-                const dy = my - ctx.baseMouseY;
-                ctx.items.forEach(it=>{
-                    const el = S.find(s=>s.id===it.id);
-                    if(!el) return;
+        if(drag && ctx && ctx.items){
+            const dx = mx - ctx.baseMouseX;
+            const dy = my - ctx.baseMouseY;
+            ctx.items.forEach(it=>{
+                const el = S.find(s=>s.id===it.id);
+                if(!el) return;
                     // Calculate new position
                     let newX = it.startX + dx;
                     let newY = it.startY + dy;
@@ -2280,14 +2309,14 @@
                     
                     el.x = newX;
                     el.y = newY;
-                });
-                render();
-                updateProps();
-            } else if(resizeMode && ctx && ctx.el){
-                const dx = mx - ctx.startMouseX;
-                const dy = my - ctx.startMouseY;
-                let nw = ctx.startWidth + dx;
-                let nh = ctx.startHeight + dy;
+            });
+            render();
+            updateProps();
+        } else if(resizeMode && ctx && ctx.el){
+            const dx = mx - ctx.startMouseX;
+            const dy = my - ctx.startMouseY;
+            let nw = ctx.startWidth + dx;
+            let nh = ctx.startHeight + dy;
                 
                 // Get current rotation
                 const rotation = Number(ctx.el.props.rotation) || 0;
@@ -2324,12 +2353,12 @@
                         ctx.el.height *= scale;
                     }
                 }
-                render();
-                updateProps();
-            }
-        });
+            render();
+            updateProps();
+        }
+    });
 
-        window.addEventListener('mouseup', (e)=>{
+    window.addEventListener('mouseup', (e)=>{
             // Disabilita interazioni quando non è in full screen
             if (!isFullScreen) {
                 drag = false;
@@ -2339,84 +2368,84 @@
                 return;
             }
             
-            if(marqueeActive){
-                // compute selection rectangle intersection using label-canvas bounding rect (this respects zoom)
-                const rect = lc.getBoundingClientRect();
-                const x1 = marqueeStart.clientX, y1 = marqueeStart.clientY;
-                const x2 = e.clientX, y2 = e.clientY;
-                // determine screen-space selection bounds
-                const leftPx = Math.min(x1,x2);
-                const topPx = Math.min(y1,y2);
-                const rightPx = Math.max(x1,x2);
-                const bottomPx = Math.max(y1,y2);
-                // clamp to label-canvas
-                const selLeft = Math.max(leftPx, rect.left);
-                const selTop = Math.max(topPx, rect.top);
-                const selRight = Math.min(rightPx, rect.right);
-                const selBottom = Math.min(bottomPx, rect.bottom);
+        if(marqueeActive){
+            // compute selection rectangle intersection using label-canvas bounding rect (this respects zoom)
+            const rect = lc.getBoundingClientRect();
+            const x1 = marqueeStart.clientX, y1 = marqueeStart.clientY;
+            const x2 = e.clientX, y2 = e.clientY;
+            // determine screen-space selection bounds
+            const leftPx = Math.min(x1,x2);
+            const topPx = Math.min(y1,y2);
+            const rightPx = Math.max(x1,x2);
+            const bottomPx = Math.max(y1,y2);
+            // clamp to label-canvas
+            const selLeft = Math.max(leftPx, rect.left);
+            const selTop = Math.max(topPx, rect.top);
+            const selRight = Math.min(rightPx, rect.right);
+            const selBottom = Math.min(bottomPx, rect.bottom);
 
-                let selected = [];
-                if(selRight > selLeft && selBottom > selTop){
-                    const fracLeft = (selLeft - rect.left) / rect.width;
-                    const fracTop = (selTop - rect.top) / rect.height;
-                    const fracRight = (selRight - rect.left) / rect.width;
-                    const fracBottom = (selBottom - rect.top) / rect.height;
-                    const cmLeft = fracLeft * W;
-                    const cmTop = fracTop * H;
-                    const cmRight = fracRight * W;
-                    const cmBottom = fracBottom * H;
+            let selected = [];
+            if(selRight > selLeft && selBottom > selTop){
+                const fracLeft = (selLeft - rect.left) / rect.width;
+                const fracTop = (selTop - rect.top) / rect.height;
+                const fracRight = (selRight - rect.left) / rect.width;
+                const fracBottom = (selBottom - rect.top) / rect.height;
+                const cmLeft = fracLeft * W;
+                const cmTop = fracTop * H;
+                const cmRight = fracRight * W;
+                const cmBottom = fracBottom * H;
 
-                    // select elements whose rectangles intersect the selection rect
-                    S.forEach(el=>{
-                        const elLeft = el.x;
-                        const elTop = el.y;
-                        const elRight = el.x + el.width;
-                        const elBottom = el.y + el.height;
-                        const intersect = !(elRight < cmLeft || elLeft > cmRight || elBottom < cmTop || elTop > cmBottom);
-                        if(intersect) selected.push(el.id);
-                    });
-                }
+                // select elements whose rectangles intersect the selection rect
+                S.forEach(el=>{
+                    const elLeft = el.x;
+                    const elTop = el.y;
+                    const elRight = el.x + el.width;
+                    const elBottom = el.y + el.height;
+                    const intersect = !(elRight < cmLeft || elLeft > cmRight || elBottom < cmTop || elTop > cmBottom);
+                    if(intersect) selected.push(el.id);
+                });
+            }
 
-                // ctrl/meta -> toggle behavior; otherwise replace selection
-                if(e.ctrlKey || e.metaKey){
-                    selected.forEach(id=>{
-                        const i = selectedIds.indexOf(id);
-                        if(i===-1) selectedIds.push(id); else selectedIds.splice(i,1);
-                    });
-                } else {
-                    selectedIds = selected;
-                }
+            // ctrl/meta -> toggle behavior; otherwise replace selection
+            if(e.ctrlKey || e.metaKey){
+                selected.forEach(id=>{
+                    const i = selectedIds.indexOf(id);
+                    if(i===-1) selectedIds.push(id); else selectedIds.splice(i,1);
+                });
+            } else {
+                selectedIds = selected;
+            }
 
-                marqueeActive = false;
-                marquee.style.display = 'none';
-                render();
-                updateProps();
-                updateBtns();
+            marqueeActive = false;
+            marquee.style.display = 'none';
+            render();
+            updateProps();
+            updateBtns();
                 saveCurrentDesign();
-                e.preventDefault();
-                return;
-            }
+            e.preventDefault();
+            return;
+        }
 
-            if(drag || resizeMode){
+        if(drag || resizeMode){
                 saveCurrentDesign();
-            }
-            drag = false; resizeMode = false; ctx = {};
-        });
+        }
+        drag = false; resizeMode = false; ctx = {};
+    });
 
-        // ---------- Keyboard shortcuts (undo/redo/multi) ----------
-        window.addEventListener('keydown', (e)=>{
-            if((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'z'){
-                e.preventDefault();
-                if(e.shiftKey) redo(); else undo();
-                return;
-            }
-            if((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'y'){
-                e.preventDefault(); redo(); return;
-            }
+    // ---------- Keyboard shortcuts (undo/redo/multi) ----------
+    window.addEventListener('keydown', (e)=>{
+        if((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'z'){
+            e.preventDefault();
+            if(e.shiftKey) redo(); else undo();
+            return;
+        }
+        if((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'y'){
+            e.preventDefault(); redo(); return;
+        }
 
-            if((e.key === 'Delete' || e.key === 'Backspace') && selectedIds.length>0){
-                if(e.target.tagName !== 'INPUT' && e.target.tagName !== 'TEXTAREA'){ e.preventDefault(); deleteSelected(); }
-            }
+        if((e.key === 'Delete' || e.key === 'Backspace') && selectedIds.length>0){
+            if(e.target.tagName !== 'INPUT' && e.target.tagName !== 'TEXTAREA'){ e.preventDefault(); deleteSelected(); }
+        }
 
             // Ignore arrow keys if user is typing in an input/select/textarea
             const activeElement = document.activeElement;
@@ -2433,23 +2462,23 @@
                 // For other inputs/selects, don't move elements
                 return;
             }
-            
-            if(['ArrowUp','ArrowDown','ArrowLeft','ArrowRight'].includes(e.key)){
+
+        if(['ArrowUp','ArrowDown','ArrowLeft','ArrowRight'].includes(e.key)){
                 // Don't move elements if user is interacting with form controls
                 // Exception: allow font select navigation (handled separately with stopPropagation)
                 if(e.target.tagName !== 'INPUT' && e.target.tagName !== 'TEXTAREA' && e.target.tagName !== 'SELECT'){
-                    if(selectedIds.length>0){
-                        e.preventDefault();
-                        const step = e.shiftKey ? 0.1 : 0.01;
-                        pushBeforeChange();
-                        selectedIds.forEach(id=>{
-                            const el = S.find(s=>s.id===id); if(!el) return;
+                if(selectedIds.length>0){
+                    e.preventDefault();
+                    const step = e.shiftKey ? 0.1 : 0.01;
+                    pushBeforeChange();
+                    selectedIds.forEach(id=>{
+                        const el = S.find(s=>s.id===id); if(!el) return;
                             // Get effective bounds considering rotation
                             const bounds = getRotatedBounds(el);
                             const effectiveWidth = bounds.width;
                             const effectiveHeight = bounds.height;
                             
-                            switch(e.key){
+                        switch(e.key){
                                 case 'ArrowUp': {
                                     const newY = el.y - step;
                                     el.y = Math.max((effectiveHeight - el.height) / 2, newY);
@@ -2473,31 +2502,31 @@
                             }
                         });
                         render(); updateProps(); saveCurrentDesign();
-                    }
                 }
             }
+        }
 
-            if((e.ctrlKey||e.metaKey) && e.key.toLowerCase() === 'd'){
-                e.preventDefault();
-                dupSelected();
-            }
-        });
+        if((e.ctrlKey||e.metaKey) && e.key.toLowerCase() === 'd'){
+            e.preventDefault();
+            dupSelected();
+        }
+    });
 
-        // ---------- Property edits (apply to single or multiple) ----------
-        pp.addEventListener('input', (e)=>{
-            if(selectedIds.length === 0 && e.target.dataset.prop !== 'bind_search') return;
-            const target = e.target;
-            const prop = target.dataset.prop;
-            if(!prop) return;
+    // ---------- Property edits (apply to single or multiple) ----------
+    pp.addEventListener('input', (e)=>{
+        if(selectedIds.length === 0 && e.target.dataset.prop !== 'bind_search') return;
+        const target = e.target;
+        const prop = target.dataset.prop;
+        if(!prop) return;
 
-            // Handle bound column search input
-            if(prop === 'bind_search'){
+        // Handle bound column search input
+        if(prop === 'bind_search'){
                 // Clear previous debounce timer
                 if(searchDebounceTimer) clearTimeout(searchDebounceTimer);
                 
                 const query = String(target.value || '').trim();
-                const select = pp.querySelector('select[data-prop="props.boundColumn"]');
-                if(!select) return;
+            const select = pp.querySelector('select[data-prop="props.boundColumn"]');
+            if(!select) return;
                 
                 // Debounce search for better performance
                 searchDebounceTimer = setTimeout(() => {
@@ -2514,12 +2543,12 @@
                         }
                     }
                 }, 150); // 150ms debounce
-                return;
-            }
+            return;
+        }
 
-            if(prop.startsWith('multi.')){
-                const keyPath = prop.slice('multi.'.length);
-                const value = (target.type === 'checkbox') ? target.checked : (target.type === 'number' ? Number(target.value) : target.value);
+        if(prop.startsWith('multi.')){
+            const keyPath = prop.slice('multi.'.length);
+            const value = (target.type === 'checkbox') ? target.checked : (target.type === 'number' ? Number(target.value) : target.value);
                 
                 // Special handling: when showBorder is enabled, activate all border sides
                 if(keyPath === 'props.showBorder' && value === true){
@@ -2537,13 +2566,13 @@
                     return;
                 }
                 
-                pushBeforeChange();
-                selectedIds.forEach(id=>{
-                    const el = S.find(s=>s.id===id);
-                    if(!el) return;
-                    if(keyPath.includes('.')){
-                        const [o,k] = keyPath.split('.');
-                        if(!el[o]) el[o] = {};
+            pushBeforeChange();
+            selectedIds.forEach(id=>{
+                const el = S.find(s=>s.id===id);
+                if(!el) return;
+                if(keyPath.includes('.')){
+                    const [o,k] = keyPath.split('.');
+                    if(!el[o]) el[o] = {};
                         if(['fontSize','lineHeight','decimals','thickness','borderWidth','rotation','paddingTop','paddingRight','paddingBottom','paddingLeft','x','y','width','height'].includes(k)) el[o][k] = Number(value);
                         else if(['showBorder','displayValue','asPercent','borderTop','borderRight','borderBottom','borderLeft'].includes(k)) el[o][k] = !!value;
                         else if(k === 'fontWeight'){
@@ -2551,18 +2580,18 @@
                             const numVal = Number(value);
                             el[o][k] = (!isNaN(numVal) && numVal >= 100 && numVal <= 900) ? numVal : value;
                         }
-                        else el[o][k] = value;
-                    } else {
-                        if(['x','y','width','height','zIndex'].includes(keyPath)) el[keyPath] = Number(value);
-                        else el[keyPath] = value;
-                    }
-                });
+                    else el[o][k] = value;
+                } else {
+                    if(['x','y','width','height','zIndex'].includes(keyPath)) el[keyPath] = Number(value);
+                    else el[keyPath] = value;
+                }
+            });
                 render(); updateProps(); saveCurrentDesign();
-                return;
-            }
+            return;
+        }
 
-            const applyToAll = selectedIds.length > 1;
-            const parsedValue = (target.type === 'checkbox') ? target.checked : (target.type === 'number' ? Number(target.value) : target.value);
+        const applyToAll = selectedIds.length > 1;
+        const parsedValue = (target.type === 'checkbox') ? target.checked : (target.type === 'number' ? Number(target.value) : target.value);
             
             // Special handling: when showBorder is enabled, activate all border sides
             if(prop === 'props.showBorder' && parsedValue === true){
@@ -2593,46 +2622,46 @@
                 return;
             }
 
-            function applyPropToElement(el, p, v){
-                if(p === 'widthHeight'){ el.height = Number(v); return; }
-                if(p.includes('.')){
-                    const [o,k] = p.split('.');
-                    if(!el[o]) el[o] = {};
-                    if(['fontSize','decimals','thickness','borderWidth','rotation','paddingTop','paddingRight','paddingBottom','paddingLeft','x','y','width','height'].includes(k)) el[o][k] = Number(v);
+        function applyPropToElement(el, p, v){
+            if(p === 'widthHeight'){ el.height = Number(v); return; }
+            if(p.includes('.')){
+                const [o,k] = p.split('.');
+                if(!el[o]) el[o] = {};
+                    if(['fontSize','decimals','thickness','borderWidth','rotation','paddingTop','paddingRight','paddingBottom','paddingLeft','x','y','width','height','borderRadiusTopLeft','borderRadiusTopRight','borderRadiusBottomRight','borderRadiusBottomLeft'].includes(k)) el[o][k] = Number(v);
                     else if(['showBorder','displayValue','asPercent','borderTop','borderRight','borderBottom','borderLeft'].includes(k)) el[o][k] = !!v;
                     else if(k === 'fontWeight'){
                         // Handle fontWeight: can be number (100-900) or string ('normal', 'bold')
                         const numVal = Number(v);
                         el[o][k] = (!isNaN(numVal) && numVal >= 100 && numVal <= 900) ? numVal : v;
                     }
-                    else el[o][k] = v;
-                } else {
-                    if(['x','y','width','height','zIndex'].includes(p)) el[p] = Number(v);
-                    else el[p] = v;
-                }
-            }
-
-            pushBeforeChange();
-            if(applyToAll){
-                selectedIds.forEach(id=>{
-                    const el = S.find(s=>s.id===id); if(!el) return;
-                    applyPropToElement(el, prop, parsedValue);
-                });
+                else el[o][k] = v;
             } else {
-                const id = selectedIds[0];
-                const el = S.find(s=>s.id===id);
-                if(el) applyPropToElement(el, prop, parsedValue);
+                if(['x','y','width','height','zIndex'].includes(p)) el[p] = Number(v);
+                else el[p] = v;
             }
+        }
+
+        pushBeforeChange();
+        if(applyToAll){
+            selectedIds.forEach(id=>{
+                const el = S.find(s=>s.id===id); if(!el) return;
+                applyPropToElement(el, prop, parsedValue);
+            });
+        } else {
+            const id = selectedIds[0];
+            const el = S.find(s=>s.id===id);
+            if(el) applyPropToElement(el, prop, parsedValue);
+        }
             render(); 
             saveCurrentDesign(); 
             saveCurrentDesign();
-        });
+    });
 
-        pp.addEventListener('click', (e)=>{
-            if(e.target && e.target.id === 'btn-delete'){
-                deleteSelected();
-            }
-        });
+    pp.addEventListener('click', (e)=>{
+        if(e.target && e.target.id === 'btn-delete'){
+            deleteSelected();
+        }
+    });
 
         // ---------- Prevent textarea from losing focus when typing "." ----------
         // Add listener to textarea to prevent focus loss
@@ -2790,33 +2819,33 @@
         }
 
         // ---------- Buttons ----------
-        document.getElementById('btn-print').addEventListener('click', ()=>{
+    document.getElementById('btn-print').addEventListener('click', ()=>{
             printBothCanvases();
         });
         document.getElementById('btn-rotate-canvas').addEventListener('click', ()=>{
             canvasRotation = (canvasRotation + 90) % 360;
             applyCanvasRotation();
-        });
-        document.getElementById('btn-clear').addEventListener('click', ()=>{
-            if(confirm('Are you sure you want to clear the layout?')){
-                pushBeforeChange();
-                S=[]; selectedIds=[];
-                render(); updateProps(); updateBtns();
+    });
+    document.getElementById('btn-clear').addEventListener('click', ()=>{
+        if(confirm('Are you sure you want to clear the layout?')){
+            pushBeforeChange();
+            S=[]; selectedIds=[];
+            render(); updateProps(); updateBtns();
                 saveCurrentDesign();
                 saveCurrentDesign();
-            }
-        });
-        bd.addEventListener('click', dupSelected);
-        bf.addEventListener('click', bringToFront);
-        bs.addEventListener('click', sendToBack);
-        document.getElementById('btn-zoom-in').addEventListener('click', ()=> setZoom(z*1.25));
-        document.getElementById('btn-zoom-out').addEventListener('click', ()=> setZoom(z/1.25));
-        document.getElementById('btn-zoom-fit').addEventListener('click', fit);
+        }
+    });
+    bd.addEventListener('click', dupSelected);
+    bf.addEventListener('click', bringToFront);
+    bs.addEventListener('click', sendToBack);
+    document.getElementById('btn-zoom-in').addEventListener('click', ()=> setZoom(z*1.25));
+    document.getElementById('btn-zoom-out').addEventListener('click', ()=> setZoom(z/1.25));
+    document.getElementById('btn-zoom-fit').addEventListener('click', fit);
 
-        document.querySelectorAll('.add-element').forEach(b=> b.addEventListener('click', e => add(e.currentTarget.dataset.type)));
+    document.querySelectorAll('.add-element').forEach(b=> b.addEventListener('click', e => add(e.currentTarget.dataset.type)));
 
-        btnExport.addEventListener('click', ()=>{ exportToFile(); msg('Layout exported to file.'); });
-        btnImport.addEventListener('click', ()=>{ fileInput.value=''; fileInput.click(); });
+    btnExport.addEventListener('click', ()=>{ exportToFile(); msg('Layout exported to file.'); });
+    btnImport.addEventListener('click', ()=>{ fileInput.value=''; fileInput.click(); });
 
         // Profile/Design management
         profileSelector.addEventListener('change', (e)=>{
@@ -2852,17 +2881,17 @@
         canvas2Enabled.addEventListener('change', (e)=>{
             toggleCanvas2(e.target.checked);
         });
-        fileInput.addEventListener('change', (ev)=>{
-            const f = ev.target.files && ev.target.files[0];
-            if(!f) return;
-            const reader = new FileReader();
+    fileInput.addEventListener('change', (ev)=>{
+        const f = ev.target.files && ev.target.files[0];
+        if(!f) return;
+        const reader = new FileReader();
             reader.onload = function(e){ importFromFile(e.target.result); };
-            reader.readAsText(f);
-        });
+        reader.readAsText(f);
+    });
 
-        window.addEventListener('keydown', (e)=>{
-            if((e.ctrlKey||e.metaKey) && e.key.toLowerCase() === 'e'){ e.preventDefault(); exportToFile(); msg('Layout exported to file.'); }
-        });
+    window.addEventListener('keydown', (e)=>{
+        if((e.ctrlKey||e.metaKey) && e.key.toLowerCase() === 'e'){ e.preventDefault(); exportToFile(); msg('Layout exported to file.'); }
+    });
 
         // Listen for window resize to detect full screen mode changes
         window.addEventListener('resize', () => {
@@ -2875,7 +2904,7 @@
             }
         });
 
-        // ---------- Zoom / fit ----------
+    // ---------- Zoom / fit ----------
         function setZoom(nz){ 
             z = Math.max(.1, Math.min(3, nz)); 
             // Combina zoom e rotazione del canvas
@@ -2886,7 +2915,7 @@
             }
             zd.textContent = `${Math.round(z*100)}%`; 
         }
-        function fit(){ const cr = cc.getBoundingClientRect(); const hw = (cr.width-40)/(W*37.795276); const vw = (cr.height-40)/(H*37.795276); setZoom(Math.min(hw,vw,1.5)); }
+    function fit(){ const cr = cc.getBoundingClientRect(); const hw = (cr.width-40)/(W*37.795276); const vw = (cr.height-40)/(H*37.795276); setZoom(Math.min(hw,vw,1.5)); }
 
         // ---------- Full screen detection & UI visibility ----------
         function checkFullScreenMode() {
@@ -3026,20 +3055,20 @@
             }
         }
 
-        // ---------- Grist integration (optional) ----------
-        if(isGristAvailable()){
-            try{ window.grist.ready({ requiredAccess:'full' }); }catch(e){}
-            try{
-                if(typeof window.grist.onRecord === 'function'){
-                    window.grist.onRecord(function(record,mappings){ R = record||{}; C = Object.keys(R); if(selectedIds.length) updateProps(); render(); });
-                }
-            }catch(e){ console.warn('grist.onRecord error',e); }
-            try{
-                if(typeof window.grist.onOptions === 'function'){
-                    window.grist.onOptions(function(options){ /* no-op */ });
-                }
-            }catch(e){}
-        } else { R = {}; C = []; }
+    // ---------- Grist integration (optional) ----------
+    if(isGristAvailable()){
+        try{ window.grist.ready({ requiredAccess:'full' }); }catch(e){}
+        try{
+            if(typeof window.grist.onRecord === 'function'){
+                window.grist.onRecord(function(record,mappings){ R = record||{}; C = Object.keys(R); if(selectedIds.length) updateProps(); render(); });
+            }
+        }catch(e){ console.warn('grist.onRecord error',e); }
+        try{
+            if(typeof window.grist.onOptions === 'function'){
+                window.grist.onOptions(function(options){ /* no-op */ });
+            }
+        }catch(e){}
+    } else { R = {}; C = []; }
 
         // ---------- Initial setup & history init ----------
         // Load from localStorage on startup
@@ -3097,7 +3126,7 @@
         render();
         updateProps();
         fit();
-        resetHistory();
+    resetHistory();
         
         // Check full screen mode on initial load
         checkFullScreenMode();
@@ -3111,8 +3140,8 @@
             if(cloneBtn && selectHeight) cloneBtn.style.height = `${selectHeight}px`;
         }, 100);
 
-    }); // DOMContentLoaded
-    </script>
+}); // DOMContentLoaded
+</script>
 
-    </body>
-    </html>
+</body>
+</html>
