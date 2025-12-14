@@ -2487,6 +2487,23 @@
             if(prop.startsWith('multi.')){
                 const keyPath = prop.slice('multi.'.length);
                 const value = (target.type === 'checkbox') ? target.checked : (target.type === 'number' ? Number(target.value) : target.value);
+                
+                // Special handling: when showBorder is enabled, activate all border sides
+                if(keyPath === 'props.showBorder' && value === true){
+                    pushBeforeChange();
+                    selectedIds.forEach(id=>{
+                        const el = S.find(s=>s.id===id);
+                        if(!el) return;
+                        el.props.showBorder = true;
+                        el.props.borderTop = true;
+                        el.props.borderRight = true;
+                        el.props.borderBottom = true;
+                        el.props.borderLeft = true;
+                    });
+                    render(); updateProps(); saveCurrentDesign();
+                    return;
+                }
+                
                 pushBeforeChange();
                 selectedIds.forEach(id=>{
                     const el = S.find(s=>s.id===id);
@@ -2513,6 +2530,35 @@
 
             const applyToAll = selectedIds.length > 1;
             const parsedValue = (target.type === 'checkbox') ? target.checked : (target.type === 'number' ? Number(target.value) : target.value);
+            
+            // Special handling: when showBorder is enabled, activate all border sides
+            if(prop === 'props.showBorder' && parsedValue === true){
+                pushBeforeChange();
+                if(applyToAll){
+                    selectedIds.forEach(id=>{
+                        const el = S.find(s=>s.id===id); if(!el) return;
+                        el.props.showBorder = true;
+                        el.props.borderTop = true;
+                        el.props.borderRight = true;
+                        el.props.borderBottom = true;
+                        el.props.borderLeft = true;
+                    });
+                } else {
+                    const id = selectedIds[0];
+                    const el = S.find(s=>s.id===id);
+                    if(el) {
+                        el.props.showBorder = true;
+                        el.props.borderTop = true;
+                        el.props.borderRight = true;
+                        el.props.borderBottom = true;
+                        el.props.borderLeft = true;
+                    }
+                }
+                render(); 
+                updateProps(); 
+                saveCurrentDesign();
+                return;
+            }
 
             function applyPropToElement(el, p, v){
                 if(p === 'widthHeight'){ el.height = Number(v); return; }
