@@ -162,7 +162,90 @@
         let canvasRotation = 0;           // temporary canvas rotation (0, 90, 180, 270 degrees)
         let W = 8, H = 5;                 // Current dimensions (dynamic)
         const KEY = 'grist_label_layout_v2'; // Updated version for profiles
+        const FONT_FAVORITES_KEY = 'grist_label_font_favorites'; // Key for font favorites
         const MAX_HISTORY = 100;
+        
+        // All available fonts for labels
+        const ALL_FONTS = [
+            { value: 'Arial, sans-serif', name: 'Arial' },
+            { value: "'Courier New', monospace", name: 'Courier New' },
+            { value: 'Consolas, monospace', name: 'Consolas' },
+            { value: 'Georgia, serif', name: 'Georgia' },
+            { value: "'Times New Roman', serif", name: 'Times New Roman' },
+            { value: 'Verdana, sans-serif', name: 'Verdana' },
+            { value: "'Trebuchet MS', sans-serif", name: 'Trebuchet MS' },
+            { value: 'Impact, sans-serif', name: 'Impact' },
+            { value: "'Comic Sans MS', cursive", name: 'Comic Sans MS' },
+            { value: "'Winky Rough', sans-serif", name: 'Winky Rough' }
+        ];
+        
+        // Load font favorites from localStorage
+        let fontFavorites = [];
+        try {
+            const saved = localStorage.getItem(FONT_FAVORITES_KEY);
+            if(saved) {
+                fontFavorites = JSON.parse(saved);
+            } else {
+                // Default favorites
+                fontFavorites = ['Arial, sans-serif', 'Verdana, sans-serif', 'Impact, sans-serif'];
+            }
+        } catch(e) {
+            fontFavorites = ['Arial, sans-serif', 'Verdana, sans-serif', 'Impact, sans-serif'];
+        }
+        
+        function saveFontFavorites() {
+            try {
+                localStorage.setItem(FONT_FAVORITES_KEY, JSON.stringify(fontFavorites));
+            } catch(e) {
+                console.warn('Failed to save font favorites:', e);
+            }
+        }
+        
+        function toggleFontFavorite(fontValue) {
+            const index = fontFavorites.indexOf(fontValue);
+            if(index === -1) {
+                fontFavorites.push(fontValue);
+                msg('Font added to favorites');
+            } else {
+                fontFavorites.splice(index, 1);
+                msg('Font removed from favorites');
+            }
+            saveFontFavorites();
+        }
+        
+        function generateFontOptions(currentFontFamily) {
+            const favoriteFonts = ALL_FONTS.filter(f => fontFavorites.includes(f.value));
+            const otherFonts = ALL_FONTS.filter(f => !fontFavorites.includes(f.value));
+            
+            let html = '';
+            
+            // Add favorites section
+            if(favoriteFonts.length > 0) {
+                html += '<optgroup label="⭐ Favorites">';
+                favoriteFonts.forEach(font => {
+                    const selected = currentFontFamily === font.value ? 'selected' : '';
+                    html += `<option value="${font.value}" ${selected}>${font.name}</option>`;
+                });
+                html += '</optgroup>';
+            }
+            
+            // Add separator if there are favorites
+            if(favoriteFonts.length > 0 && otherFonts.length > 0) {
+                html += '<optgroup label="All Fonts">';
+            }
+            
+            // Add other fonts
+            otherFonts.forEach(font => {
+                const selected = currentFontFamily === font.value ? 'selected' : '';
+                html += `<option value="${font.value}" ${selected}>${font.name}</option>`;
+            });
+            
+            if(favoriteFonts.length > 0 && otherFonts.length > 0) {
+                html += '</optgroup>';
+            }
+            
+            return html;
+        }
         
         // Profile management
         let profiles = {
@@ -753,7 +836,12 @@
                     d.style.display = 'flex';
                     d.style.alignItems = alignMap[el.props.valign] || 'flex-start';
                     d.style.justifyContent = justifyMap[el.props.textAlign] || 'flex-start';
-                    d.style.whiteSpace = 'normal';
+                    // Use pre-wrap to preserve line breaks from textarea
+                    if(el.type === 'text' || el.type === 'data'){
+                        d.style.whiteSpace = 'pre-wrap';
+                    } else {
+                        d.style.whiteSpace = 'normal';
+                    }
                 } else {
                     d.style.display = '';
                     d.style.whiteSpace = '';
@@ -801,6 +889,7 @@
                         span.style.pointerEvents='none';
                         span.style.overflow='hidden';
                         span.style.wordWrap='break-word';
+                        span.style.whiteSpace='pre-wrap'; // Preserve line breaks
                         span.textContent = el.props.text || 'Static Text';
                         d.appendChild(span);
                         break;
@@ -812,6 +901,7 @@
                         span.style.pointerEvents='none';
                         span.style.overflow='hidden';
                         span.style.wordWrap='break-word';
+                        span.style.whiteSpace='pre-wrap'; // Preserve line breaks
                         span.textContent = getData(el);
                         d.appendChild(span);
                         break;
@@ -1052,7 +1142,7 @@
 
             if(el.type==='text' || el.type==='data'){
                 const currentFontFamily = el.props.fontFamily || 'Arial, sans-serif';
-                h += `<hr><div class="prop-grid"><label>Font Size</label><input type="number" data-prop="props.fontSize" value="${el.props.fontSize||16}" min="6" max="200"><label>Font Family</label><select data-prop="props.fontFamily" id="font-family-select-${el.id}"><option value="Arial, sans-serif" ${currentFontFamily==='Arial, sans-serif'?'selected':''}>Arial</option><option value="'Courier New', monospace" ${currentFontFamily==="'Courier New', monospace"?'selected':''}>Courier New</option><option value="Consolas, monospace" ${currentFontFamily==='Consolas, monospace'?'selected':''}>Consolas</option><option value="Georgia, serif" ${currentFontFamily==='Georgia, serif'?'selected':''}>Georgia</option><option value="'Times New Roman', serif" ${currentFontFamily==="'Times New Roman', serif"?'selected':''}>Times New Roman</option><option value="Verdana, sans-serif" ${currentFontFamily==='Verdana, sans-serif'?'selected':''}>Verdana</option><option value="'Trebuchet MS', sans-serif" ${currentFontFamily==="'Trebuchet MS', sans-serif"?'selected':''}>Trebuchet MS</option><option value="Impact, sans-serif" ${currentFontFamily==='Impact, sans-serif'?'selected':''}>Impact</option><option value="'Comic Sans MS', cursive" ${currentFontFamily==="'Comic Sans MS', cursive"?'selected':''}>Comic Sans MS</option><option value="'Winky Rough', sans-serif" ${currentFontFamily==="'Winky Rough', sans-serif"?'selected':''}>Winky Rough</option></select></div>`;
+                h += `<hr><div class="prop-grid"><label>Font Size</label><input type="number" data-prop="props.fontSize" value="${el.props.fontSize||16}" min="6" max="200"><label>Font Family</label><div style="display:flex;gap:4px;align-items:center"><select data-prop="props.fontFamily" id="font-family-select-${el.id}" style="flex:1">${generateFontOptions(currentFontFamily)}</select><button type="button" id="font-favorite-btn-${el.id}" style="padding:4px 8px;font-size:16px;background:transparent;border:1px solid #ccc;border-radius:4px;cursor:pointer;flex-shrink:0" title="${fontFavorites.includes(currentFontFamily) ? 'Remove from favorites' : 'Add to favorites'}">${fontFavorites.includes(currentFontFamily) ? '⭐' : '☆'}</button></div></div>`;
                 h += `<div class="prop-grid"><label>Weight</label><select data-prop="props.fontWeight" id="font-weight-select-${el.id}">${generateWeightOptions(currentFontFamily, el.props.fontWeight)}</select><label>Line Height</label><input type="number" step="0.1" data-prop="props.lineHeight" value="${el.props.lineHeight!==undefined?el.props.lineHeight:1.2}" min="0.5" max="3"></div>`;
                 h += `<div class="prop-grid"><label>H. Align</label><select data-prop="props.textAlign"><option value="left" ${el.props.textAlign==='left'?'selected':''}>Left</option><option value="center" ${el.props.textAlign==='center'?'selected':''}>Center</option><option value="right" ${el.props.textAlign==='right'?'selected':''}>Right</option></select><label>V. Align</label><select data-prop="props.valign"><option value="top" ${el.props.valign==='top'?'selected':''}>Top</option><option value="middle" ${el.props.valign==='middle'?'selected':''}>Middle</option><option value="bottom" ${el.props.valign==='bottom'?'selected':''}>Bottom</option></select></div>`;
                 h += `<div class="prop-grid"><label>Rotation°</label><input type="number" step="1" data-prop="props.rotation" value="${el.props.rotation||0}"><label></label></div>`;
@@ -1074,11 +1164,89 @@
             if(el.type === 'text' || el.type === 'data'){
                 const fontFamilySelect = pp.querySelector(`#font-family-select-${el.id}`);
                 const weightSelect = pp.querySelector(`#font-weight-select-${el.id}`);
+                const favoriteBtn = pp.querySelector(`#font-favorite-btn-${el.id}`);
+                
                 if(fontFamilySelect && weightSelect){
                     fontFamilySelect.addEventListener('change', function(){
                         const newFontFamily = this.value;
                         const currentWeight = el.props.fontWeight || 'normal';
                         weightSelect.innerHTML = generateWeightOptions(newFontFamily, currentWeight);
+                        // Update favorite button
+                        if(favoriteBtn) {
+                            favoriteBtn.innerHTML = fontFavorites.includes(newFontFamily) ? '⭐' : '☆';
+                            favoriteBtn.title = fontFavorites.includes(newFontFamily) ? 'Remove from favorites' : 'Add to favorites';
+                        }
+                        // Trigger change event to update element
+                        this.dispatchEvent(new Event('input', { bubbles: true }));
+                    });
+                    
+                    // Add keyboard navigation (arrow keys) with live preview
+                    let originalFontFamily = el.props.fontFamily || 'Arial, sans-serif';
+                    fontFamilySelect.addEventListener('focus', function(){
+                        originalFontFamily = el.props.fontFamily || 'Arial, sans-serif';
+                    });
+                    
+                    fontFamilySelect.addEventListener('keydown', function(e){
+                        if(e.key === 'ArrowUp' || e.key === 'ArrowDown'){
+                            e.preventDefault();
+                            const options = Array.from(this.options);
+                            const currentIndex = this.selectedIndex;
+                            let newIndex;
+                            if(e.key === 'ArrowUp'){
+                                newIndex = currentIndex > 0 ? currentIndex - 1 : options.length - 1;
+                            } else {
+                                newIndex = currentIndex < options.length - 1 ? currentIndex + 1 : 0;
+                            }
+                            this.selectedIndex = newIndex;
+                            const newFontFamily = this.options[newIndex].value;
+                            
+                            // Update element temporarily for live preview
+                            el.props.fontFamily = newFontFamily;
+                            const currentWeight = el.props.fontWeight || 'normal';
+                            weightSelect.innerHTML = generateWeightOptions(newFontFamily, currentWeight);
+                            
+                            // Update favorite button
+                            if(favoriteBtn) {
+                                favoriteBtn.innerHTML = fontFavorites.includes(newFontFamily) ? '⭐' : '☆';
+                                favoriteBtn.title = fontFavorites.includes(newFontFamily) ? 'Remove from favorites' : 'Add to favorites';
+                            }
+                            
+                            // Render to show the change
+                            render();
+                        } else if(e.key === 'Escape'){
+                            // Restore original font on Escape
+                            el.props.fontFamily = originalFontFamily;
+                            this.value = originalFontFamily;
+                            const currentWeight = el.props.fontWeight || 'normal';
+                            weightSelect.innerHTML = generateWeightOptions(originalFontFamily, currentWeight);
+                            if(favoriteBtn) {
+                                favoriteBtn.innerHTML = fontFavorites.includes(originalFontFamily) ? '⭐' : '☆';
+                                favoriteBtn.title = fontFavorites.includes(originalFontFamily) ? 'Remove from favorites' : 'Add to favorites';
+                            }
+                            render();
+                        }
+                    });
+                    
+                    // Save on blur (when user leaves the select)
+                    fontFamilySelect.addEventListener('blur', function(){
+                        // Trigger change event to save
+                        this.dispatchEvent(new Event('change', { bubbles: true }));
+                    });
+                }
+                
+                // Add favorite button listener
+                if(favoriteBtn){
+                    favoriteBtn.addEventListener('click', function(e){
+                        e.preventDefault();
+                        const currentFont = fontFamilySelect.value;
+                        toggleFontFavorite(currentFont);
+                        // Update button
+                        this.innerHTML = fontFavorites.includes(currentFont) ? '⭐' : '☆';
+                        this.title = fontFavorites.includes(currentFont) ? 'Remove from favorites' : 'Add to favorites';
+                        // Regenerate options to reflect favorites
+                        const selectedValue = fontFamilySelect.value;
+                        fontFamilySelect.innerHTML = generateFontOptions(selectedValue);
+                        fontFamilySelect.value = selectedValue;
                     });
                 }
             }
@@ -1104,7 +1272,7 @@
             let h = `<div style="font-weight:600;margin-bottom:6px">${elems.length} elements selected</div>`;
             h += `<div class="prop-grid"><label>X</label><input type="number" step="0.01" data-prop="multi.x" value="${common('x')}"><label>Y</label><input type="number" step="0.01" data-prop="multi.y" value="${common('y')}"></div>`;
             h += `<div class="prop-grid"><label>Width</label><input type="number" step="0.01" data-prop="multi.width" value="${common('width')}"><label>Height</label><input type="number" step="0.01" data-prop="multi.height" value="${common('height')}"></div><hr>`;
-            h += `<div class="prop-grid"><label>Font Size</label><input type="number" data-prop="multi.props.fontSize" value="${common('props.fontSize')}" min="6"><label>Font Family</label><select data-prop="multi.props.fontFamily" id="multi-font-family-select"><option value="Arial, sans-serif" ${commonFontFamily==='Arial, sans-serif'?'selected':''}>Arial</option><option value="'Courier New', monospace" ${commonFontFamily==="'Courier New', monospace"?'selected':''}>Courier New</option><option value="Consolas, monospace" ${commonFontFamily==='Consolas, monospace'?'selected':''}>Consolas</option><option value="Georgia, serif" ${commonFontFamily==='Georgia, serif'?'selected':''}>Georgia</option><option value="'Times New Roman', serif" ${commonFontFamily==="'Times New Roman', serif"?'selected':''}>Times New Roman</option><option value="Verdana, sans-serif" ${commonFontFamily==='Verdana, sans-serif'?'selected':''}>Verdana</option><option value="'Trebuchet MS', sans-serif" ${commonFontFamily==="'Trebuchet MS', sans-serif"?'selected':''}>Trebuchet MS</option><option value="Impact, sans-serif" ${commonFontFamily==='Impact, sans-serif'?'selected':''}>Impact</option><option value="'Comic Sans MS', cursive" ${commonFontFamily==="'Comic Sans MS', cursive"?'selected':''}>Comic Sans MS</option><option value="'Winky Rough', sans-serif" ${commonFontFamily==="'Winky Rough', sans-serif"?'selected':''}>Winky Rough</option></select></div>`;
+            h += `<div class="prop-grid"><label>Font Size</label><input type="number" data-prop="multi.props.fontSize" value="${common('props.fontSize')}" min="6"><label>Font Family</label><div style="display:flex;gap:4px;align-items:center"><select data-prop="multi.props.fontFamily" id="multi-font-family-select" style="flex:1">${generateFontOptions(commonFontFamily)}</select><button type="button" id="multi-font-favorite-btn" style="padding:4px 8px;font-size:16px;background:transparent;border:1px solid #ccc;border-radius:4px;cursor:pointer;flex-shrink:0" title="${fontFavorites.includes(commonFontFamily) ? 'Remove from favorites' : 'Add to favorites'}">${fontFavorites.includes(commonFontFamily) ? '⭐' : '☆'}</button></div></div>`;
             h += `<div class="prop-grid"><label>Font Weight</label><select data-prop="multi.props.fontWeight" id="multi-font-weight-select">${generateWeightOptions(commonFontFamily, commonWeight)}</select><label>Line Height</label><input type="number" step="0.1" data-prop="multi.props.lineHeight" value="${common('props.lineHeight')}" min="0.5" max="3"></div>`;
             h += `<div class="prop-grid"><label>H. Align</label><select data-prop="multi.props.textAlign"><option value="">—</option><option value="left" ${common('props.textAlign')==='left'?'selected':''}>Left</option><option value="center" ${common('props.textAlign')==='center'?'selected':''}>Center</option><option value="right" ${common('props.textAlign')==='right'?'selected':''}>Right</option></select><label>V. Align</label><select data-prop="multi.props.valign"><option value="">—</option><option value="top" ${common('props.valign')==='top'?'selected':''}>Top</option><option value="middle" ${common('props.valign')==='middle'?'selected':''}>Middle</option><option value="bottom" ${common('props.valign')==='bottom'?'selected':''}>Bottom</option></select></div>`;
             h += `<div class="prop-grid"><label>Padding Top</label><input type="number" step="0.1" data-prop="multi.props.paddingTop" value="${common('props.paddingTop')}" min="0"><label>Padding Right</label><input type="number" step="0.1" data-prop="multi.props.paddingRight" value="${common('props.paddingRight')}" min="0"></div>`;
@@ -1121,11 +1289,103 @@
             // Add listener to update weight options when font family changes (multi-select)
             const multiFontFamilySelect = pp.querySelector('#multi-font-family-select');
             const multiWeightSelect = pp.querySelector('#multi-font-weight-select');
+            const multiFavoriteBtn = pp.querySelector('#multi-font-favorite-btn');
+            
             if(multiFontFamilySelect && multiWeightSelect){
                 multiFontFamilySelect.addEventListener('change', function(){
                     const newFontFamily = this.value;
                     const currentWeight = commonWeight;
                     multiWeightSelect.innerHTML = generateWeightOptions(newFontFamily, currentWeight);
+                    // Update favorite button
+                    if(multiFavoriteBtn) {
+                        multiFavoriteBtn.innerHTML = fontFavorites.includes(newFontFamily) ? '⭐' : '☆';
+                        multiFavoriteBtn.title = fontFavorites.includes(newFontFamily) ? 'Remove from favorites' : 'Add to favorites';
+                    }
+                    // Trigger change event to update elements
+                    this.dispatchEvent(new Event('input', { bubbles: true }));
+                });
+                
+                // Add keyboard navigation (arrow keys) with live preview
+                let originalFontFamily = commonFontFamily;
+                multiFontFamilySelect.addEventListener('focus', function(){
+                    originalFontFamily = commonFontFamily;
+                });
+                
+                multiFontFamilySelect.addEventListener('keydown', function(e){
+                    if(e.key === 'ArrowUp' || e.key === 'ArrowDown'){
+                        e.preventDefault();
+                        e.stopPropagation(); // Prevent event from bubbling to global listener
+                        const options = Array.from(this.options);
+                        const currentIndex = this.selectedIndex;
+                        let newIndex;
+                        if(e.key === 'ArrowUp'){
+                            newIndex = currentIndex > 0 ? currentIndex - 1 : options.length - 1;
+                        } else {
+                            newIndex = currentIndex < options.length - 1 ? currentIndex + 1 : 0;
+                        }
+                        this.selectedIndex = newIndex;
+                        const newFontFamily = this.options[newIndex].value;
+                        
+                        // Update all selected elements temporarily for live preview
+                        selectedIds.forEach(id => {
+                            const elem = S.find(s => s.id === id);
+                            if(elem && (elem.type === 'text' || elem.type === 'data')){
+                                elem.props.fontFamily = newFontFamily;
+                            }
+                        });
+                        
+                        const currentWeight = commonWeight;
+                        multiWeightSelect.innerHTML = generateWeightOptions(newFontFamily, currentWeight);
+                        
+                        // Update favorite button
+                        if(multiFavoriteBtn) {
+                            multiFavoriteBtn.innerHTML = fontFavorites.includes(newFontFamily) ? '⭐' : '☆';
+                            multiFavoriteBtn.title = fontFavorites.includes(newFontFamily) ? 'Remove from favorites' : 'Add to favorites';
+                        }
+                        
+                        // Render to show the change
+                        render();
+                    } else if(e.key === 'Escape'){
+                        e.preventDefault();
+                        e.stopPropagation();
+                        // Restore original font on Escape
+                        selectedIds.forEach(id => {
+                            const elem = S.find(s => s.id === id);
+                            if(elem && (elem.type === 'text' || elem.type === 'data')){
+                                elem.props.fontFamily = originalFontFamily;
+                            }
+                        });
+                        this.value = originalFontFamily;
+                        const currentWeight = commonWeight;
+                        multiWeightSelect.innerHTML = generateWeightOptions(originalFontFamily, currentWeight);
+                        if(multiFavoriteBtn) {
+                            multiFavoriteBtn.innerHTML = fontFavorites.includes(originalFontFamily) ? '⭐' : '☆';
+                            multiFavoriteBtn.title = fontFavorites.includes(originalFontFamily) ? 'Remove from favorites' : 'Add to favorites';
+                        }
+                        render();
+                    }
+                });
+                
+                // Save on blur (when user leaves the select)
+                multiFontFamilySelect.addEventListener('blur', function(){
+                    // Trigger change event to save
+                    this.dispatchEvent(new Event('change', { bubbles: true }));
+                });
+            }
+            
+            // Add favorite button listener
+            if(multiFavoriteBtn){
+                multiFavoriteBtn.addEventListener('click', function(e){
+                    e.preventDefault();
+                    const currentFont = multiFontFamilySelect.value;
+                    toggleFontFavorite(currentFont);
+                    // Update button
+                    this.innerHTML = fontFavorites.includes(currentFont) ? '⭐' : '☆';
+                    this.title = fontFavorites.includes(currentFont) ? 'Remove from favorites' : 'Add to favorites';
+                    // Regenerate options to reflect favorites
+                    const selectedValue = multiFontFamilySelect.value;
+                    multiFontFamilySelect.innerHTML = generateFontOptions(selectedValue);
+                    multiFontFamilySelect.value = selectedValue;
                 });
             }
         }
@@ -1134,17 +1394,19 @@
 
         // ---------- Font weights mapping ----------
         function getFontWeights(fontFamily){
+            // Only include weights that are actually supported by the font
+            // Most system fonts only support normal (400) and bold (700)
             const fontWeights = {
-                'Arial, sans-serif': [100, 200, 300, 400, 500, 600, 700, 800, 900, 'normal', 'bold'],
+                'Arial, sans-serif': [400, 700, 'normal', 'bold'],
                 "'Courier New', monospace": [400, 700, 'normal', 'bold'],
                 'Consolas, monospace': [400, 700, 'normal', 'bold'],
                 'Georgia, serif': [400, 700, 'normal', 'bold'],
                 "'Times New Roman', serif": [400, 700, 'normal', 'bold'],
                 'Verdana, sans-serif': [400, 700, 'normal', 'bold'],
                 "'Trebuchet MS', sans-serif": [400, 700, 'normal', 'bold'],
-                'Impact, sans-serif': [400, 'normal'],
+                'Impact, sans-serif': [400, 'normal'], // Impact only has one weight
                 "'Comic Sans MS', cursive": [400, 700, 'normal', 'bold'],
-                "'Winky Rough', sans-serif": [300, 400, 500, 600, 700, 800, 900, 'normal', 'bold']
+                "'Winky Rough', sans-serif": [300, 400, 500, 600, 700, 800, 900, 'normal', 'bold'] // Custom font with multiple weights
             };
             return fontWeights[fontFamily] || [400, 700, 'normal', 'bold'];
         }
@@ -1605,7 +1867,12 @@
                         d.style.display = 'flex';
                         d.style.alignItems = alignMap[el.props.valign] || 'flex-start';
                         d.style.justifyContent = justifyMap[el.props.textAlign] || 'flex-start';
-                        d.style.whiteSpace = 'normal';
+                        // Use pre-wrap to preserve line breaks from textarea
+                        if(el.type === 'text' || el.type === 'data'){
+                            d.style.whiteSpace = 'pre-wrap';
+                        } else {
+                            d.style.whiteSpace = 'normal';
+                        }
                     } else {
                         d.style.display = 'block';
                         d.style.whiteSpace = '';
@@ -1654,6 +1921,7 @@
                             span.style.pointerEvents='none';
                             span.style.overflow='hidden';
                             span.style.wordWrap='break-word';
+                            span.style.whiteSpace='pre-wrap'; // Preserve line breaks
                             span.textContent = el.props.text || 'Static Text';
                             d.appendChild(span);
                             break;
@@ -1665,6 +1933,7 @@
                             span.style.pointerEvents='none';
                             span.style.overflow='hidden';
                             span.style.wordWrap='break-word';
+                            span.style.whiteSpace='pre-wrap'; // Preserve line breaks
                             span.textContent = getData(el);
                             d.appendChild(span);
                             break;
@@ -2120,8 +2389,22 @@
                 if(e.target.tagName !== 'INPUT' && e.target.tagName !== 'TEXTAREA'){ e.preventDefault(); deleteSelected(); }
             }
 
+            // Ignore arrow keys if user is typing in an input/select/textarea
+            const activeElement = document.activeElement;
+            if(activeElement && (activeElement.tagName === 'INPUT' || activeElement.tagName === 'SELECT' || activeElement.tagName === 'TEXTAREA')){
+                // Allow arrow keys in select elements for font navigation (handled separately)
+                if(activeElement.tagName === 'SELECT' && (activeElement.id && (activeElement.id.includes('font-family-select') || activeElement.id.includes('multi-font-family-select')))){
+                    // Font select navigation is handled in its own listener, but we still want to prevent element movement
+                    return;
+                }
+                // For other inputs/selects, don't move elements
+                return;
+            }
+            
             if(['ArrowUp','ArrowDown','ArrowLeft','ArrowRight'].includes(e.key)){
-                if(e.target.tagName !== 'INPUT' && e.target.tagName !== 'TEXTAREA'){
+                // Don't move elements if user is interacting with form controls
+                // Exception: allow font select navigation (handled separately with stopPropagation)
+                if(e.target.tagName !== 'INPUT' && e.target.tagName !== 'TEXTAREA' && e.target.tagName !== 'SELECT'){
                     if(selectedIds.length>0){
                         e.preventDefault();
                         const step = e.shiftKey ? 0.1 : 0.01;
