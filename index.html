@@ -988,6 +988,7 @@
 
             if(el.type==='line'){
                 h += `<label>Thickness (px)</label><input type="number" data-prop="props.thickness" value="${el.props.thickness||2}" min="1">`;
+                h += `<hr><div class="prop-grid"><label>Rotation°</label><input type="number" step="1" data-prop="props.rotation" value="${el.props.rotation||0}"><label></label></div>`;
             }
 
             if(el.type==='box'){
@@ -1523,8 +1524,14 @@
                     d.style.position = 'absolute';
                     d.style.left = `${el.x}cm`;
                     d.style.top = `${el.y}cm`;
-                    d.style.width = `${el.width}cm`;
-                    d.style.height = `${el.height}cm`;
+                    // For lines, don't set height in cm initially - it will be set in px later
+                    if(el.type !== 'line'){
+                        d.style.width = `${el.width}cm`;
+                        d.style.height = `${el.height}cm`;
+                    } else {
+                        d.style.width = `${el.width}cm`;
+                        // Height will be set in px in the line case below
+                    }
                     d.style.zIndex = el.zIndex || 0;
                     d.style.fontSize = `${el.props.fontSize || 16}px`;
                     const fontWeight = el.props.fontWeight;
@@ -1547,7 +1554,10 @@
                         d.style.whiteSpace = '';
                     }
                     d.style.textAlign = el.props.textAlign || 'left';
-                    d.style.color = el.props.color || '#000000';
+                    // For lines, color is handled separately via background
+                    if(el.type !== 'line'){
+                        d.style.color = el.props.color || '#000000';
+                    }
                     d.style.boxSizing = 'border-box';
                     const rotation = Number(el.props.rotation) || 0;
                     d.style.transform = `rotate(${rotation}deg)`;
@@ -1595,15 +1605,27 @@
                             break;
                         }
                         case 'line':
-                            d.style.backgroundColor = el.props.color || '#000000';
+                            // For lines, use explicit background color and ensure visibility
+                            const lineColor = el.props.color || '#000000';
+                            d.style.background = lineColor;
+                            d.style.backgroundColor = lineColor;
                             d.style.height = `${el.props.thickness || 2}px`;
                             d.style.width = `${el.width}cm`;
-                            d.style.border = 'none'; // No border for lines - thickness controls height
-                            d.style.display = 'block'; // Ensure block display for lines
-                            d.style.margin = '0'; // Remove any margins
-                            d.style.padding = '0'; // Remove any padding
-                            d.style.overflow = 'visible'; // Ensure visibility
-                            d.style.minHeight = `${el.props.thickness || 2}px`; // Ensure minimum height
+                            d.style.border = 'none';
+                            d.style.display = 'block';
+                            d.style.margin = '0';
+                            d.style.padding = '0';
+                            d.style.overflow = 'visible';
+                            d.style.minHeight = `${el.props.thickness || 2}px`;
+                            d.style.maxHeight = `${el.props.thickness || 2}px`;
+                            d.style.boxSizing = 'border-box';
+                            // Force browsers to print background colors
+                            d.style.printColorAdjust = 'exact';
+                            d.style.webkitPrintColorAdjust = 'exact';
+                            // Add a non-breaking space to ensure the div has content (invisible but ensures rendering)
+                            d.innerHTML = '&nbsp;';
+                            d.style.color = 'transparent';
+                            d.style.fontSize = '0';
                             break;
                         case 'box':
                             d.style.border = `${el.props.thickness || 2}px solid ${el.props.color || '#000000'}`;
@@ -1738,6 +1760,7 @@
                     .print-page:last-child{page-break-after:auto!important}
                     .print-container{display:block!important;position:static!important;left:auto!important;top:auto!important}
                     #main-content,#canvas-container,#canvas-wrapper,#label-canvas{display:none!important}
+                    .label-element{print-color-adjust:exact!important;-webkit-print-color-adjust:exact!important}
                 }
             `;
             
