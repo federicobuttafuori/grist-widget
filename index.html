@@ -701,15 +701,31 @@
 
             function removeDesign(){
                 const profile = profiles[currentProfile];
+                if(!profile) return;
                 if(Object.keys(profile.designs).length <= 1){
                     msg('Cannot remove the last design', true);
                     return;
                 }
                 if(!confirm(`Remove design "${currentDesign}"?`)) return;
+                
+                // Save current design before deletion
+                saveCurrentDesign();
+                
+                // Delete the design
                 delete profile.designs[currentDesign];
+                
                 // Switch to first available design
-                const firstKey = Object.keys(profile.designs)[0];
-                switchDesign(firstKey);
+                const remainingDesigns = Object.keys(profile.designs);
+                if(remainingDesigns.length > 0){
+                    const firstKey = remainingDesigns[0];
+                    currentDesign = firstKey;
+                    updateDesignSelector();
+                    loadCurrentDesign();
+                    render();
+                    updateProps();
+                    resetHistory();
+                }
+                
                 msg('Design removed');
                 saveCurrentDesign();
             }
@@ -737,7 +753,8 @@
                 }
                 stack.history.push({
                 data: deepCopy(S),
-                sel: deepCopy(selectedIds)
+                sel: deepCopy(selectedIds),
+                groups: deepCopy(groups)
             });
                 if(stack.history.length > MAX_HISTORY) stack.history.shift();
                 stack.historyIndex = stack.history.length - 1;
@@ -757,6 +774,11 @@
                 const snap = stack.history[stack.historyIndex];
             S = deepCopy(snap.data);
             selectedIds = deepCopy(snap.sel);
+            groups = snap.groups ? deepCopy(snap.groups) : [];
+            // Recalculate group bounds after undo
+            groups.forEach(group => {
+                group.bounds = getGroupBounds(group.elementIds);
+            });
             render();
             updateProps();
             updateBtns();
@@ -771,6 +793,11 @@
                 const snap = stack.history[stack.historyIndex];
             S = deepCopy(snap.data);
             selectedIds = deepCopy(snap.sel);
+            groups = snap.groups ? deepCopy(snap.groups) : [];
+            // Recalculate group bounds after redo
+            groups.forEach(group => {
+                group.bounds = getGroupBounds(group.elementIds);
+            });
             render();
             updateProps();
             updateBtns();
