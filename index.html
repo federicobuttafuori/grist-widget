@@ -318,7 +318,15 @@
 
         function isGristAvailable(){ return (typeof window.grist !== 'undefined' && window.grist && typeof window.grist.getOption === 'function' && typeof window.grist.setOption === 'function'); }
 
-            // Calculate bounding box for rotated element
+        // Snap to pixel precision: convert cm to px, round to nearest pixel, convert back to cm
+        const PIXELS_PER_CM = 37.795276; // 96 DPI
+        function snapToPixel(valueCm){
+            const pixels = valueCm * PIXELS_PER_CM;
+            const roundedPixels = Math.round(pixels);
+            return roundedPixels / PIXELS_PER_CM;
+        }
+
+        // Calculate bounding box for rotated element
             function getRotatedBounds(el){
                 const rotation = Number(el.props.rotation) || 0;
                 if(rotation === 0 || rotation === 180 || rotation === -180){
@@ -2597,8 +2605,9 @@
                         newX = Math.max((effectiveWidth - el.width) / 2, Math.min(newX, W - (effectiveWidth + el.width) / 2));
                         newY = Math.max((effectiveHeight - el.height) / 2, Math.min(newY, H - (effectiveHeight + el.height) / 2));
                         
-                        el.x = newX;
-                        el.y = newY;
+                        // Snap to pixel precision
+                        el.x = snapToPixel(newX);
+                        el.y = snapToPixel(newY);
                 });
                 render();
                 updateProps();
@@ -2652,11 +2661,11 @@
                         const relX = orig.x - originalBounds.x;
                         const relY = orig.y - originalBounds.y;
                         
-                        // Scale position and size uniformly (rounded to 2 decimals for position/size)
-                        el.x = Math.round((originalBounds.x + relX * scale) * 100) / 100;
-                        el.y = Math.round((originalBounds.y + relY * scale) * 100) / 100;
-                        el.width = Math.round(orig.width * scale * 100) / 100;
-                        el.height = Math.round(orig.height * scale * 100) / 100;
+                        // Scale position and size uniformly (snapped to pixel precision)
+                        el.x = snapToPixel(originalBounds.x + relX * scale);
+                        el.y = snapToPixel(originalBounds.y + relY * scale);
+                        el.width = snapToPixel(orig.width * scale);
+                        el.height = snapToPixel(orig.height * scale);
                         
                         // Scale all size-related properties proportionally (rounded to 1 decimal)
                         if(el.props){
@@ -2698,32 +2707,36 @@
                         const maxHeight = H - ctx.el.y;
                         
                         // For rotated elements, we need to check if the rotated bounding box fits
+                        let finalWidth, finalHeight;
                         if(rotation === 0 || rotation === 180 || rotation === -180){
-                            ctx.el.width = Math.max(.2, Math.min(nw, maxWidth));
-                            ctx.el.height = Math.max(.2, Math.min(nh, maxHeight));
+                            finalWidth = Math.max(.2, Math.min(nw, maxWidth));
+                            finalHeight = Math.max(.2, Math.min(nh, maxHeight));
                         } else if(rotation === 90 || rotation === -90 || rotation === 270 || rotation === -270){
                             // When rotated 90°, width and height are swapped
-                            ctx.el.width = Math.max(.2, Math.min(nw, maxWidth));
-                            ctx.el.height = Math.max(.2, Math.min(nh, maxHeight));
+                            finalWidth = Math.max(.2, Math.min(nw, maxWidth));
+                            finalHeight = Math.max(.2, Math.min(nh, maxHeight));
                             // Check if rotated bounding box fits
-                            if(ctx.el.height > maxWidth) ctx.el.height = maxWidth;
-                            if(ctx.el.width > maxHeight) ctx.el.width = maxHeight;
+                            if(finalHeight > maxWidth) finalHeight = maxWidth;
+                            if(finalWidth > maxHeight) finalWidth = maxHeight;
                         } else {
                             // For other angles, use the rotated bounds
-                            ctx.el.width = Math.max(.2, nw);
-                            ctx.el.height = Math.max(.2, nh);
+                            finalWidth = Math.max(.2, nw);
+                            finalHeight = Math.max(.2, nh);
                             // Check if rotated bounding box fits
                             if(bounds.width > W - ctx.el.x) {
                                 const scale = (W - ctx.el.x) / bounds.width;
-                                ctx.el.width *= scale;
-                                ctx.el.height *= scale;
+                                finalWidth *= scale;
+                                finalHeight *= scale;
                             }
                             if(bounds.height > H - ctx.el.y) {
                                 const scale = (H - ctx.el.y) / bounds.height;
-                                ctx.el.width *= scale;
-                                ctx.el.height *= scale;
+                                finalWidth *= scale;
+                                finalHeight *= scale;
                             }
                         }
+                        // Snap to pixel precision
+                        ctx.el.width = snapToPixel(finalWidth);
+                        ctx.el.height = snapToPixel(finalHeight);
                 }
                 render();
                 updateProps();
@@ -2872,26 +2885,26 @@
                                 const effectiveHeight = bounds.height;
                                 
                             switch(e.key){
-                                    case 'ArrowUp': {
-                                        const newY = el.y - step;
-                                        el.y = Math.max((effectiveHeight - el.height) / 2, newY);
-                                        break;
-                                    }
-                                    case 'ArrowDown': {
-                                        const newY = el.y + step;
-                                        el.y = Math.min(H - (effectiveHeight + el.height) / 2, newY);
-                                        break;
-                                    }
-                                    case 'ArrowLeft': {
-                                        const newX = el.x - step;
-                                        el.x = Math.max((effectiveWidth - el.width) / 2, newX);
-                                        break;
-                                    }
-                                    case 'ArrowRight': {
-                                        const newX = el.x + step;
-                                        el.x = Math.min(W - (effectiveWidth + el.width) / 2, newX);
-                                        break;
-                                    }
+                                case 'ArrowUp': {
+                                    const newY = el.y - step;
+                                    el.y = snapToPixel(Math.max((effectiveHeight - el.height) / 2, newY));
+                                    break;
+                                }
+                                case 'ArrowDown': {
+                                    const newY = el.y + step;
+                                    el.y = snapToPixel(Math.min(H - (effectiveHeight + el.height) / 2, newY));
+                                    break;
+                                }
+                                case 'ArrowLeft': {
+                                    const newX = el.x - step;
+                                    el.x = snapToPixel(Math.max((effectiveWidth - el.width) / 2, newX));
+                                    break;
+                                }
+                                case 'ArrowRight': {
+                                    const newX = el.x + step;
+                                    el.x = snapToPixel(Math.min(W - (effectiveWidth + el.width) / 2, newX));
+                                    break;
+                                }
                                 }
                             });
                             render(); updateProps(); saveCurrentDesign();
