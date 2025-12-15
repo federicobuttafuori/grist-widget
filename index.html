@@ -959,6 +959,16 @@ document.addEventListener('DOMContentLoaded', ()=>{
                 case 'box':
                     d.style.border = `${el.props.thickness || 2}px solid ${el.props.color || '#000000'}`;
                     d.style.backgroundColor = el.props.fillColor || 'transparent';
+                    // Apply border radius for boxes
+                    const brTL = Number(el.props.borderRadiusTopLeft) || 0;
+                    const brTR = Number(el.props.borderRadiusTopRight) || 0;
+                    const brBR = Number(el.props.borderRadiusBottomRight) || 0;
+                    const brBL = Number(el.props.borderRadiusBottomLeft) || 0;
+                    if(brTL > 0 || brTR > 0 || brBR > 0 || brBL > 0){
+                        d.style.borderRadius = `${brTL}px ${brTR}px ${brBR}px ${brBL}px`;
+                    } else {
+                        d.style.borderRadius = '';
+                    }
                     break;
                 case 'qr': {
                     const c = getData(el);
@@ -1158,8 +1168,8 @@ document.addEventListener('DOMContentLoaded', ()=>{
         }
 
         if(el.type==='data'){
-            h += `<label>Prefix</label><input type="text" data-prop="props.prefix" value="${escapeHtml(el.props.prefix||'')}">`;
-            h += `<label>Suffix</label><input type="text" data-prop="props.suffix" value="${escapeHtml(el.props.suffix||'')}">`;
+            h += `<label>Prefix</label><textarea data-prop="props.prefix">${escapeHtml(el.props.prefix||'')}</textarea>`;
+            h += `<label>Suffix</label><textarea data-prop="props.suffix">${escapeHtml(el.props.suffix||'')}</textarea>`;
             h += `<hr><div class="prop-grid"><label>Decimals</label><input type="number" step="1" data-prop="props.decimals" value="${el.props.decimals!==undefined?el.props.decimals:2}" min="0" max="10"><label>As Percent</label><input type="checkbox" data-prop="props.asPercent" ${el.props.asPercent?'checked':''}></div>`;
         }
 
@@ -1178,6 +1188,7 @@ document.addEventListener('DOMContentLoaded', ()=>{
 
         if(el.type==='box'){
             h += `<label>Border (px)</label><input type="number" step="1" data-prop="props.thickness" value="${el.props.thickness||2}" min="1"><label>Fill Color</label><input type="color" data-prop="props.fillColor" value="${el.props.fillColor||'#ffffff'}">`;
+            h += `<div style="margin-top:8px"><label style="font-size:12px;display:block;margin-bottom:6px">Border Radius (px):</label><div style="display:grid;grid-template-columns:1fr 1fr;gap:6px;max-width:200px"><div style="display:flex;flex-direction:column;gap:2px"><label style="font-size:11px;font-weight:normal;text-align:center">↖ Top Left</label><input type="number" data-prop="props.borderRadiusTopLeft" value="${Number(el.props.borderRadiusTopLeft||0)}" min="0" step="0.1" style="font-size:12px;padding:4px;text-align:center"></div><div style="display:flex;flex-direction:column;gap:2px"><label style="font-size:11px;font-weight:normal;text-align:center">↗ Top Right</label><input type="number" data-prop="props.borderRadiusTopRight" value="${Number(el.props.borderRadiusTopRight||0)}" min="0" step="0.1" style="font-size:12px;padding:4px;text-align:center"></div><div style="display:flex;flex-direction:column;gap:2px"><label style="font-size:11px;font-weight:normal;text-align:center">↙ Bottom Left</label><input type="number" data-prop="props.borderRadiusBottomLeft" value="${Number(el.props.borderRadiusBottomLeft||0)}" min="0" step="0.1" style="font-size:12px;padding:4px;text-align:center"></div><div style="display:flex;flex-direction:column;gap:2px"><label style="font-size:11px;font-weight:normal;text-align:center">↘ Bottom Right</label><input type="number" data-prop="props.borderRadiusBottomRight" value="${Number(el.props.borderRadiusBottomRight||0)}" min="0" step="0.1" style="font-size:12px;padding:4px;text-align:center"></div></div></div>`;
         }
 
             if(el.type==='image'){
@@ -2029,6 +2040,16 @@ document.addEventListener('DOMContentLoaded', ()=>{
                         case 'box':
                             d.style.border = `${el.props.thickness || 2}px solid ${el.props.color || '#000000'}`;
                             d.style.backgroundColor = el.props.fillColor || 'transparent';
+                            // Apply border radius for boxes
+                            const brTL = Number(el.props.borderRadiusTopLeft) || 0;
+                            const brTR = Number(el.props.borderRadiusTopRight) || 0;
+                            const brBR = Number(el.props.borderRadiusBottomRight) || 0;
+                            const brBL = Number(el.props.borderRadiusBottomLeft) || 0;
+                            if(brTL > 0 || brTR > 0 || brBR > 0 || brBL > 0){
+                                d.style.borderRadius = `${brTL}px ${brTR}px ${brBR}px ${brBL}px`;
+                            } else {
+                                d.style.borderRadius = '';
+                            }
                             break;
                         case 'qr': {
                             const c = getData(el);
