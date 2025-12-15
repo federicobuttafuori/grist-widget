@@ -952,18 +952,18 @@
 
                 // content
                 switch(el.type){
-                    case 'text': {
-                        const span = document.createElement('div');
-                        span.style.display='block';
-                        span.style.width='100%';
-                        span.style.pointerEvents='none';
-                        span.style.overflow='hidden';
-                        span.style.wordWrap='break-word';
-                            span.style.whiteSpace='pre-wrap'; // Preserve line breaks
-                        span.textContent = el.props.text || 'Static Text';
-                        d.appendChild(span);
-                        break;
-                    }
+                            case 'text': {
+                                const span = document.createElement('div');
+                                span.style.display='block';
+                                span.style.width='100%';
+                                span.style.pointerEvents='none';
+                                span.style.overflow='hidden';
+                                span.style.wordWrap='break-word';
+                                span.style.whiteSpace='pre-wrap'; // Preserve line breaks
+                                span.textContent = getData(el);
+                                d.appendChild(span);
+                                break;
+                            }
                     case 'data': {
                         const span = document.createElement('div');
                         span.style.display='block';
@@ -1145,10 +1145,42 @@
             });
         }
 
+        // Helper function to replace **column** syntax with actual data
+        function replaceColumnSyntax(str, el){
+            if(!str || typeof str !== 'string' || !R || typeof R !== 'object') return str;
+            return str.replace(/\*\*([^*]+)\*\*/g, (match, columnId) => {
+                const trimmedColumnId = columnId.trim();
+                if(Object.prototype.hasOwnProperty.call(R, trimmedColumnId)){
+                    let v = R[trimmedColumnId];
+                    if(v === null || v === undefined) return '';
+                    // Format numbers if it's a data field
+                    if(el && el.type === 'data' && typeof v === 'number'){
+                        const dec = (el.props.decimals !== undefined) ? Number(el.props.decimals) : 2;
+                        const pct = !!el.props.asPercent;
+                        return fmt(v, dec, pct);
+                    }
+                    return String(v);
+                }
+                // Return the original match if column not found (so user can see what's missing)
+                return match;
+            });
+        }
+
         function getData(el){
-            const prefix = el.props.prefix || '';
-            const suffix = el.props.suffix || '';
-            if(el.props.boundColumn && R && Object.prototype.hasOwnProperty.call(R, el.props.boundColumn)){
+            let text = el.props.text || '';
+            let prefix = el.props.prefix || '';
+            let suffix = el.props.suffix || '';
+            
+            // Handle **column** syntax for text and data fields
+            if(el.type === 'text' || el.type === 'data'){
+                // Process text, prefix, and suffix for **column** syntax
+                text = replaceColumnSyntax(text, el);
+                prefix = replaceColumnSyntax(prefix, el);
+                suffix = replaceColumnSyntax(suffix, el);
+            }
+            
+            // Handle boundColumn (legacy support) - only if **column** syntax wasn't used
+            if(el.props.boundColumn && R && Object.prototype.hasOwnProperty.call(R, el.props.boundColumn) && !text.includes('**') && !prefix.includes('**') && !suffix.includes('**')){
                 let v = R[el.props.boundColumn];
                 if(el.type === 'data' && typeof v === 'number'){
                     const dec = (el.props.decimals !== undefined) ? Number(el.props.decimals) : 2;
@@ -1157,6 +1189,12 @@
                 }
                 return prefix + String(v) + suffix;
             }
+            
+            // For text/data fields, return the processed text with prefix/suffix
+            if(el.type === 'text' || el.type === 'data'){
+                return prefix + text + suffix;
+            }
+            
             return prefix + (el.props.text || 'SAMPLE') + suffix;
         }
 
@@ -2201,7 +2239,7 @@
                                 span.style.overflow='hidden';
                                 span.style.wordWrap='break-word';
                                 span.style.whiteSpace='pre-wrap'; // Preserve line breaks
-                                span.textContent = el.props.text || 'Static Text';
+                                span.textContent = getData(el);
                                 d.appendChild(span);
                                 break;
                             }
