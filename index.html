@@ -45,6 +45,7 @@
             .label-element.selected{border:2px dashed #007aff;box-shadow:0 0 0 1px rgba(0,122,255,.1)}
             .resize-handle{position:absolute;width:12px;height:12px;background:#007aff;border:2px solid #fff;border-radius:50%;bottom:-6px;right:-6px;cursor:nwse-resize;display:none;box-shadow:0 2px 4px rgba(0,0,0,.2)}
             .label-element.selected .resize-handle{display:block}
+            .resize-handle.group-resize{background:#ff6b00;width:14px;height:14px;border:2px solid #fff;box-shadow:0 2px 6px rgba(255,107,0,.4)}
             .label-element img,.label-element svg{width:100%;height:100%;object-fit:contain;pointer-events:none}
             .status-message{position:fixed;top:60px;right:20px;padding:12px 16px;background:#4CAF50;color:#fff;border-radius:4px;box-shadow:0 2px 8px rgba(0,0,0,.2);z-index:1000;animation:slideIn .3s ease-out}
             @keyframes slideIn{from{transform:translateX(400px);opacity:0}to{transform:translateX(0);opacity:1}}
@@ -159,6 +160,7 @@
         // ---------- State ----------
         let S = [];                       // elements array
         let selectedIds = [];             // array of selected element ids (multi-select)
+        let groups = [];                   // array of groups: [{id: 'group_xxx', elementIds: ['el_xxx', ...], bounds: {x, y, width, height}}]
         let z = 1;
         let R = {}, C = [];
         let drag = false, resizeMode = false, ctx = {};
@@ -379,9 +381,10 @@
                             #canvas-container{width:${profile.width}cm!important;height:${profile.height}cm!important;padding:0!important;margin:0!important;overflow:visible!important;background:#fff!important;display:block!important;position:static!important}
                             #canvas-wrapper{position:static!important;width:${profile.width}cm!important;height:${profile.height}cm!important;margin:0!important;padding:0!important;transform:none!important;display:block!important}
                             #label-canvas{position:static!important;width:${profile.width}cm!important;height:${profile.height}cm!important;transform:none!important;box-shadow:none!important;display:block!important;overflow:visible!important;background:#fff!important}
-                            .label-element{page-break-inside:avoid!important}
+                            .label-element{page-break-inside:avoid!important;-webkit-print-color-adjust:exact!important;print-color-adjust:exact!important}
                             .label-element.selected{border:1px solid transparent!important;box-shadow:none!important}
                             .resize-handle{display:none!important}
+                            .label-element[style*="border"]{-webkit-print-color-adjust:exact!important;print-color-adjust:exact!important}
                         }
                     `;
                 }
@@ -544,12 +547,13 @@
                 
                 // Save to localStorage
                 try {
-                    const payloadObj = { 
-                        version: 2, 
+                    const payloadObj = {
+                        version: 2,
                         profiles: profiles,
                         currentProfile: currentProfile,
                         currentDesign: currentDesign,
-                        currentCanvas: currentCanvas
+                        currentCanvas: currentCanvas,
+                        groups: groups
                     };
                     localStorage.setItem(KEY, JSON.stringify(payloadObj));
                 } catch(e) {
@@ -1079,9 +1083,54 @@
                 // selection visuals
                 if(selectedIds.includes(el.id)){
                     d.classList.add('selected');
-                    const h = document.createElement('div');
-                    h.classList.add('resize-handle');
-                    d.appendChild(h);
+                    const group = getGroupForElement(el.id);
+                    
+                    // Show resize handle for groups when all group elements are selected
+                    if(group){
+                        const allGroupSelected = group.elementIds.every(id => selectedIds.includes(id));
+                        if(allGroupSelected){
+                            // Show resize handle on the element that's at the bottom-right of the group
+                            const groupBounds = getGroupBounds(group.elementIds);
+                            // Find element closest to bottom-right corner
+                            let maxDistance = -1;
+                            let bottomRightElement = null;
+                            group.elementIds.forEach(eid => {
+                                const elem = S.find(e => e.id === eid);
+                                if(elem){
+                                    const distance = (elem.x + elem.width) + (elem.y + elem.height);
+                                    if(distance > maxDistance){
+                                        maxDistance = distance;
+                                        bottomRightElement = elem;
+                                    }
+                                }
+                            });
+                            // Show resize handle on the bottom-right element
+                            if(bottomRightElement && bottomRightElement.id === el.id){
+                                const h = document.createElement('div');
+                                h.classList.add('resize-handle', 'group-resize');
+                                h.title = 'Resize group (maintains proportions)';
+                                d.appendChild(h);
+                            }
+                        } else if(selectedIds.length === 1 && selectedIds[0] === el.id){
+                            // Show resize handle if only this element is selected (will resize whole group)
+                            const h = document.createElement('div');
+                            h.classList.add('resize-handle', 'group-resize');
+                            h.title = 'Resize group (maintains proportions)';
+                            d.appendChild(h);
+                        }
+                        // Add elegant group indicator with subtle styling
+                        d.style.borderColor = '#ff6b00';
+                        d.style.borderStyle = 'dashed';
+                        d.style.borderWidth = '2px';
+                        d.style.borderRadius = '3px';
+                        d.style.boxShadow = '0 0 0 1px rgba(255,107,0,0.15), inset 0 0 0 1px rgba(255,107,0,0.05)';
+                        d.style.opacity = '0.9';
+                    } else {
+                        // Regular resize handle for non-grouped elements
+                        const h = document.createElement('div');
+                        h.classList.add('resize-handle');
+                        d.appendChild(h);
+                    }
                 }
 
                 lc.appendChild(d);
@@ -1148,6 +1197,25 @@
                 pp.innerHTML = 'Select an element to edit its properties.';
                 return;
             }
+            
+            // Check if any selected element is in a group
+            const hasGroupedElement = selectedIds.some(id => getGroupForElement(id) !== undefined);
+            if(hasGroupedElement){
+                const groupIds = new Set();
+                selectedIds.forEach(id => {
+                    const group = getGroupForElement(id);
+                    if(group) groupIds.add(group.id);
+                });
+                if(groupIds.size > 0){
+                    pp.innerHTML = `<div style="padding:12px;text-align:center;color:#666;">
+                        <p style="margin-bottom:8px;">⚠️ Elements are grouped</p>
+                        <p style="font-size:12px;margin-bottom:12px;">Use <strong>Ctrl+Shift+G</strong> to ungroup and edit properties</p>
+                        <p style="font-size:12px;">Use <strong>Ctrl+G</strong> to group selected elements</p>
+                    </div>`;
+                    return;
+                }
+            }
+            
             if(selectedIds.length===1){
                 const el = S.find(x=>x.id===selectedIds[0]);
                 if(!el){ pp.innerHTML='Error: Element not found.'; return; }
@@ -1721,12 +1789,97 @@
         function deleteSelected(){
             if(selectedIds.length===0) return;
             pushBeforeChange();
+            // Remove elements from groups first
+            selectedIds.forEach(id => {
+                groups = groups.map(group => ({
+                    ...group,
+                    elementIds: group.elementIds.filter(eid => eid !== id)
+                })).filter(group => group.elementIds.length > 0);
+            });
             S = S.filter(e => !selectedIds.includes(e.id));
             selectedIds = [];
             render(); updateProps(); updateBtns();
                 saveCurrentDesign();
                 saveCurrentDesign();
             }
+
+        // ---------- Grouping functions ----------
+        function getGroupForElement(elementId){
+            return groups.find(g => g.elementIds.includes(elementId));
+        }
+
+        function getGroupBounds(elementIds){
+            if(elementIds.length === 0) return null;
+            const elements = elementIds.map(id => S.find(e => e.id === id)).filter(Boolean);
+            if(elements.length === 0) return null;
+            
+            let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
+            elements.forEach(el => {
+                const bounds = getRotatedBounds(el);
+                const left = el.x;
+                const top = el.y;
+                const right = left + bounds.width;
+                const bottom = top + bounds.height;
+                
+                minX = Math.min(minX, left);
+                minY = Math.min(minY, top);
+                maxX = Math.max(maxX, right);
+                maxY = Math.max(maxY, bottom);
+            });
+            
+            return {
+                x: minX,
+                y: minY,
+                width: maxX - minX,
+                height: maxY - minY
+            };
+        }
+
+        function groupSelected(){
+            if(selectedIds.length < 2) return;
+            pushBeforeChange();
+            
+            // Check if any element is already in a group
+            const alreadyGrouped = selectedIds.some(id => getGroupForElement(id));
+            if(alreadyGrouped){
+                msg('Some elements are already in a group. Ungroup them first.');
+                return;
+            }
+            
+            // Create new group
+            const groupId = `group_${Date.now()}`;
+            const bounds = getGroupBounds(selectedIds);
+            groups.push({
+                id: groupId,
+                elementIds: [...selectedIds],
+                bounds: bounds,
+                originalBounds: {...bounds}
+            });
+            
+            render(); updateProps(); updateBtns();
+            saveCurrentDesign();
+            msg('Elements grouped');
+        }
+
+        function ungroupSelected(){
+            if(selectedIds.length === 0) return;
+            pushBeforeChange();
+            
+            let ungrouped = false;
+            selectedIds.forEach(id => {
+                const groupIndex = groups.findIndex(g => g.elementIds.includes(id));
+                if(groupIndex !== -1){
+                    groups.splice(groupIndex, 1);
+                    ungrouped = true;
+                }
+            });
+            
+            if(ungrouped){
+                render(); updateProps(); updateBtns();
+                saveCurrentDesign();
+                msg('Group ungrouped');
+            }
+        }
 
             // ---------- Import ----------
             function importFromFile(fileContent){
@@ -1983,6 +2136,7 @@
                             d.style.padding = '';
                         }
                         
+                        // Apply borders for elements with showBorder enabled
                         if(el.props.showBorder && el.type !== 'box'){
                             const borderWidth = `${Number(el.props.borderWidth)||1}px`;
                             const borderColor = el.props.borderColor || '#000';
@@ -1994,6 +2148,10 @@
                             d.style.borderBottom = (el.props.borderBottom !== false) ? `${borderWidth} ${borderStyle} ${borderColor}` : 'none';
                             d.style.borderLeft = (el.props.borderLeft !== false) ? `${borderWidth} ${borderStyle} ${borderColor}` : 'none';
                             
+                            // Force borders to print
+                            d.style.printColorAdjust = 'exact';
+                            d.style.webkitPrintColorAdjust = 'exact';
+                            
                             // Apply border radius (individual corners)
                             const brTL = Number(el.props.borderRadiusTopLeft) || 0;
                             const brTR = Number(el.props.borderRadiusTopRight) || 0;
@@ -2003,6 +2161,12 @@
                                 d.style.borderRadius = `${brTL}px ${brTR}px ${brBR}px ${brBL}px`;
                             } else {
                                 d.style.borderRadius = '';
+                            }
+                        } else if(el.type !== 'box' && el.type !== 'line'){
+                            // Only apply transparent border if showBorder is not enabled
+                            // This ensures borders are visible when showBorder is true
+                            if(!el.props.showBorder){
+                                d.style.border = '1px solid transparent';
                             }
                         }
                         
@@ -2017,9 +2181,6 @@
                             } else {
                                 d.style.borderRadius = '';
                             }
-                        } else {
-                            // Don't apply transparent border to lines - they use thickness for height
-                            if(el.type !== 'box' && el.type !== 'line') d.style.border = '1px solid transparent';
                         }
                         
                         // Content
@@ -2300,7 +2461,13 @@
             } else {
                 if(!selectedIds.includes(id)){
                     pushBeforeChange();
-                    setSelection([id]);
+                    // If element is in a group, select all elements in the group
+                    const group = getGroupForElement(id);
+                    if(group){
+                        setSelection(group.elementIds);
+                    } else {
+                        setSelection([id]);
+                    }
                 }
             }
 
@@ -2308,14 +2475,68 @@
             const smx = (e.clientX - cr.left) / cr.width * W;
             const smy = (e.clientY - cr.top) / cr.height * H;
 
-            if(t.classList.contains('resize-handle') && selectedIds.length <= 1){
-                resizeMode = true;
-                ctx = { el: clickedElement, startWidth: clickedElement.width, startHeight: clickedElement.height, startMouseX: smx, startMouseY: smy };
-            } else {
+            // Check if clicked element is in a group
+            const group = getGroupForElement(id);
+            const isGrouped = group !== undefined;
+            
+            if(t.classList.contains('resize-handle')){
+                if(isGrouped){
+                    // Resize group - check if all group elements are selected or just this one
+                    const allGroupSelected = group.elementIds.every(eid => selectedIds.includes(eid));
+                    if(allGroupSelected || (selectedIds.length === 1 && selectedIds[0] === id)){
+                        resizeMode = true;
+                        const groupBounds = getGroupBounds(group.elementIds);
+                        // Store original element positions, sizes, and properties for scaling
+                        const originalElements = {};
+                        group.elementIds.forEach(elementId => {
+                            const el = S.find(e => e.id === elementId);
+                            if(el){
+                                originalElements[elementId] = {
+                                    x: el.x,
+                                    y: el.y,
+                                    width: el.width,
+                                    height: el.height,
+                                    props: deepCopy(el.props)
+                                };
+                            }
+                        });
+                        ctx = { 
+                            isGroup: true,
+                            groupId: group.id,
+                            group: group,
+                            startWidth: groupBounds.width,
+                            startHeight: groupBounds.height,
+                            startMouseX: smx,
+                            startMouseY: smy,
+                            originalBounds: {...groupBounds},
+                            originalElements: originalElements
+                        };
+                    }
+                } else if(!isGrouped && selectedIds.length <= 1){
+                    resizeMode = true;
+                    ctx = { el: clickedElement, startWidth: clickedElement.width, startHeight: clickedElement.height, startMouseX: smx, startMouseY: smy, isGroup: false };
+                }
+            }
+            
+            if(!resizeMode){
                 drag = true;
-                const movers = selectedIds.includes(id) ? selectedIds.slice() : [id];
-                const items = movers.map(iid => S.find(s => s.id === iid)).filter(Boolean);
-                ctx = { items: items.map(it => ({ id: it.id, startX: it.x, startY: it.y })), baseMouseX: smx, baseMouseY: smy };
+                if(isGrouped){
+                    // Move entire group
+                    const groupElementIds = group.elementIds;
+                    const items = groupElementIds.map(iid => S.find(s => s.id === iid)).filter(Boolean);
+                    ctx = { 
+                        items: items.map(it => ({ id: it.id, startX: it.x, startY: it.y })), 
+                        baseMouseX: smx, 
+                        baseMouseY: smy,
+                        isGroup: true,
+                        groupId: group.id
+                    };
+                } else {
+                    // Move individual elements
+                    const movers = selectedIds.includes(id) ? selectedIds.slice() : [id];
+                    const items = movers.map(iid => S.find(s => s.id === iid)).filter(Boolean);
+                    ctx = { items: items.map(it => ({ id: it.id, startX: it.x, startY: it.y })), baseMouseX: smx, baseMouseY: smy, isGroup: false };
+                }
                 pushBeforeChange();
             }
             e.preventDefault();
@@ -2381,47 +2602,129 @@
                 });
                 render();
                 updateProps();
-            } else if(resizeMode && ctx && ctx.el){
-                const dx = mx - ctx.startMouseX;
-                const dy = my - ctx.startMouseY;
-                let nw = ctx.startWidth + dx;
-                let nh = ctx.startHeight + dy;
+            } else if(resizeMode && ctx){
+                if(ctx.isGroup && ctx.group){
+                    // Resize group maintaining proportions
+                    const dx = mx - ctx.startMouseX;
+                    const dy = my - ctx.startMouseY;
                     
-                    // Get current rotation
-                    const rotation = Number(ctx.el.props.rotation) || 0;
-                    const bounds = getRotatedBounds({ width: nw, height: nh, props: { rotation: rotation } });
+                    // Calculate scale based on diagonal distance to maintain aspect ratio
+                    const originalBounds = ctx.originalBounds;
+                    const diagonal = Math.sqrt(originalBounds.width * originalBounds.width + originalBounds.height * originalBounds.height);
+                    const newDiagonal = Math.sqrt((originalBounds.width + dx) * (originalBounds.width + dx) + (originalBounds.height + dy) * (originalBounds.height + dy));
+                    let scale = newDiagonal / diagonal;
                     
-                    // Constrain resize considering rotation
-                    const maxWidth = W - ctx.el.x;
-                    const maxHeight = H - ctx.el.y;
+                    // Ensure minimum scale
+                    scale = Math.max(0.1, scale);
                     
-                    // For rotated elements, we need to check if the rotated bounding box fits
-                    if(rotation === 0 || rotation === 180 || rotation === -180){
-                        ctx.el.width = Math.max(.2, Math.min(nw, maxWidth));
-                        ctx.el.height = Math.max(.2, Math.min(nh, maxHeight));
-                    } else if(rotation === 90 || rotation === -90 || rotation === 270 || rotation === -270){
-                        // When rotated 90°, width and height are swapped
-                        ctx.el.width = Math.max(.2, Math.min(nw, maxWidth));
-                        ctx.el.height = Math.max(.2, Math.min(nh, maxHeight));
-                        // Check if rotated bounding box fits
-                        if(ctx.el.height > maxWidth) ctx.el.height = maxWidth;
-                        if(ctx.el.width > maxHeight) ctx.el.width = maxHeight;
-                    } else {
-                        // For other angles, use the rotated bounds
-                        ctx.el.width = Math.max(.2, nw);
-                        ctx.el.height = Math.max(.2, nh);
-                        // Check if rotated bounding box fits
-                        if(bounds.width > W - ctx.el.x) {
-                            const scale = (W - ctx.el.x) / bounds.width;
-                            ctx.el.width *= scale;
-                            ctx.el.height *= scale;
+                    // Constrain to canvas - check if scaled group fits
+                    const newWidth = originalBounds.width * scale;
+                    const newHeight = originalBounds.height * scale;
+                    const maxWidth = W - originalBounds.x;
+                    const maxHeight = H - originalBounds.y;
+                    
+                    // Limit scale to fit within canvas
+                    if(newWidth > maxWidth) scale = Math.min(scale, maxWidth / originalBounds.width);
+                    if(newHeight > maxHeight) scale = Math.min(scale, maxHeight / originalBounds.height);
+                    
+                    // Apply uniform scaling to all elements in group (including properties)
+                    ctx.group.elementIds.forEach(elementId => {
+                        const el = S.find(e => e.id === elementId);
+                        if(!el) return;
+                        
+                        // Store original values if not already stored
+                        if(!ctx.originalElements){
+                            ctx.originalElements = {};
                         }
-                        if(bounds.height > H - ctx.el.y) {
-                            const scale = (H - ctx.el.y) / bounds.height;
-                            ctx.el.width *= scale;
-                            ctx.el.height *= scale;
+                        if(!ctx.originalElements[elementId]){
+                            ctx.originalElements[elementId] = {
+                                x: el.x,
+                                y: el.y,
+                                width: el.width,
+                                height: el.height,
+                                props: deepCopy(el.props)
+                            };
                         }
-                    }
+                        
+                        const orig = ctx.originalElements[elementId];
+                        
+                        // Calculate relative position from group origin
+                        const relX = orig.x - originalBounds.x;
+                        const relY = orig.y - originalBounds.y;
+                        
+                        // Scale position and size uniformly (rounded to 2 decimals for position/size)
+                        el.x = Math.round((originalBounds.x + relX * scale) * 100) / 100;
+                        el.y = Math.round((originalBounds.y + relY * scale) * 100) / 100;
+                        el.width = Math.round(orig.width * scale * 100) / 100;
+                        el.height = Math.round(orig.height * scale * 100) / 100;
+                        
+                        // Scale all size-related properties proportionally (rounded to 1 decimal)
+                        if(el.props){
+                            // Font size
+                            if(orig.props.fontSize !== undefined){
+                                el.props.fontSize = Math.round(Math.max(6, orig.props.fontSize * scale) * 10) / 10;
+                            }
+                            // Padding
+                            if(orig.props.paddingTop !== undefined) el.props.paddingTop = Math.round(orig.props.paddingTop * scale * 10) / 10;
+                            if(orig.props.paddingRight !== undefined) el.props.paddingRight = Math.round(orig.props.paddingRight * scale * 10) / 10;
+                            if(orig.props.paddingBottom !== undefined) el.props.paddingBottom = Math.round(orig.props.paddingBottom * scale * 10) / 10;
+                            if(orig.props.paddingLeft !== undefined) el.props.paddingLeft = Math.round(orig.props.paddingLeft * scale * 10) / 10;
+                            // Border width
+                            if(orig.props.borderWidth !== undefined) el.props.borderWidth = Math.round(Math.max(0.1, orig.props.borderWidth * scale) * 10) / 10;
+                            // Thickness (for lines and boxes)
+                            if(orig.props.thickness !== undefined) el.props.thickness = Math.round(Math.max(0.1, orig.props.thickness * scale) * 10) / 10;
+                            // Border radius
+                            if(orig.props.borderRadiusTopLeft !== undefined) el.props.borderRadiusTopLeft = Math.round(orig.props.borderRadiusTopLeft * scale * 10) / 10;
+                            if(orig.props.borderRadiusTopRight !== undefined) el.props.borderRadiusTopRight = Math.round(orig.props.borderRadiusTopRight * scale * 10) / 10;
+                            if(orig.props.borderRadiusBottomRight !== undefined) el.props.borderRadiusBottomRight = Math.round(orig.props.borderRadiusBottomRight * scale * 10) / 10;
+                            if(orig.props.borderRadiusBottomLeft !== undefined) el.props.borderRadiusBottomLeft = Math.round(orig.props.borderRadiusBottomLeft * scale * 10) / 10;
+                        }
+                    });
+                    
+                    // Update group bounds
+                    ctx.group.bounds = getGroupBounds(ctx.group.elementIds);
+                } else if(ctx.el){
+                    const dx = mx - ctx.startMouseX;
+                    const dy = my - ctx.startMouseY;
+                    let nw = ctx.startWidth + dx;
+                    let nh = ctx.startHeight + dy;
+                        
+                        // Get current rotation
+                        const rotation = Number(ctx.el.props.rotation) || 0;
+                        const bounds = getRotatedBounds({ width: nw, height: nh, props: { rotation: rotation } });
+                        
+                        // Constrain resize considering rotation
+                        const maxWidth = W - ctx.el.x;
+                        const maxHeight = H - ctx.el.y;
+                        
+                        // For rotated elements, we need to check if the rotated bounding box fits
+                        if(rotation === 0 || rotation === 180 || rotation === -180){
+                            ctx.el.width = Math.max(.2, Math.min(nw, maxWidth));
+                            ctx.el.height = Math.max(.2, Math.min(nh, maxHeight));
+                        } else if(rotation === 90 || rotation === -90 || rotation === 270 || rotation === -270){
+                            // When rotated 90°, width and height are swapped
+                            ctx.el.width = Math.max(.2, Math.min(nw, maxWidth));
+                            ctx.el.height = Math.max(.2, Math.min(nh, maxHeight));
+                            // Check if rotated bounding box fits
+                            if(ctx.el.height > maxWidth) ctx.el.height = maxWidth;
+                            if(ctx.el.width > maxHeight) ctx.el.width = maxHeight;
+                        } else {
+                            // For other angles, use the rotated bounds
+                            ctx.el.width = Math.max(.2, nw);
+                            ctx.el.height = Math.max(.2, nh);
+                            // Check if rotated bounding box fits
+                            if(bounds.width > W - ctx.el.x) {
+                                const scale = (W - ctx.el.x) / bounds.width;
+                                ctx.el.width *= scale;
+                                ctx.el.height *= scale;
+                            }
+                            if(bounds.height > H - ctx.el.y) {
+                                const scale = (H - ctx.el.y) / bounds.height;
+                                ctx.el.width *= scale;
+                                ctx.el.height *= scale;
+                            }
+                        }
+                }
                 render();
                 updateProps();
             }
@@ -2437,6 +2740,20 @@
                     return;
                 }
                 
+            if(drag && ctx && ctx.items){
+                // Update group bounds after drag if it was a group
+                if(ctx.isGroup && ctx.groupId){
+                    const group = groups.find(g => g.id === ctx.groupId);
+                    if(group){
+                        group.bounds = getGroupBounds(group.elementIds);
+                    }
+                }
+            }
+            if(resizeMode && ctx && ctx.isGroup && ctx.group){
+                // Update group bounds after resize
+                ctx.group.bounds = getGroupBounds(ctx.group.elementIds);
+            }
+            
             if(marqueeActive){
                 // compute selection rectangle intersection using label-canvas bounding rect (this respects zoom)
                 const rect = lc.getBoundingClientRect();
@@ -2586,11 +2903,30 @@
                 e.preventDefault();
                 dupSelected();
             }
+
+            // Group/Ungroup shortcuts
+            if((e.ctrlKey||e.metaKey) && e.key.toLowerCase() === 'g'){
+                e.preventDefault();
+                if(e.shiftKey){
+                    ungroupSelected();
+                } else {
+                    groupSelected();
+                }
+            }
         });
 
         // ---------- Property edits (apply to single or multiple) ----------
         pp.addEventListener('input', (e)=>{
             if(selectedIds.length === 0 && e.target.dataset.prop !== 'bind_search') return;
+            
+            // Block property edits if any selected element is in a group
+            const hasGroupedElement = selectedIds.some(id => getGroupForElement(id) !== undefined);
+            if(hasGroupedElement){
+                e.preventDefault();
+                e.stopPropagation();
+                msg('Cannot edit properties of grouped elements. Ungroup first (Ctrl+Shift+G).');
+                return;
+            }
             const target = e.target;
             const prop = target.dataset.prop;
             if(!prop) return;
@@ -3220,6 +3556,19 @@
                                 }
                             }
                         }
+                        // Load groups if saved
+                        if(parsed.groups && Array.isArray(parsed.groups)){
+                            groups = parsed.groups;
+                            // Validate groups - remove groups with non-existent elements
+                            groups = groups.filter(group => {
+                                group.elementIds = group.elementIds.filter(id => S.some(e => e.id === id));
+                                return group.elementIds.length > 0;
+                            });
+                            // Recalculate bounds for loaded groups
+                            groups.forEach(group => {
+                                group.bounds = getGroupBounds(group.elementIds);
+                            });
+                        }
                     }
                 }
             } catch(e) {
@@ -3232,6 +3581,10 @@
             updateDesignSelector();
             updateCanvasControls();
             loadCurrentDesign();
+            // Recalculate group bounds after loading elements
+            groups.forEach(group => {
+                group.bounds = getGroupBounds(group.elementIds);
+            });
             render();
             updateProps();
             fit();
