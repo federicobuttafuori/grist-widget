@@ -8,7 +8,7 @@
     <script src="https://cdn.jsdelivr.net/npm/jsbarcode@3.11.5/dist/JsBarcode.all.min.js"></script>
         <link rel="preconnect" href="https://fonts.googleapis.com">
         <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-        <link href="https://fonts.googleapis.com/css2?family=Oswald:wght@200;300;400;500;600;700&family=Roboto+Condensed:wght@300;400;700&family=Sofia+Sans+Extra+Condensed:wght@100;200;300;400;500;600;700;800;900&display=swap" rel="stylesheet">
+        <link href="https://fonts.googleapis.com/css2?family=Oswald:wght@200;300;400;500;600;700&family=Roboto+Condensed:wght@300;400;700&display=swap" rel="stylesheet">
     <style>
         *{box-sizing:border-box;margin:0;padding:0}
         html,body{height:100vh;width:100vw;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;display:flex;flex-direction:column;overflow:hidden;background:#f0f0f0;color:#333}
@@ -182,8 +182,7 @@ document.addEventListener('DOMContentLoaded', ()=>{
             { value: "'Comic Sans MS', cursive", name: 'Comic Sans MS' },
             { value: "'Winky Rough', sans-serif", name: 'Winky Rough' },
             { value: "'Oswald', sans-serif", name: 'Oswald' },
-            { value: "'Roboto Condensed', sans-serif", name: 'Roboto Condensed' },
-            { value: "'Sofia Sans Extra Condensed', sans-serif", name: 'Sofia Sans Extra Condensed' }
+            { value: "'Roboto Condensed', sans-serif", name: 'Roboto Condensed' }
         ];
         
         // Load font favorites from localStorage
@@ -1161,7 +1160,7 @@ document.addEventListener('DOMContentLoaded', ()=>{
         if(el.type==='data'){
             h += `<label>Prefix</label><input type="text" data-prop="props.prefix" value="${escapeHtml(el.props.prefix||'')}">`;
             h += `<label>Suffix</label><input type="text" data-prop="props.suffix" value="${escapeHtml(el.props.suffix||'')}">`;
-            h += `<hr><div class="prop-grid"><label>Decimals</label><input type="number" step="1" data-prop="props.decimals" value="${el.props.decimals!==undefined?el.props.decimals:2}" min="0" max="10"><label>As Percent</label><input type="checkbox" data-prop="props.asPercent" ${el.props.asPercent?'checked':''}></div>`;
+            h += `<hr><div class="prop-grid"><label>Decimals</label><input type="number" data-prop="props.decimals" value="${el.props.decimals!==undefined?el.props.decimals:2}" min="0" max="10"><label>As Percent</label><input type="checkbox" data-prop="props.asPercent" ${el.props.asPercent?'checked':''}></div>`;
         }
 
         if(el.type==='qr' || el.type==='barcode'){
@@ -1321,11 +1320,6 @@ document.addEventListener('DOMContentLoaded', ()=>{
             h += `<div class="prop-grid"><label>Font Size</label><input type="number" step="1" data-prop="multi.props.fontSize" value="${common('props.fontSize')}" min="6"><label>Font Family</label><div style="display:flex;gap:4px;align-items:center"><select data-prop="multi.props.fontFamily" id="multi-font-family-select" style="flex:1">${generateFontOptions(commonFontFamily)}</select><button type="button" id="multi-font-favorite-btn" style="padding:4px 8px;font-size:16px;background:transparent;border:1px solid #ccc;border-radius:4px;cursor:pointer;flex-shrink:0" title="${fontFavorites.includes(commonFontFamily) ? 'Remove from favorites' : 'Add to favorites'}">${fontFavorites.includes(commonFontFamily) ? '⭐' : '☆'}</button></div></div>`;
             h += `<div class="prop-grid"><label>Font Weight</label><select data-prop="multi.props.fontWeight" id="multi-font-weight-select">${generateWeightOptions(commonFontFamily, commonWeight)}</select><label>Line Height</label><input type="number" step="0.1" data-prop="multi.props.lineHeight" value="${common('props.lineHeight')}" min="0.5" max="3"></div>`;
             h += `<div class="prop-grid"><label>H. Align</label><select data-prop="multi.props.textAlign"><option value="">—</option><option value="left" ${common('props.textAlign')==='left'?'selected':''}>Left</option><option value="center" ${common('props.textAlign')==='center'?'selected':''}>Center</option><option value="right" ${common('props.textAlign')==='right'?'selected':''}>Right</option></select><label>V. Align</label><select data-prop="multi.props.valign"><option value="">—</option><option value="top" ${common('props.valign')==='top'?'selected':''}>Top</option><option value="middle" ${common('props.valign')==='middle'?'selected':''}>Middle</option><option value="bottom" ${common('props.valign')==='bottom'?'selected':''}>Bottom</option></select></div>`;
-            // Show decimals only if at least one element is of type 'data'
-            const hasDataElement = elems.some(el => el.type === 'data');
-            if(hasDataElement){
-                h += `<hr><div class="prop-grid"><label>Decimals</label><input type="number" step="1" data-prop="multi.props.decimals" value="${common('props.decimals')!==''?common('props.decimals'):2}" min="0" max="10"><label>As Percent</label><input type="checkbox" data-prop="multi.props.asPercent" ${common('props.asPercent')?'checked':''}></div>`;
-            }
             h += `<div class="prop-grid"><label>Padding Top</label><input type="number" step="0.01" data-prop="multi.props.paddingTop" value="${common('props.paddingTop')}" min="0"><label>Padding Right</label><input type="number" step="0.01" data-prop="multi.props.paddingRight" value="${common('props.paddingRight')}" min="0"></div>`;
             h += `<div class="prop-grid"><label>Padding Bottom</label><input type="number" step="0.01" data-prop="multi.props.paddingBottom" value="${common('props.paddingBottom')}" min="0"><label>Padding Left</label><input type="number" step="0.01" data-prop="multi.props.paddingLeft" value="${common('props.paddingLeft')}" min="0"></div>`;
             h += `<hr><div class="prop-grid"><label>Rotation°</label><input type="number" step="1" data-prop="multi.props.rotation" value="${common('props.rotation')}"><label>Show Border</label><input type="checkbox" data-prop="multi.props.showBorder" ${common('props.showBorder')?'checked':''}></div>`;
@@ -1460,8 +1454,7 @@ document.addEventListener('DOMContentLoaded', ()=>{
                 "'Comic Sans MS', cursive": [400, 700, 'normal', 'bold'],
                 "'Winky Rough', sans-serif": [300, 400, 500, 600, 700, 800, 900, 'normal', 'bold'], // Custom font with multiple weights
                 "'Oswald', sans-serif": [200, 300, 400, 500, 600, 700, 'normal', 'bold'], // Google Font: Oswald
-                "'Roboto Condensed', sans-serif": [300, 400, 700, 'normal', 'bold'], // Google Font: Roboto Condensed
-                "'Sofia Sans Extra Condensed', sans-serif": [100, 200, 300, 400, 500, 600, 700, 800, 900, 'normal', 'bold'] // Google Font: Sofia Sans Extra Condensed
+                "'Roboto Condensed', sans-serif": [300, 400, 700, 'normal', 'bold'] // Google Font: Roboto Condensed
             };
             return fontWeights[fontFamily] || [400, 700, 'normal', 'bold'];
         }
