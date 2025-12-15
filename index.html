@@ -8,7 +8,7 @@
     <script src="https://cdn.jsdelivr.net/npm/jsbarcode@3.11.5/dist/JsBarcode.all.min.js"></script>
         <link rel="preconnect" href="https://fonts.googleapis.com">
         <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-        <link href="https://fonts.googleapis.com/css2?family=Oswald:wght@200;300;400;500;600;700&family=Roboto+Condensed:wght@300;400;700&display=swap" rel="stylesheet">
+        <link href="https://fonts.googleapis.com/css2?family=Oswald:wght@200;300;400;500;600;700&family=Roboto+Condensed:wght@300;400;700&family=Sofia+Sans+Extra+Condensed:wght@100;200;300;400;500;600;700;800;900&display=swap" rel="stylesheet">
     <style>
         *{box-sizing:border-box;margin:0;padding:0}
         html,body{height:100vh;width:100vw;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;display:flex;flex-direction:column;overflow:hidden;background:#f0f0f0;color:#333}
@@ -131,7 +131,7 @@
                         <input type="checkbox" id="canvas2-enabled" style="width:auto;flex:none">
                         <label for="canvas2-enabled" style="font-size:14px;margin:0;font-weight:normal;cursor:pointer">Enable Canvas 2</label>
                     </div>
-            </div>
+                </div>
             <hr>
             <div class="sidebar-section">
                 <h3>Import/Export</h3>
@@ -166,7 +166,6 @@ document.addEventListener('DOMContentLoaded', ()=>{
         let W = 8, H = 5;                 // Current dimensions (dynamic)
         const KEY = 'grist_label_layout_v2'; // Updated version for profiles
         const FONT_FAVORITES_KEY = 'grist_label_font_favorites'; // Key for font favorites
-        const CM_TO_PX = 37.795276;      // Conversion factor from cm to pixels
     const MAX_HISTORY = 100;
 
         // All available fonts for labels
@@ -182,7 +181,8 @@ document.addEventListener('DOMContentLoaded', ()=>{
             { value: "'Comic Sans MS', cursive", name: 'Comic Sans MS' },
             { value: "'Winky Rough', sans-serif", name: 'Winky Rough' },
             { value: "'Oswald', sans-serif", name: 'Oswald' },
-            { value: "'Roboto Condensed', sans-serif", name: 'Roboto Condensed' }
+            { value: "'Roboto Condensed', sans-serif", name: 'Roboto Condensed' },
+            { value: "'Sofia Sans Extra Condensed', sans-serif", name: 'Sofia Sans Extra Condensed' }
         ];
         
         // Load font favorites from localStorage
@@ -353,8 +353,8 @@ document.addEventListener('DOMContentLoaded', ()=>{
             if(!profile) return;
             W = profile.width;
             H = profile.height;
-            lc.style.width = `${Math.round(W * CM_TO_PX)}px`;
-            lc.style.height = `${Math.round(H * CM_TO_PX)}px`;
+            lc.style.width = `${W}cm`;
+            lc.style.height = `${H}cm`;
             updatePrintCSS();
             fit();
         }
@@ -849,10 +849,10 @@ document.addEventListener('DOMContentLoaded', ()=>{
             const d = document.createElement('div');
             d.classList.add('label-element');
             d.dataset.id = el.id;
-            d.style.left = `${Math.round(el.x * CM_TO_PX)}px`;
-            d.style.top = `${Math.round(el.y * CM_TO_PX)}px`;
-            d.style.width = `${Math.round(el.width * CM_TO_PX)}px`;
-            d.style.height = `${Math.round(el.height * CM_TO_PX)}px`;
+            d.style.left = `${el.x}cm`;
+            d.style.top = `${el.y}cm`;
+            d.style.width = `${el.width}cm`;
+            d.style.height = `${el.height}cm`;
             d.style.zIndex = el.zIndex || 0;
             d.style.fontSize = `${el.props.fontSize || 16}px`;
                 const fontWeight = el.props.fontWeight;
@@ -886,13 +886,13 @@ document.addEventListener('DOMContentLoaded', ()=>{
             d.style.transform = `rotate(${rotation}deg)`;
             d.style.transformOrigin = 'center center';
 
-            // padding sides applied in px (converted from cm) if element is text or data (default 0)
+            // padding sides applied in cm if element is text or data (default 0)
             if((el.type === 'text' || el.type === 'data')){
                 const pt = Number.isFinite(Number(el.props.paddingTop)) ? Number(el.props.paddingTop) : 0;
                 const pr = Number.isFinite(Number(el.props.paddingRight)) ? Number(el.props.paddingRight) : 0;
                 const pb = Number.isFinite(Number(el.props.paddingBottom)) ? Number(el.props.paddingBottom) : 0;
                 const pl = Number.isFinite(Number(el.props.paddingLeft)) ? Number(el.props.paddingLeft) : 0;
-                d.style.padding = `${Math.round(pt * CM_TO_PX)}px ${Math.round(pr * CM_TO_PX)}px ${Math.round(pb * CM_TO_PX)}px ${Math.round(pl * CM_TO_PX)}px`;
+                d.style.padding = `${pt}cm ${pr}cm ${pb}cm ${pl}cm`;
             } else {
                 d.style.padding = '';
             }
@@ -953,7 +953,7 @@ document.addEventListener('DOMContentLoaded', ()=>{
                 case 'line':
                     d.style.backgroundColor = el.props.color || '#000000';
                     d.style.height = `${el.props.thickness || 2}px`;
-                    d.style.width = `${Math.round(el.width * CM_TO_PX)}px`;
+                    d.style.width = `${el.width}cm`;
                         d.style.border = 'none'; // No border for lines - thickness controls height
                     break;
                 case 'box':
@@ -963,7 +963,7 @@ document.addEventListener('DOMContentLoaded', ()=>{
                 case 'qr': {
                     const c = getData(el);
                     const q = document.createElement('img');
-                    const dpi = CM_TO_PX;
+                    const dpi = 37.795276;
                     const qs = Math.min(el.width, el.height) * dpi;
                     q.src = `https://api.qrserver.com/v1/create-qr-code/?size=${Math.round(qs)}x${Math.round(qs)}&data=${encodeURIComponent(c)}`;
                     q.style.pointerEvents='none';
@@ -981,7 +981,7 @@ document.addEventListener('DOMContentLoaded', ()=>{
                     sv.setAttribute('height','100%');
                     d.appendChild(sv);
                     try{
-                        const pxHeight = Math.max(30, (el.height * CM_TO_PX) - 10);
+                        const pxHeight = Math.max(30, (el.height * 37.795276) - 10);
                         JsBarcode(sv, String(c), {
                             format: el.props.format || "CODE128",
                             displayValue: el.props.displayValue !== false,
@@ -1051,8 +1051,8 @@ document.addEventListener('DOMContentLoaded', ()=>{
                             d.appendChild(placeholder);
                         }
                         d.appendChild(img);
-                    break;
-                }
+                        break;
+                    }
                 default:
                     d.innerText = el.props.text || '';
             }
@@ -1160,7 +1160,7 @@ document.addEventListener('DOMContentLoaded', ()=>{
         if(el.type==='data'){
             h += `<label>Prefix</label><input type="text" data-prop="props.prefix" value="${escapeHtml(el.props.prefix||'')}">`;
             h += `<label>Suffix</label><input type="text" data-prop="props.suffix" value="${escapeHtml(el.props.suffix||'')}">`;
-            h += `<hr><div class="prop-grid"><label>Decimals</label><input type="number" data-prop="props.decimals" value="${el.props.decimals!==undefined?el.props.decimals:2}" min="0" max="10"><label>As Percent</label><input type="checkbox" data-prop="props.asPercent" ${el.props.asPercent?'checked':''}></div>`;
+            h += `<hr><div class="prop-grid"><label>Decimals</label><input type="number" step="1" data-prop="props.decimals" value="${el.props.decimals!==undefined?el.props.decimals:2}" min="0" max="10"><label>As Percent</label><input type="checkbox" data-prop="props.asPercent" ${el.props.asPercent?'checked':''}></div>`;
         }
 
         if(el.type==='qr' || el.type==='barcode'){
@@ -1320,6 +1320,11 @@ document.addEventListener('DOMContentLoaded', ()=>{
             h += `<div class="prop-grid"><label>Font Size</label><input type="number" step="1" data-prop="multi.props.fontSize" value="${common('props.fontSize')}" min="6"><label>Font Family</label><div style="display:flex;gap:4px;align-items:center"><select data-prop="multi.props.fontFamily" id="multi-font-family-select" style="flex:1">${generateFontOptions(commonFontFamily)}</select><button type="button" id="multi-font-favorite-btn" style="padding:4px 8px;font-size:16px;background:transparent;border:1px solid #ccc;border-radius:4px;cursor:pointer;flex-shrink:0" title="${fontFavorites.includes(commonFontFamily) ? 'Remove from favorites' : 'Add to favorites'}">${fontFavorites.includes(commonFontFamily) ? '⭐' : '☆'}</button></div></div>`;
             h += `<div class="prop-grid"><label>Font Weight</label><select data-prop="multi.props.fontWeight" id="multi-font-weight-select">${generateWeightOptions(commonFontFamily, commonWeight)}</select><label>Line Height</label><input type="number" step="0.1" data-prop="multi.props.lineHeight" value="${common('props.lineHeight')}" min="0.5" max="3"></div>`;
             h += `<div class="prop-grid"><label>H. Align</label><select data-prop="multi.props.textAlign"><option value="">—</option><option value="left" ${common('props.textAlign')==='left'?'selected':''}>Left</option><option value="center" ${common('props.textAlign')==='center'?'selected':''}>Center</option><option value="right" ${common('props.textAlign')==='right'?'selected':''}>Right</option></select><label>V. Align</label><select data-prop="multi.props.valign"><option value="">—</option><option value="top" ${common('props.valign')==='top'?'selected':''}>Top</option><option value="middle" ${common('props.valign')==='middle'?'selected':''}>Middle</option><option value="bottom" ${common('props.valign')==='bottom'?'selected':''}>Bottom</option></select></div>`;
+            // Show decimals only if at least one element is of type 'data'
+            const hasDataElement = elems.some(el => el.type === 'data');
+            if(hasDataElement){
+                h += `<hr><div class="prop-grid"><label>Decimals</label><input type="number" step="1" data-prop="multi.props.decimals" value="${common('props.decimals')!==''?common('props.decimals'):2}" min="0" max="10"><label>As Percent</label><input type="checkbox" data-prop="multi.props.asPercent" ${common('props.asPercent')?'checked':''}></div>`;
+            }
             h += `<div class="prop-grid"><label>Padding Top</label><input type="number" step="0.01" data-prop="multi.props.paddingTop" value="${common('props.paddingTop')}" min="0"><label>Padding Right</label><input type="number" step="0.01" data-prop="multi.props.paddingRight" value="${common('props.paddingRight')}" min="0"></div>`;
             h += `<div class="prop-grid"><label>Padding Bottom</label><input type="number" step="0.01" data-prop="multi.props.paddingBottom" value="${common('props.paddingBottom')}" min="0"><label>Padding Left</label><input type="number" step="0.01" data-prop="multi.props.paddingLeft" value="${common('props.paddingLeft')}" min="0"></div>`;
             h += `<hr><div class="prop-grid"><label>Rotation°</label><input type="number" step="1" data-prop="multi.props.rotation" value="${common('props.rotation')}"><label>Show Border</label><input type="checkbox" data-prop="multi.props.showBorder" ${common('props.showBorder')?'checked':''}></div>`;
@@ -1454,7 +1459,8 @@ document.addEventListener('DOMContentLoaded', ()=>{
                 "'Comic Sans MS', cursive": [400, 700, 'normal', 'bold'],
                 "'Winky Rough', sans-serif": [300, 400, 500, 600, 700, 800, 900, 'normal', 'bold'], // Custom font with multiple weights
                 "'Oswald', sans-serif": [200, 300, 400, 500, 600, 700, 'normal', 'bold'], // Google Font: Oswald
-                "'Roboto Condensed', sans-serif": [300, 400, 700, 'normal', 'bold'] // Google Font: Roboto Condensed
+                "'Roboto Condensed', sans-serif": [300, 400, 700, 'normal', 'bold'], // Google Font: Roboto Condensed
+                "'Sofia Sans Extra Condensed', sans-serif": [100, 200, 300, 400, 500, 600, 700, 800, 900, 'normal', 'bold'] // Google Font: Sofia Sans Extra Condensed
             };
             return fontWeights[fontFamily] || [400, 700, 'normal', 'bold'];
         }
@@ -1889,14 +1895,14 @@ document.addEventListener('DOMContentLoaded', ()=>{
                     const d = document.createElement('div');
                     d.classList.add('label-element');
                     d.style.position = 'absolute';
-                    d.style.left = `${Math.round(el.x * CM_TO_PX)}px`;
-                    d.style.top = `${Math.round(el.y * CM_TO_PX)}px`;
+                    d.style.left = `${el.x}cm`;
+                    d.style.top = `${el.y}cm`;
                     // For lines, don't set height in cm initially - it will be set in px later
                     if(el.type !== 'line'){
-                        d.style.width = `${Math.round(el.width * CM_TO_PX)}px`;
-                        d.style.height = `${Math.round(el.height * CM_TO_PX)}px`;
+                        d.style.width = `${el.width}cm`;
+                        d.style.height = `${el.height}cm`;
                     } else {
-                        d.style.width = `${Math.round(el.width * CM_TO_PX)}px`;
+                        d.style.width = `${el.width}cm`;
                         // Height will be set in px in the line case below
                     }
                     d.style.zIndex = el.zIndex || 0;
@@ -1940,7 +1946,7 @@ document.addEventListener('DOMContentLoaded', ()=>{
                         const pr = Number.isFinite(Number(el.props.paddingRight)) ? Number(el.props.paddingRight) : 0;
                         const pb = Number.isFinite(Number(el.props.paddingBottom)) ? Number(el.props.paddingBottom) : 0;
                         const pl = Number.isFinite(Number(el.props.paddingLeft)) ? Number(el.props.paddingLeft) : 0;
-                        d.style.padding = `${Math.round(pt * CM_TO_PX)}px ${Math.round(pr * CM_TO_PX)}px ${Math.round(pb * CM_TO_PX)}px ${Math.round(pl * CM_TO_PX)}px`;
+                        d.style.padding = `${pt}cm ${pr}cm ${pb}cm ${pl}cm`;
                     } else {
                         d.style.padding = '';
                     }
@@ -2003,7 +2009,7 @@ document.addEventListener('DOMContentLoaded', ()=>{
                             d.style.background = lineColor;
                             d.style.backgroundColor = lineColor;
                             d.style.height = `${el.props.thickness || 2}px`;
-                            d.style.width = `${Math.round(el.width * CM_TO_PX)}px`;
+                            d.style.width = `${el.width}cm`;
                             d.style.border = 'none';
                             d.style.display = 'block';
                             d.style.margin = '0';
@@ -2027,7 +2033,7 @@ document.addEventListener('DOMContentLoaded', ()=>{
                         case 'qr': {
                             const c = getData(el);
                             const q = document.createElement('img');
-                            const dpi = CM_TO_PX;
+                            const dpi = 37.795276;
                             const qs = Math.min(el.width, el.height) * dpi;
                             q.src = `https://api.qrserver.com/v1/create-qr-code/?size=${Math.round(qs)}x${Math.round(qs)}&data=${encodeURIComponent(c)}`;
                             q.style.pointerEvents='none';
@@ -2045,7 +2051,7 @@ document.addEventListener('DOMContentLoaded', ()=>{
                             sv.setAttribute('height','100%');
                             d.appendChild(sv);
                             try{
-                                const pxHeight = Math.max(30, (el.height * CM_TO_PX) - 10);
+                                const pxHeight = Math.max(30, (el.height * 37.795276) - 10);
                                 JsBarcode(sv, String(c), {
                                     format: el.props.format || "CODE128",
                                     displayValue: el.props.displayValue !== false,
@@ -2462,7 +2468,7 @@ document.addEventListener('DOMContentLoaded', ()=>{
                 }
                 // For other inputs/selects, don't move elements
                 return;
-        }
+            }
 
         if(['ArrowUp','ArrowDown','ArrowLeft','ArrowRight'].includes(e.key)){
                 // Don't move elements if user is interacting with form controls
@@ -2470,16 +2476,7 @@ document.addEventListener('DOMContentLoaded', ()=>{
                 if(e.target.tagName !== 'INPUT' && e.target.tagName !== 'TEXTAREA' && e.target.tagName !== 'SELECT'){
                 if(selectedIds.length>0){
                     e.preventDefault();
-                    // Step in pixels: 1px normally, 10px with Shift
-                    const stepPx = e.shiftKey ? 10 : 1;
-                    const step = stepPx / CM_TO_PX; // Convert to cm
-                    
-                    // Round to pixel grid to avoid sub-pixel movements
-                    const roundToPixel = (cmValue) => {
-                        const px = Math.round(cmValue * CM_TO_PX);
-                        return px / CM_TO_PX;
-                    };
-                    
+                    const step = e.shiftKey ? 0.1 : 0.01;
                     pushBeforeChange();
                     selectedIds.forEach(id=>{
                         const el = S.find(s=>s.id===id); if(!el) return;
@@ -2490,22 +2487,22 @@ document.addEventListener('DOMContentLoaded', ()=>{
                             
                         switch(e.key){
                                 case 'ArrowUp': {
-                                    const newY = roundToPixel(el.y - step);
+                                    const newY = el.y - step;
                                     el.y = Math.max((effectiveHeight - el.height) / 2, newY);
                                     break;
                                 }
                                 case 'ArrowDown': {
-                                    const newY = roundToPixel(el.y + step);
+                                    const newY = el.y + step;
                                     el.y = Math.min(H - (effectiveHeight + el.height) / 2, newY);
                                     break;
                                 }
                                 case 'ArrowLeft': {
-                                    const newX = roundToPixel(el.x - step);
+                                    const newX = el.x - step;
                                     el.x = Math.max((effectiveWidth - el.width) / 2, newX);
                                     break;
                                 }
                                 case 'ArrowRight': {
-                                    const newX = roundToPixel(el.x + step);
+                                    const newX = el.x + step;
                                     el.x = Math.min(W - (effectiveWidth + el.width) / 2, newX);
                                     break;
                                 }
@@ -2812,8 +2809,8 @@ document.addEventListener('DOMContentLoaded', ()=>{
                     const effectiveWidth = (canvasRotation === 90 || canvasRotation === 270) ? H : W;
                     const effectiveHeight = (canvasRotation === 90 || canvasRotation === 270) ? W : H;
                     
-                    const hw = (availableWidth - 40) / (effectiveWidth * CM_TO_PX);
-                    const vw = (availableHeight - 40) / (effectiveHeight * CM_TO_PX);
+                    const hw = (availableWidth - 40) / (effectiveWidth * 37.795276);
+                    const vw = (availableHeight - 40) / (effectiveHeight * 37.795276);
                     setZoom(Math.min(hw, vw, 1.5));
                 } else {
                     // In full screen, calcola lo zoom considerando la rotazione
@@ -2821,8 +2818,8 @@ document.addEventListener('DOMContentLoaded', ()=>{
                     // Quando ruotato di 90° o 270°, le dimensioni effettive si scambiano
                     const effectiveWidth = (canvasRotation === 90 || canvasRotation === 270) ? H : W;
                     const effectiveHeight = (canvasRotation === 90 || canvasRotation === 270) ? W : H;
-                    const hw = (cr.width - 40) / (effectiveWidth * CM_TO_PX);
-                    const vw = (cr.height - 40) / (effectiveHeight * CM_TO_PX);
+                    const hw = (cr.width - 40) / (effectiveWidth * 37.795276);
+                    const vw = (cr.height - 40) / (effectiveHeight * 37.795276);
                     setZoom(Math.min(hw, vw, 1.5));
                 }
             }, 50);
@@ -2912,7 +2909,7 @@ document.addEventListener('DOMContentLoaded', ()=>{
                     fit();
                 }, 50);
             }
-    });
+        });
 
     // ---------- Zoom / fit ----------
         function setZoom(nz){ 
@@ -2925,7 +2922,7 @@ document.addEventListener('DOMContentLoaded', ()=>{
             }
             zd.textContent = `${Math.round(z*100)}%`; 
         }
-    function fit(){ const cr = cc.getBoundingClientRect(); const hw = (cr.width-40)/(W*CM_TO_PX); const vw = (cr.height-40)/(H*CM_TO_PX); setZoom(Math.min(hw,vw,1.5)); }
+    function fit(){ const cr = cc.getBoundingClientRect(); const hw = (cr.width-40)/(W*37.795276); const vw = (cr.height-40)/(H*37.795276); setZoom(Math.min(hw,vw,1.5)); }
 
         // ---------- Full screen detection & UI visibility ----------
         function checkFullScreenMode() {
@@ -3058,8 +3055,8 @@ document.addEventListener('DOMContentLoaded', ()=>{
                     const availableHeight = window.innerHeight - toolbarHeight;
                     const availableWidth = window.innerWidth;
                     const cr = cc.getBoundingClientRect();
-                    const hw = (availableWidth - 40) / (W * CM_TO_PX);
-                    const vw = (availableHeight - 40) / (H * CM_TO_PX);
+                    const hw = (availableWidth - 40) / (W * 37.795276);
+                    const vw = (availableHeight - 40) / (H * 37.795276);
                     setZoom(Math.min(hw, vw, 1.5));
                 }, 50);
             }
