@@ -43,9 +43,11 @@
         #marquee{position:absolute;border:1px dashed #007aff;background:rgba(0,122,255,0.08);pointer-events:none;display:none;z-index:9999}
         .label-element{position:absolute;cursor:move;border:1px solid transparent;font-size:16px;line-height:1.2;overflow:hidden;word-wrap:break-word;user-select:none;transform-origin:center center}
         .label-element.selected{border:2px dashed #007aff;box-shadow:0 0 0 1px rgba(0,122,255,.1)}
-        .resize-handle{position:absolute;width:12px;height:12px;background:#007aff;border:2px solid #fff;border-radius:50%;bottom:-6px;right:-6px;cursor:nwse-resize;display:none;box-shadow:0 2px 4px rgba(0,0,0,.2)}
+        .resize-handle{position:absolute;width:24px;height:24px;bottom:-12px;right:-12px;cursor:nwse-resize;display:none;z-index:10000;pointer-events:auto;background:transparent}
+        .resize-handle-inner{position:absolute;width:12px;height:12px;background:#007aff;border:2px solid #fff;border-radius:50%;top:50%;left:50%;transform:translate(-50%,-50%);box-shadow:0 2px 4px rgba(0,0,0,.2)}
         .label-element.selected .resize-handle{display:block}
-            .resize-handle.group-resize{background:#ff6b00;width:14px;height:14px;border:2px solid #fff;box-shadow:0 2px 6px rgba(255,107,0,.4)}
+            .resize-handle.group-resize{width:28px;height:28px;bottom:-14px;right:-14px;z-index:10001}
+            .resize-handle.group-resize .resize-handle-inner{background:#ff6b00;width:14px;height:14px;box-shadow:0 2px 6px rgba(255,107,0,.4)}
         .label-element img,.label-element svg{width:100%;height:100%;object-fit:contain;pointer-events:none}
         .status-message{position:fixed;top:60px;right:20px;padding:12px 16px;background:#4CAF50;color:#fff;border-radius:4px;box-shadow:0 2px 8px rgba(0,0,0,.2);z-index:1000;animation:slideIn .3s ease-out}
         @keyframes slideIn{from{transform:translateX(400px);opacity:0}to{transform:translateX(0);opacity:1}}
@@ -1151,6 +1153,9 @@ document.addEventListener('DOMContentLoaded', ()=>{
                             const h = document.createElement('div');
                             h.classList.add('resize-handle', 'group-resize');
                             h.title = 'Resize group (maintains proportions)';
+                            const inner = document.createElement('div');
+                            inner.classList.add('resize-handle-inner');
+                            h.appendChild(inner);
                             d.appendChild(h);
                         }
                         // Add elegant group indicator with subtle styling
@@ -1164,6 +1169,9 @@ document.addEventListener('DOMContentLoaded', ()=>{
                         // Regular resize handle for non-grouped elements
                 const h = document.createElement('div');
                 h.classList.add('resize-handle');
+                const inner = document.createElement('div');
+                inner.classList.add('resize-handle-inner');
+                h.appendChild(inner);
                 d.appendChild(h);
                     }
             }
@@ -1271,22 +1279,70 @@ document.addEventListener('DOMContentLoaded', ()=>{
             return;
         }
             
-            // Check if any selected element is in a group
+            // Check if all selected elements belong to the same group
+            const groupIds = new Set();
+            selectedIds.forEach(id => {
+                const group = getGroupForElement(id);
+                if(group) groupIds.add(group.id);
+            });
+            
+            // If all selected elements belong to the same group, show scale control
+            if(groupIds.size === 1 && selectedIds.length > 0){
+                const groupId = Array.from(groupIds)[0];
+                const group = groups.find(g => g.id === groupId);
+                if(group && group.elementIds.length > 0){
+                    // Check if all group elements are selected
+                    const allGroupSelected = group.elementIds.every(id => selectedIds.includes(id));
+                    if(allGroupSelected){
+                        // Show scale control for the group
+                        const currentBounds = getGroupBounds(group.elementIds);
+                        const originalBounds = group.originalBounds || currentBounds;
+                        const currentScale = originalBounds.width > 0 ? (currentBounds.width / originalBounds.width) : 1;
+                        
+                        pp.innerHTML = `<div style="padding:12px;">
+                            <div style="margin-bottom:12px;padding:8px;background:#fff3e0;border:1px solid #ffb74d;border-radius:4px;">
+                                <p style="margin:0;font-size:13px;font-weight:600;color:#e65100;">📦 Group Selected (${group.elementIds.length} elements)</p>
+                            </div>
+                            <div class="prop-grid" style="margin-bottom:12px;">
+                                <label>Scale (%)</label>
+                                <input type="number" id="group-scale-input" step="0.1" min="10" max="500" value="${(currentScale * 100).toFixed(1)}" style="width:100%">
+                            </div>
+                            <div style="font-size:12px;color:#666;margin-top:8px;">
+                                <p style="margin:4px 0;">Use <strong>Ctrl+Shift+G</strong> to ungroup</p>
+                                <p style="margin:4px 0;">Drag the resize handle to scale proportionally</p>
+                            </div>
+                        </div>`;
+                        
+                        // Add event listener for scale input
+                        setTimeout(() => {
+                            const scaleInput = document.getElementById('group-scale-input');
+                            if(scaleInput){
+                                let scaleTimeout = null;
+                                scaleInput.addEventListener('input', (e) => {
+                                    clearTimeout(scaleTimeout);
+                                    scaleTimeout = setTimeout(() => {
+                                        const scaleValue = parseFloat(e.target.value);
+                                        if(!isNaN(scaleValue) && scaleValue > 0){
+                                            scaleGroup(group, scaleValue / 100);
+                                        }
+                                    }, 300);
+                                });
+                            }
+                        }, 0);
+                        return;
+                    }
+                }
+            }
+            
+            // Check if any selected element is in a group (but not all same group)
             const hasGroupedElement = selectedIds.some(id => getGroupForElement(id) !== undefined);
             if(hasGroupedElement){
-                const groupIds = new Set();
-                selectedIds.forEach(id => {
-                    const group = getGroupForElement(id);
-                    if(group) groupIds.add(group.id);
-                });
-                if(groupIds.size > 0){
-                    pp.innerHTML = `<div style="padding:12px;text-align:center;color:#666;">
-                        <p style="margin-bottom:8px;">⚠️ Elements are grouped</p>
-                        <p style="font-size:12px;margin-bottom:12px;">Use <strong>Ctrl+Shift+G</strong> to ungroup and edit properties</p>
-                        <p style="font-size:12px;">Use <strong>Ctrl+G</strong> to group selected elements</p>
-                    </div>`;
-                    return;
-                }
+                pp.innerHTML = `<div style="padding:12px;text-align:center;color:#666;">
+                    <p style="margin-bottom:8px;">⚠️ Elements are grouped</p>
+                    <p style="font-size:12px;margin-bottom:12px;">Use <strong>Ctrl+Shift+G</strong> to ungroup and edit properties</p>
+                    <p style="font-size:12px;">Use <strong>Ctrl+G</strong> to group selected elements</p>
+                </div>`;
+                return;
             }
             
         if(selectedIds.length===1){
@@ -1933,6 +1989,87 @@ document.addEventListener('DOMContentLoaded', ()=>{
             saveCurrentDesign();
             msg('Elements grouped');
         }
+        
+        function scaleGroup(group, scale){
+            if(!group || !group.elementIds || group.elementIds.length === 0) return;
+            if(scale <= 0) return;
+            
+            pushBeforeChange();
+            
+            // Get original bounds if not set
+            if(!group.originalBounds){
+                group.originalBounds = getGroupBounds(group.elementIds);
+            }
+            
+            const originalBounds = group.originalBounds;
+            
+            // Store original element states if not already stored
+            const originalElements = {};
+            group.elementIds.forEach(elementId => {
+                const el = S.find(e => e.id === elementId);
+                if(el){
+                    // Check if we need to store original values
+                    const needsStorage = !originalElements[elementId];
+                    if(needsStorage){
+                        originalElements[elementId] = {
+                            x: el.x,
+                            y: el.y,
+                            width: el.width,
+                            height: el.height,
+                            props: deepCopy(el.props)
+                        };
+                    }
+                }
+            });
+            
+            // Apply uniform scaling to all elements in group
+            group.elementIds.forEach(elementId => {
+                const el = S.find(e => e.id === elementId);
+                if(!el) return;
+                
+                const orig = originalElements[elementId];
+                if(!orig) return;
+                
+                // Calculate relative position from group origin
+                const relX = orig.x - originalBounds.x;
+                const relY = orig.y - originalBounds.y;
+                
+                // Scale position and size uniformly (snapped to pixel precision)
+                el.x = snapToPixel(originalBounds.x + relX * scale);
+                el.y = snapToPixel(originalBounds.y + relY * scale);
+                el.width = snapToPixel(orig.width * scale);
+                el.height = snapToPixel(orig.height * scale);
+                
+                // Scale all size-related properties proportionally (rounded to 1 decimal)
+                if(el.props){
+                    // Font size
+                    if(orig.props.fontSize !== undefined){
+                        el.props.fontSize = Math.round(Math.max(6, orig.props.fontSize * scale) * 10) / 10;
+                    }
+                    // Padding
+                    if(orig.props.paddingTop !== undefined) el.props.paddingTop = Math.round(orig.props.paddingTop * scale * 10) / 10;
+                    if(orig.props.paddingRight !== undefined) el.props.paddingRight = Math.round(orig.props.paddingRight * scale * 10) / 10;
+                    if(orig.props.paddingBottom !== undefined) el.props.paddingBottom = Math.round(orig.props.paddingBottom * scale * 10) / 10;
+                    if(orig.props.paddingLeft !== undefined) el.props.paddingLeft = Math.round(orig.props.paddingLeft * scale * 10) / 10;
+                    // Border width
+                    if(orig.props.borderWidth !== undefined) el.props.borderWidth = Math.round(Math.max(0.1, orig.props.borderWidth * scale) * 10) / 10;
+                    // Thickness (for lines and boxes)
+                    if(orig.props.thickness !== undefined) el.props.thickness = Math.round(Math.max(0.1, orig.props.thickness * scale) * 10) / 10;
+                    // Border radius
+                    if(orig.props.borderRadiusTopLeft !== undefined) el.props.borderRadiusTopLeft = Math.round(orig.props.borderRadiusTopLeft * scale * 10) / 10;
+                    if(orig.props.borderRadiusTopRight !== undefined) el.props.borderRadiusTopRight = Math.round(orig.props.borderRadiusTopRight * scale * 10) / 10;
+                    if(orig.props.borderRadiusBottomRight !== undefined) el.props.borderRadiusBottomRight = Math.round(orig.props.borderRadiusBottomRight * scale * 10) / 10;
+                    if(orig.props.borderRadiusBottomLeft !== undefined) el.props.borderRadiusBottomLeft = Math.round(orig.props.borderRadiusBottomLeft * scale * 10) / 10;
+                }
+            });
+            
+            // Update group bounds
+            group.bounds = getGroupBounds(group.elementIds);
+            
+            render();
+            updateProps();
+            saveCurrentDesign();
+        }
 
         function ungroupSelected(){
             if(selectedIds.length === 0) return;
@@ -2576,7 +2713,9 @@ document.addEventListener('DOMContentLoaded', ()=>{
             const group = getGroupForElement(id);
             const isGrouped = group !== undefined;
             
-            if(t.classList.contains('resize-handle')){
+            // Check if clicked on resize handle (including inner element)
+            const resizeHandle = t.classList.contains('resize-handle') ? t : t.closest('.resize-handle');
+            if(resizeHandle){
                 if(isGrouped){
                     // Resize group - check if all group elements are selected or just this one
                     const allGroupSelected = group.elementIds.every(eid => selectedIds.includes(eid));
