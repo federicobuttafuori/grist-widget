@@ -131,7 +131,7 @@
                         <input type="checkbox" id="canvas2-enabled" style="width:auto;flex:none">
                         <label for="canvas2-enabled" style="font-size:14px;margin:0;font-weight:normal;cursor:pointer">Enable Canvas 2</label>
                     </div>
-                </div>
+            </div>
             <hr>
             <div class="sidebar-section">
                 <h3>Import/Export</h3>
@@ -166,6 +166,7 @@ document.addEventListener('DOMContentLoaded', ()=>{
         let W = 8, H = 5;                 // Current dimensions (dynamic)
         const KEY = 'grist_label_layout_v2'; // Updated version for profiles
         const FONT_FAVORITES_KEY = 'grist_label_font_favorites'; // Key for font favorites
+        const CM_TO_PX = 37.795276;      // Conversion factor from cm to pixels
     const MAX_HISTORY = 100;
 
         // All available fonts for labels
@@ -353,8 +354,8 @@ document.addEventListener('DOMContentLoaded', ()=>{
             if(!profile) return;
             W = profile.width;
             H = profile.height;
-            lc.style.width = `${W}cm`;
-            lc.style.height = `${H}cm`;
+            lc.style.width = `${Math.round(W * CM_TO_PX)}px`;
+            lc.style.height = `${Math.round(H * CM_TO_PX)}px`;
             updatePrintCSS();
             fit();
         }
@@ -849,10 +850,10 @@ document.addEventListener('DOMContentLoaded', ()=>{
             const d = document.createElement('div');
             d.classList.add('label-element');
             d.dataset.id = el.id;
-            d.style.left = `${el.x}cm`;
-            d.style.top = `${el.y}cm`;
-            d.style.width = `${el.width}cm`;
-            d.style.height = `${el.height}cm`;
+            d.style.left = `${Math.round(el.x * CM_TO_PX)}px`;
+            d.style.top = `${Math.round(el.y * CM_TO_PX)}px`;
+            d.style.width = `${Math.round(el.width * CM_TO_PX)}px`;
+            d.style.height = `${Math.round(el.height * CM_TO_PX)}px`;
             d.style.zIndex = el.zIndex || 0;
             d.style.fontSize = `${el.props.fontSize || 16}px`;
                 const fontWeight = el.props.fontWeight;
@@ -886,13 +887,13 @@ document.addEventListener('DOMContentLoaded', ()=>{
             d.style.transform = `rotate(${rotation}deg)`;
             d.style.transformOrigin = 'center center';
 
-            // padding sides applied in cm if element is text or data (default 0)
+            // padding sides applied in px (converted from cm) if element is text or data (default 0)
             if((el.type === 'text' || el.type === 'data')){
                 const pt = Number.isFinite(Number(el.props.paddingTop)) ? Number(el.props.paddingTop) : 0;
                 const pr = Number.isFinite(Number(el.props.paddingRight)) ? Number(el.props.paddingRight) : 0;
                 const pb = Number.isFinite(Number(el.props.paddingBottom)) ? Number(el.props.paddingBottom) : 0;
                 const pl = Number.isFinite(Number(el.props.paddingLeft)) ? Number(el.props.paddingLeft) : 0;
-                d.style.padding = `${pt}cm ${pr}cm ${pb}cm ${pl}cm`;
+                d.style.padding = `${Math.round(pt * CM_TO_PX)}px ${Math.round(pr * CM_TO_PX)}px ${Math.round(pb * CM_TO_PX)}px ${Math.round(pl * CM_TO_PX)}px`;
             } else {
                 d.style.padding = '';
             }
@@ -953,7 +954,7 @@ document.addEventListener('DOMContentLoaded', ()=>{
                 case 'line':
                     d.style.backgroundColor = el.props.color || '#000000';
                     d.style.height = `${el.props.thickness || 2}px`;
-                    d.style.width = `${el.width}cm`;
+                    d.style.width = `${Math.round(el.width * CM_TO_PX)}px`;
                         d.style.border = 'none'; // No border for lines - thickness controls height
                     break;
                 case 'box':
@@ -973,7 +974,7 @@ document.addEventListener('DOMContentLoaded', ()=>{
                 case 'qr': {
                     const c = getData(el);
                     const q = document.createElement('img');
-                    const dpi = 37.795276;
+                    const dpi = CM_TO_PX;
                     const qs = Math.min(el.width, el.height) * dpi;
                     q.src = `https://api.qrserver.com/v1/create-qr-code/?size=${Math.round(qs)}x${Math.round(qs)}&data=${encodeURIComponent(c)}`;
                     q.style.pointerEvents='none';
@@ -991,7 +992,7 @@ document.addEventListener('DOMContentLoaded', ()=>{
                     sv.setAttribute('height','100%');
                     d.appendChild(sv);
                     try{
-                        const pxHeight = Math.max(30, (el.height * 37.795276) - 10);
+                        const pxHeight = Math.max(30, (el.height * CM_TO_PX) - 10);
                         JsBarcode(sv, String(c), {
                             format: el.props.format || "CODE128",
                             displayValue: el.props.displayValue !== false,
@@ -1061,8 +1062,8 @@ document.addEventListener('DOMContentLoaded', ()=>{
                             d.appendChild(placeholder);
                         }
                         d.appendChild(img);
-                        break;
-                    }
+                    break;
+                }
                 default:
                     d.innerText = el.props.text || '';
             }
@@ -1906,14 +1907,14 @@ document.addEventListener('DOMContentLoaded', ()=>{
                     const d = document.createElement('div');
                     d.classList.add('label-element');
                     d.style.position = 'absolute';
-                    d.style.left = `${el.x}cm`;
-                    d.style.top = `${el.y}cm`;
+                    d.style.left = `${Math.round(el.x * CM_TO_PX)}px`;
+                    d.style.top = `${Math.round(el.y * CM_TO_PX)}px`;
                     // For lines, don't set height in cm initially - it will be set in px later
                     if(el.type !== 'line'){
-                        d.style.width = `${el.width}cm`;
-                        d.style.height = `${el.height}cm`;
+                        d.style.width = `${Math.round(el.width * CM_TO_PX)}px`;
+                        d.style.height = `${Math.round(el.height * CM_TO_PX)}px`;
                     } else {
-                        d.style.width = `${el.width}cm`;
+                        d.style.width = `${Math.round(el.width * CM_TO_PX)}px`;
                         // Height will be set in px in the line case below
                     }
                     d.style.zIndex = el.zIndex || 0;
@@ -1957,7 +1958,7 @@ document.addEventListener('DOMContentLoaded', ()=>{
                         const pr = Number.isFinite(Number(el.props.paddingRight)) ? Number(el.props.paddingRight) : 0;
                         const pb = Number.isFinite(Number(el.props.paddingBottom)) ? Number(el.props.paddingBottom) : 0;
                         const pl = Number.isFinite(Number(el.props.paddingLeft)) ? Number(el.props.paddingLeft) : 0;
-                        d.style.padding = `${pt}cm ${pr}cm ${pb}cm ${pl}cm`;
+                        d.style.padding = `${Math.round(pt * CM_TO_PX)}px ${Math.round(pr * CM_TO_PX)}px ${Math.round(pb * CM_TO_PX)}px ${Math.round(pl * CM_TO_PX)}px`;
                     } else {
                         d.style.padding = '';
                     }
@@ -2020,7 +2021,7 @@ document.addEventListener('DOMContentLoaded', ()=>{
                             d.style.background = lineColor;
                             d.style.backgroundColor = lineColor;
                             d.style.height = `${el.props.thickness || 2}px`;
-                            d.style.width = `${el.width}cm`;
+                            d.style.width = `${Math.round(el.width * CM_TO_PX)}px`;
                             d.style.border = 'none';
                             d.style.display = 'block';
                             d.style.margin = '0';
@@ -2054,7 +2055,7 @@ document.addEventListener('DOMContentLoaded', ()=>{
                         case 'qr': {
                             const c = getData(el);
                             const q = document.createElement('img');
-                            const dpi = 37.795276;
+                            const dpi = CM_TO_PX;
                             const qs = Math.min(el.width, el.height) * dpi;
                             q.src = `https://api.qrserver.com/v1/create-qr-code/?size=${Math.round(qs)}x${Math.round(qs)}&data=${encodeURIComponent(c)}`;
                             q.style.pointerEvents='none';
@@ -2072,7 +2073,7 @@ document.addEventListener('DOMContentLoaded', ()=>{
                             sv.setAttribute('height','100%');
                             d.appendChild(sv);
                             try{
-                                const pxHeight = Math.max(30, (el.height * 37.795276) - 10);
+                                const pxHeight = Math.max(30, (el.height * CM_TO_PX) - 10);
                                 JsBarcode(sv, String(c), {
                                     format: el.props.format || "CODE128",
                                     displayValue: el.props.displayValue !== false,
@@ -2489,7 +2490,7 @@ document.addEventListener('DOMContentLoaded', ()=>{
                 }
                 // For other inputs/selects, don't move elements
                 return;
-            }
+        }
 
         if(['ArrowUp','ArrowDown','ArrowLeft','ArrowRight'].includes(e.key)){
                 // Don't move elements if user is interacting with form controls
@@ -2497,7 +2498,16 @@ document.addEventListener('DOMContentLoaded', ()=>{
                 if(e.target.tagName !== 'INPUT' && e.target.tagName !== 'TEXTAREA' && e.target.tagName !== 'SELECT'){
                 if(selectedIds.length>0){
                     e.preventDefault();
-                    const step = e.shiftKey ? 0.1 : 0.01;
+                    // Step in pixels: 1px normally, 10px with Shift
+                    const stepPx = e.shiftKey ? 10 : 1;
+                    const step = stepPx / CM_TO_PX; // Convert to cm
+                    
+                    // Round to pixel grid to avoid sub-pixel movements
+                    const roundToPixel = (cmValue) => {
+                        const px = Math.round(cmValue * CM_TO_PX);
+                        return px / CM_TO_PX;
+                    };
+                    
                     pushBeforeChange();
                     selectedIds.forEach(id=>{
                         const el = S.find(s=>s.id===id); if(!el) return;
@@ -2508,22 +2518,22 @@ document.addEventListener('DOMContentLoaded', ()=>{
                             
                         switch(e.key){
                                 case 'ArrowUp': {
-                                    const newY = el.y - step;
+                                    const newY = roundToPixel(el.y - step);
                                     el.y = Math.max((effectiveHeight - el.height) / 2, newY);
                                     break;
                                 }
                                 case 'ArrowDown': {
-                                    const newY = el.y + step;
+                                    const newY = roundToPixel(el.y + step);
                                     el.y = Math.min(H - (effectiveHeight + el.height) / 2, newY);
                                     break;
                                 }
                                 case 'ArrowLeft': {
-                                    const newX = el.x - step;
+                                    const newX = roundToPixel(el.x - step);
                                     el.x = Math.max((effectiveWidth - el.width) / 2, newX);
                                     break;
                                 }
                                 case 'ArrowRight': {
-                                    const newX = el.x + step;
+                                    const newX = roundToPixel(el.x + step);
                                     el.x = Math.min(W - (effectiveWidth + el.width) / 2, newX);
                                     break;
                                 }
@@ -2830,8 +2840,8 @@ document.addEventListener('DOMContentLoaded', ()=>{
                     const effectiveWidth = (canvasRotation === 90 || canvasRotation === 270) ? H : W;
                     const effectiveHeight = (canvasRotation === 90 || canvasRotation === 270) ? W : H;
                     
-                    const hw = (availableWidth - 40) / (effectiveWidth * 37.795276);
-                    const vw = (availableHeight - 40) / (effectiveHeight * 37.795276);
+                    const hw = (availableWidth - 40) / (effectiveWidth * CM_TO_PX);
+                    const vw = (availableHeight - 40) / (effectiveHeight * CM_TO_PX);
                     setZoom(Math.min(hw, vw, 1.5));
                 } else {
                     // In full screen, calcola lo zoom considerando la rotazione
@@ -2839,8 +2849,8 @@ document.addEventListener('DOMContentLoaded', ()=>{
                     // Quando ruotato di 90° o 270°, le dimensioni effettive si scambiano
                     const effectiveWidth = (canvasRotation === 90 || canvasRotation === 270) ? H : W;
                     const effectiveHeight = (canvasRotation === 90 || canvasRotation === 270) ? W : H;
-                    const hw = (cr.width - 40) / (effectiveWidth * 37.795276);
-                    const vw = (cr.height - 40) / (effectiveHeight * 37.795276);
+                    const hw = (cr.width - 40) / (effectiveWidth * CM_TO_PX);
+                    const vw = (cr.height - 40) / (effectiveHeight * CM_TO_PX);
                     setZoom(Math.min(hw, vw, 1.5));
                 }
             }, 50);
@@ -2930,7 +2940,7 @@ document.addEventListener('DOMContentLoaded', ()=>{
                     fit();
                 }, 50);
             }
-        });
+    });
 
     // ---------- Zoom / fit ----------
         function setZoom(nz){ 
@@ -2943,7 +2953,7 @@ document.addEventListener('DOMContentLoaded', ()=>{
             }
             zd.textContent = `${Math.round(z*100)}%`; 
         }
-    function fit(){ const cr = cc.getBoundingClientRect(); const hw = (cr.width-40)/(W*37.795276); const vw = (cr.height-40)/(H*37.795276); setZoom(Math.min(hw,vw,1.5)); }
+    function fit(){ const cr = cc.getBoundingClientRect(); const hw = (cr.width-40)/(W*CM_TO_PX); const vw = (cr.height-40)/(H*CM_TO_PX); setZoom(Math.min(hw,vw,1.5)); }
 
         // ---------- Full screen detection & UI visibility ----------
         function checkFullScreenMode() {
@@ -3076,8 +3086,8 @@ document.addEventListener('DOMContentLoaded', ()=>{
                     const availableHeight = window.innerHeight - toolbarHeight;
                     const availableWidth = window.innerWidth;
                     const cr = cc.getBoundingClientRect();
-                    const hw = (availableWidth - 40) / (W * 37.795276);
-                    const vw = (availableHeight - 40) / (H * 37.795276);
+                    const hw = (availableWidth - 40) / (W * CM_TO_PX);
+                    const vw = (availableHeight - 40) / (H * CM_TO_PX);
                     setZoom(Math.min(hw, vw, 1.5));
                 }, 50);
             }
