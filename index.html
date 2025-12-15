@@ -2205,6 +2205,12 @@ document.addEventListener('DOMContentLoaded', ()=>{
             // Disabilita interazioni quando non è in full screen
             if (!isFullScreen) return;
             
+            // Assicura che il focus sia sul canvas container quando si clicca sul canvas
+            if (cc.tabIndex === -1) {
+                cc.setAttribute('tabindex', '-1');
+            }
+            cc.focus();
+            
             const t = e.target;
             // If clicking on the background (container or canvas), start marquee selection
             if(t === cc || t === lc){
@@ -2216,6 +2222,12 @@ document.addEventListener('DOMContentLoaded', ()=>{
         lc.addEventListener('mousedown', (e)=>{
             // Disabilita interazioni quando non è in full screen
             if (!isFullScreen) return;
+            
+            // Assicura che il focus sia sul canvas container quando si clicca sul canvas
+            if (cc.tabIndex === -1) {
+                cc.setAttribute('tabindex', '-1');
+            }
+            cc.focus();
             
             const t = e.target;
             // If clicking on the background of label-canvas, start marquee selection
@@ -2471,6 +2483,9 @@ document.addEventListener('DOMContentLoaded', ()=>{
             }
 
         if(['ArrowUp','ArrowDown','ArrowLeft','ArrowRight'].includes(e.key)){
+                // Only handle arrow keys in full screen mode
+                if (!isFullScreen) return;
+                
                 // Don't move elements if user is interacting with form controls
                 // Exception: allow font select navigation (handled separately with stopPropagation)
                 if(e.target.tagName !== 'INPUT' && e.target.tagName !== 'TEXTAREA' && e.target.tagName !== 'SELECT'){
@@ -2955,6 +2970,39 @@ document.addEventListener('DOMContentLoaded', ()=>{
                 if (miniToolbar) {
                     miniToolbar.style.display = 'none';
                 }
+                
+                // Fix focus: quando si entra in full screen, assicurati che il focus sia sul canvas
+                // per evitare che gli eventi della tastiera vengano intercettati da altri elementi
+                setTimeout(() => {
+                    const activeElement = document.activeElement;
+                    // Se il focus è su un elemento che non è più visibile o non dovrebbe avere il focus,
+                    // spostalo sul canvas container
+                    if (activeElement && activeElement !== document.body && activeElement !== document.documentElement) {
+                        // Controlla se l'elemento attivo è visibile
+                        const isVisible = activeElement.offsetParent !== null;
+                        const style = window.getComputedStyle(activeElement);
+                        const isDisplayed = style.display !== 'none' && style.visibility !== 'hidden';
+                        
+                        // Se l'elemento non è visibile o non è un input/textarea/select attivo e visibile, sposta il focus
+                        if (!isVisible || !isDisplayed || (activeElement.tagName !== 'INPUT' && activeElement.tagName !== 'TEXTAREA' && activeElement.tagName !== 'SELECT')) {
+                            // Sposta il focus sul canvas container per assicurarsi che gli eventi vengano gestiti correttamente
+                            if (canvasContainer) {
+                                if (canvasContainer.tabIndex === -1) {
+                                    canvasContainer.setAttribute('tabindex', '-1');
+                                }
+                                canvasContainer.focus();
+                            }
+                        }
+                    } else {
+                        // Se non c'è focus, impostalo sul canvas container
+                        if (canvasContainer) {
+                            if (canvasContainer.tabIndex === -1) {
+                                canvasContainer.setAttribute('tabindex', '-1');
+                            }
+                            canvasContainer.focus();
+                        }
+                    }
+                }, 50);
             } else {
                 // Nascondi tutto tranne print, rotate e canvas
                 toolbar.style.display = 'none';
