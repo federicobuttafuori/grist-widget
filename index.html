@@ -824,7 +824,7 @@ document.addEventListener('DOMContentLoaded', ()=>{
                 paddingTop: 0, paddingRight: 0, paddingBottom: 0, paddingLeft: 0,
                 thickness:2, format:'CODE128', displayValue:true,
                     fillColor:'#ffffff', decimals:2, asPercent:false,
-                    lineHeight: 1.2
+                    lineHeight: 1.2, textOverflow: 'clip'
             }
         };
 
@@ -988,9 +988,36 @@ document.addEventListener('DOMContentLoaded', ()=>{
                     span.style.pointerEvents='none';
                     span.style.overflow='hidden';
                     span.style.wordWrap='break-word';
-                        span.style.whiteSpace='pre-wrap'; // Preserve line breaks
-                                span.textContent = getData(el);
+                    
+                    // Set whiteSpace based on textOverflow mode
+                    const overflowMode = el.props.textOverflow || 'clip';
+                    if(overflowMode === 'auto-scale' || overflowMode === 'squeeze'){
+                        span.style.whiteSpace = 'nowrap'; // Prevent wrapping for auto-scale and squeeze
+                    } else {
+                        span.style.whiteSpace = 'pre-wrap'; // Preserve line breaks for clip mode
+                    }
+                    
+                    span.textContent = getData(el);
+                    // Copy font styles to span for overflow calculation
+                    span.style.fontFamily = el.props.fontFamily || 'Arial, sans-serif';
+                    span.style.fontSize = (el.props.fontSize || 16) + 'px';
+                    const fontWeight = el.props.fontWeight;
+                    if(typeof fontWeight === 'number'){
+                        span.style.fontWeight = fontWeight;
+                    } else {
+                        span.style.fontWeight = fontWeight || 'normal';
+                    }
+                    span.style.lineHeight = el.props.lineHeight !== undefined ? String(el.props.lineHeight) : '1.2';
+                    span.style.color = el.props.color || '#000000';
+                    
                     d.appendChild(span);
+                    
+                    // Apply text overflow handling after element is in DOM
+                    requestAnimationFrame(() => {
+                        const containerWidth = d.offsetWidth;
+                        const containerHeight = d.offsetHeight;
+                        applyTextOverflow(span, el, containerWidth, containerHeight, false);
+                    });
                     break;
                 }
                 case 'data': {
@@ -1000,9 +1027,36 @@ document.addEventListener('DOMContentLoaded', ()=>{
                     span.style.pointerEvents='none';
                     span.style.overflow='hidden';
                     span.style.wordWrap='break-word';
-                        span.style.whiteSpace='pre-wrap'; // Preserve line breaks
+                    
+                    // Set whiteSpace based on textOverflow mode
+                    const overflowMode = el.props.textOverflow || 'clip';
+                    if(overflowMode === 'auto-scale' || overflowMode === 'squeeze'){
+                        span.style.whiteSpace = 'nowrap'; // Prevent wrapping for auto-scale and squeeze
+                    } else {
+                        span.style.whiteSpace = 'pre-wrap'; // Preserve line breaks for clip mode
+                    }
+                    
                     span.textContent = getData(el);
+                    // Copy font styles to span for overflow calculation
+                    span.style.fontFamily = el.props.fontFamily || 'Arial, sans-serif';
+                    span.style.fontSize = (el.props.fontSize || 16) + 'px';
+                    const fontWeight = el.props.fontWeight;
+                    if(typeof fontWeight === 'number'){
+                        span.style.fontWeight = fontWeight;
+                    } else {
+                        span.style.fontWeight = fontWeight || 'normal';
+                    }
+                    span.style.lineHeight = el.props.lineHeight !== undefined ? String(el.props.lineHeight) : '1.2';
+                    span.style.color = el.props.color || '#000000';
+                    
                     d.appendChild(span);
+                    
+                    // Apply text overflow handling after element is in DOM
+                    requestAnimationFrame(() => {
+                        const containerWidth = d.offsetWidth;
+                        const containerHeight = d.offsetHeight;
+                        applyTextOverflow(span, el, containerWidth, containerHeight, false);
+                    });
                     break;
                 }
                 case 'line':
@@ -1012,11 +1066,15 @@ document.addEventListener('DOMContentLoaded', ()=>{
                         d.style.border = 'none'; // No border for lines - thickness controls height
                     break;
                 case 'box':
-                        const boxThickness = el.props.thickness !== undefined ? el.props.thickness : 2;
+                        const boxThickness = el.props.thickness !== undefined ? Number(el.props.thickness) : 2;
                         if(boxThickness > 0){
                             d.style.border = `${boxThickness}px solid ${el.props.color || '#000000'}`;
+                            d.style.borderWidth = `${boxThickness}px`;
                         } else {
                             d.style.border = 'none';
+                            d.style.borderWidth = '0';
+                            d.style.borderStyle = 'none';
+                            d.style.borderColor = 'transparent';
                         }
                     d.style.backgroundColor = el.props.fillColor || 'transparent';
                     break;
@@ -1180,6 +1238,125 @@ document.addEventListener('DOMContentLoaded', ()=>{
         });
     }
 
+        // Helper function to apply text overflow handling
+        function applyTextOverflow(span, el, containerWidth, containerHeight, isPrintMode){
+            const overflowMode = el.props.textOverflow || 'clip';
+            if(overflowMode === 'clip') return; // Default behavior, no changes needed
+            
+            // Ensure span has nowrap for auto-scale and squeeze
+            if(overflowMode === 'auto-scale' || overflowMode === 'squeeze'){
+                span.style.whiteSpace = 'nowrap';
+                // For squeeze, set width to auto to allow natural text width
+                if(overflowMode === 'squeeze'){
+                    span.style.width = 'auto';
+                    span.style.maxWidth = '100%';
+                }
+            }
+            
+            // Calculate available width (accounting for padding and borders)
+            // Add a small safety margin (1-2px) to prevent clipping
+            const safetyMargin = 2;
+            let availableWidth;
+            if(isPrintMode){
+                // In print mode, containerWidth is already the available width
+                availableWidth = containerWidth - safetyMargin;
+            } else {
+                // In normal render mode, calculate from container dimensions
+                const paddingLeft = Number(el.props.paddingLeft) || 0;
+                const paddingRight = Number(el.props.paddingRight) || 0;
+                const borderWidth = (el.props.showBorder && el.props.borderWidth) ? Number(el.props.borderWidth) : 0;
+                const borderLeft = (el.props.borderLeft !== false) ? borderWidth : 0;
+                const borderRight = (el.props.borderRight !== false) ? borderWidth : 0;
+                availableWidth = containerWidth - paddingLeft - paddingRight - borderLeft - borderRight - safetyMargin;
+            }
+            
+            if(availableWidth <= 0) return; // No space available
+            
+            if(overflowMode === 'auto-scale'){
+                // Create a measurement div with same styles as span
+                const measureDiv = document.createElement('div');
+                measureDiv.textContent = span.textContent;
+                measureDiv.style.position = 'absolute';
+                measureDiv.style.visibility = 'hidden';
+                measureDiv.style.whiteSpace = 'nowrap';
+                measureDiv.style.width = 'auto';
+                measureDiv.style.height = 'auto';
+                measureDiv.style.overflow = 'visible';
+                measureDiv.style.maxWidth = 'none';
+                measureDiv.style.padding = '0';
+                measureDiv.style.margin = '0';
+                measureDiv.style.border = 'none';
+                // Copy all relevant styles from span
+                measureDiv.style.fontFamily = span.style.fontFamily || el.props.fontFamily || 'Arial, sans-serif';
+                measureDiv.style.fontWeight = span.style.fontWeight || el.props.fontWeight || 'normal';
+                measureDiv.style.lineHeight = span.style.lineHeight || el.props.lineHeight || '1.2';
+                measureDiv.style.letterSpacing = span.style.letterSpacing || 'normal';
+                document.body.appendChild(measureDiv);
+                
+                let fontSize = Number(el.props.fontSize) || 16;
+                const minFontSize = 6;
+                
+                // Measure text width at current font size
+                measureDiv.style.fontSize = fontSize + 'px';
+                let textWidth = measureDiv.scrollWidth;
+                
+                // Reduce font size until text fits (with a bit of extra space)
+                while(textWidth > availableWidth && fontSize > minFontSize){
+                    fontSize -= 0.5;
+                    measureDiv.style.fontSize = fontSize + 'px';
+                    textWidth = measureDiv.scrollWidth;
+                }
+                
+                // Apply the calculated font size
+                span.style.fontSize = fontSize + 'px';
+                document.body.removeChild(measureDiv);
+                
+            } else if(overflowMode === 'squeeze'){
+                // Create a measurement div to check overflow
+                const measureDiv = document.createElement('div');
+                measureDiv.textContent = span.textContent;
+                measureDiv.style.position = 'absolute';
+                measureDiv.style.visibility = 'hidden';
+                measureDiv.style.whiteSpace = 'nowrap';
+                measureDiv.style.width = 'auto';
+                measureDiv.style.height = 'auto';
+                measureDiv.style.overflow = 'visible';
+                measureDiv.style.maxWidth = 'none';
+                measureDiv.style.padding = '0';
+                measureDiv.style.margin = '0';
+                measureDiv.style.border = 'none';
+                // Copy all relevant styles from span
+                measureDiv.style.fontFamily = span.style.fontFamily || el.props.fontFamily || 'Arial, sans-serif';
+                measureDiv.style.fontSize = span.style.fontSize || (el.props.fontSize || 16) + 'px';
+                measureDiv.style.fontWeight = span.style.fontWeight || el.props.fontWeight || 'normal';
+                measureDiv.style.lineHeight = span.style.lineHeight || el.props.lineHeight || '1.2';
+                measureDiv.style.letterSpacing = span.style.letterSpacing || 'normal';
+                document.body.appendChild(measureDiv);
+                
+                // Measure text width - use offsetWidth for more accurate measurement
+                const textWidth = Math.max(measureDiv.scrollWidth, measureDiv.offsetWidth);
+                document.body.removeChild(measureDiv);
+                
+                if(textWidth > availableWidth){
+                    // Calculate scale factor with a small safety margin
+                    const scaleX = Math.max(0.1, (availableWidth / textWidth));
+                    // Apply horizontal squeeze with transform-origin based on text alignment
+                    const textAlign = el.props.textAlign || 'left';
+                    let transformOrigin = 'left center';
+                    if(textAlign === 'center') transformOrigin = 'center center';
+                    else if(textAlign === 'right') transformOrigin = 'right center';
+                    
+                    // Apply scaleX (rotation is handled by parent container)
+                    span.style.transform = `scaleX(${scaleX})`;
+                    span.style.transformOrigin = transformOrigin;
+                } else {
+                    // Reset transform if text fits
+                    span.style.transform = '';
+                    span.style.transformOrigin = '';
+                }
+            }
+        }
+        
         // Helper function to replace **column** syntax with actual data
         function replaceColumnSyntax(str, el){
             if(!str || typeof str !== 'string' || !R || typeof R !== 'object') return str;
@@ -1388,7 +1565,7 @@ document.addEventListener('DOMContentLoaded', ()=>{
         }
 
         if(el.type==='line'){
-                h += `<label>Thickness (px)</label><input type="number" step="0.1" data-prop="props.thickness" value="${el.props.thickness||2}" min="0.1">`;
+                h += `<label>Thickness (px)</label><input type="number" step="1" data-prop="props.thickness" value="${el.props.thickness!==undefined?el.props.thickness:2}" min="0">`;
                 h += `<hr><div class="prop-grid"><label>Rotation°</label><input type="number" step="1" data-prop="props.rotation" value="${el.props.rotation||0}"><label></label></div>`;
         }
 
@@ -1407,7 +1584,7 @@ document.addEventListener('DOMContentLoaded', ()=>{
                 h += `<hr><div class="prop-grid"><label>Font Size</label><input type="number" step="1" data-prop="props.fontSize" value="${el.props.fontSize||16}" min="6" max="200"><label>Font Family</label><div style="display:flex;gap:4px;align-items:center"><select data-prop="props.fontFamily" id="font-family-select-${el.id}" style="flex:1">${generateFontOptions(currentFontFamily)}</select><button type="button" id="font-favorite-btn-${el.id}" style="padding:4px 8px;font-size:16px;background:transparent;border:1px solid #ccc;border-radius:4px;cursor:pointer;flex-shrink:0" title="${fontFavorites.includes(currentFontFamily) ? 'Remove from favorites' : 'Add to favorites'}">${fontFavorites.includes(currentFontFamily) ? '⭐' : '☆'}</button></div></div>`;
                 h += `<div class="prop-grid"><label>Weight</label><select data-prop="props.fontWeight" id="font-weight-select-${el.id}">${generateWeightOptions(currentFontFamily, el.props.fontWeight)}</select><label>Line Height</label><input type="number" step="0.1" data-prop="props.lineHeight" value="${el.props.lineHeight!==undefined?el.props.lineHeight:1.2}" min="0.5" max="3"></div>`;
                 h += `<div class="prop-grid"><label>H. Align</label><select data-prop="props.textAlign"><option value="left" ${el.props.textAlign==='left'?'selected':''}>Left</option><option value="center" ${el.props.textAlign==='center'?'selected':''}>Center</option><option value="right" ${el.props.textAlign==='right'?'selected':''}>Right</option></select><label>V. Align</label><select data-prop="props.valign"><option value="top" ${el.props.valign==='top'?'selected':''}>Top</option><option value="middle" ${el.props.valign==='middle'?'selected':''}>Middle</option><option value="bottom" ${el.props.valign==='bottom'?'selected':''}>Bottom</option></select></div>`;
-                h += `<div class="prop-grid"><label>Rotation°</label><input type="number" step="1" data-prop="props.rotation" value="${el.props.rotation||0}"><label></label></div>`;
+                h += `<div class="prop-grid"><label>Overflow</label><select data-prop="props.textOverflow"><option value="clip" ${(el.props.textOverflow||'clip')==='clip'?'selected':''}>Clip (default)</option><option value="auto-scale" ${el.props.textOverflow==='auto-scale'?'selected':''}>Auto-scale to fit</option><option value="squeeze" ${el.props.textOverflow==='squeeze'?'selected':''}>Horizontal squeeze</option></select><label>Rotation°</label><input type="number" step="1" data-prop="props.rotation" value="${el.props.rotation||0}"></div>`;
                 h += `<hr><div class="prop-grid"><label>Padding Top</label><input type="number" step="0.01" data-prop="props.paddingTop" value="${Number(el.props.paddingTop||0).toFixed(2)}" min="0"><label>Padding Right</label><input type="number" step="0.01" data-prop="props.paddingRight" value="${Number(el.props.paddingRight||0).toFixed(2)}" min="0"></div>`;
                 h += `<div class="prop-grid"><label>Padding Bottom</label><input type="number" step="0.01" data-prop="props.paddingBottom" value="${Number(el.props.paddingBottom||0).toFixed(2)}" min="0"><label>Padding Left</label><input type="number" step="0.01" data-prop="props.paddingLeft" value="${Number(el.props.paddingLeft||0).toFixed(2)}" min="0"></div>`;
             }
@@ -1538,6 +1715,10 @@ document.addEventListener('DOMContentLoaded', ()=>{
                 h += `<div class="prop-grid"><label>Font Size</label><input type="number" step="0.1" data-prop="multi.props.fontSize" value="${common('props.fontSize')}" min="6"><label>Font Family</label><div style="display:flex;gap:4px;align-items:center"><select data-prop="multi.props.fontFamily" id="multi-font-family-select" style="flex:1">${generateFontOptions(commonFontFamily)}</select><button type="button" id="multi-font-favorite-btn" style="padding:4px 8px;font-size:16px;background:transparent;border:1px solid #ccc;border-radius:4px;cursor:pointer;flex-shrink:0" title="${fontFavorites.includes(commonFontFamily) ? 'Remove from favorites' : 'Add to favorites'}">${fontFavorites.includes(commonFontFamily) ? '⭐' : '☆'}</button></div></div>`;
             h += `<div class="prop-grid"><label>Font Weight</label><select data-prop="multi.props.fontWeight" id="multi-font-weight-select">${generateWeightOptions(commonFontFamily, commonWeight)}</select><label>Line Height</label><input type="number" step="0.1" data-prop="multi.props.lineHeight" value="${common('props.lineHeight')}" min="0.5" max="3"></div>`;
             h += `<div class="prop-grid"><label>H. Align</label><select data-prop="multi.props.textAlign"><option value="">—</option><option value="left" ${common('props.textAlign')==='left'?'selected':''}>Left</option><option value="center" ${common('props.textAlign')==='center'?'selected':''}>Center</option><option value="right" ${common('props.textAlign')==='right'?'selected':''}>Right</option></select><label>V. Align</label><select data-prop="multi.props.valign"><option value="">—</option><option value="top" ${common('props.valign')==='top'?'selected':''}>Top</option><option value="middle" ${common('props.valign')==='middle'?'selected':''}>Middle</option><option value="bottom" ${common('props.valign')==='bottom'?'selected':''}>Bottom</option></select></div>`;
+            const hasTextOrData = elems.some(el => el.type === 'text' || el.type === 'data');
+            if(hasTextOrData){
+                h += `<div class="prop-grid"><label>Overflow</label><select data-prop="multi.props.textOverflow"><option value="">—</option><option value="clip" ${(common('props.textOverflow')||'clip')==='clip'?'selected':''}>Clip (default)</option><option value="auto-scale" ${common('props.textOverflow')==='auto-scale'?'selected':''}>Auto-scale to fit</option><option value="squeeze" ${common('props.textOverflow')==='squeeze'?'selected':''}>Horizontal squeeze</option></select><label></label></div>`;
+            }
             // Show decimals only if at least one element is of type 'data'
             const hasDataElement = elems.some(el => el.type === 'data');
             if(hasDataElement){
@@ -2402,9 +2583,40 @@ document.addEventListener('DOMContentLoaded', ()=>{
                             span.style.pointerEvents='none';
                             span.style.overflow='hidden';
                             span.style.wordWrap='break-word';
-                            span.style.whiteSpace='pre-wrap'; // Preserve line breaks
-                                span.textContent = getData(el);
+                            
+                            // Set whiteSpace based on textOverflow mode
+                            const overflowMode = el.props.textOverflow || 'clip';
+                            if(overflowMode === 'auto-scale' || overflowMode === 'squeeze'){
+                                span.style.whiteSpace = 'nowrap'; // Prevent wrapping for auto-scale and squeeze
+                            } else {
+                                span.style.whiteSpace = 'pre-wrap'; // Preserve line breaks for clip mode
+                            }
+                            
+                            span.textContent = getData(el);
+                            // Copy font styles to span for overflow calculation
+                            span.style.fontFamily = el.props.fontFamily || 'Arial, sans-serif';
+                            span.style.fontSize = (el.props.fontSize || 16) + 'px';
+                            const fontWeight = el.props.fontWeight;
+                            if(typeof fontWeight === 'number'){
+                                span.style.fontWeight = fontWeight;
+                            } else {
+                                span.style.fontWeight = fontWeight || 'normal';
+                            }
+                            span.style.lineHeight = el.props.lineHeight !== undefined ? String(el.props.lineHeight) : '1.2';
+                            span.style.color = el.props.color || '#000000';
+                            
                             d.appendChild(span);
+                            
+                            // Apply text overflow handling for print
+                            const paddingLeft = Number(el.props.paddingLeft) || 0;
+                            const paddingRight = Number(el.props.paddingRight) || 0;
+                            const borderWidth = (el.props.showBorder && el.props.borderWidth) ? Number(el.props.borderWidth) : 0;
+                            const borderLeft = (el.props.borderLeft !== false) ? borderWidth : 0;
+                            const borderRight = (el.props.borderRight !== false) ? borderWidth : 0;
+                            const containerWidth = el.width * PIXELS_PER_CM;
+                            const availableWidth = containerWidth - paddingLeft - paddingRight - borderLeft - borderRight;
+                            const containerHeight = el.height * PIXELS_PER_CM;
+                            applyTextOverflow(span, el, availableWidth, containerHeight, true);
                             break;
                         }
                         case 'data': {
@@ -2414,9 +2626,40 @@ document.addEventListener('DOMContentLoaded', ()=>{
                             span.style.pointerEvents='none';
                             span.style.overflow='hidden';
                             span.style.wordWrap='break-word';
-                            span.style.whiteSpace='pre-wrap'; // Preserve line breaks
+                            
+                            // Set whiteSpace based on textOverflow mode
+                            const overflowMode = el.props.textOverflow || 'clip';
+                            if(overflowMode === 'auto-scale' || overflowMode === 'squeeze'){
+                                span.style.whiteSpace = 'nowrap'; // Prevent wrapping for auto-scale and squeeze
+                            } else {
+                                span.style.whiteSpace = 'pre-wrap'; // Preserve line breaks for clip mode
+                            }
+                            
                             span.textContent = getData(el);
+                            // Copy font styles to span for overflow calculation
+                            span.style.fontFamily = el.props.fontFamily || 'Arial, sans-serif';
+                            span.style.fontSize = (el.props.fontSize || 16) + 'px';
+                            const fontWeight = el.props.fontWeight;
+                            if(typeof fontWeight === 'number'){
+                                span.style.fontWeight = fontWeight;
+                            } else {
+                                span.style.fontWeight = fontWeight || 'normal';
+                            }
+                            span.style.lineHeight = el.props.lineHeight !== undefined ? String(el.props.lineHeight) : '1.2';
+                            span.style.color = el.props.color || '#000000';
+                            
                             d.appendChild(span);
+                            
+                            // Apply text overflow handling for print
+                            const paddingLeft = Number(el.props.paddingLeft) || 0;
+                            const paddingRight = Number(el.props.paddingRight) || 0;
+                            const borderWidth = (el.props.showBorder && el.props.borderWidth) ? Number(el.props.borderWidth) : 0;
+                            const borderLeft = (el.props.borderLeft !== false) ? borderWidth : 0;
+                            const borderRight = (el.props.borderRight !== false) ? borderWidth : 0;
+                            const containerWidth = el.width * PIXELS_PER_CM;
+                            const availableWidth = containerWidth - paddingLeft - paddingRight - borderLeft - borderRight;
+                            const containerHeight = el.height * PIXELS_PER_CM;
+                            applyTextOverflow(span, el, availableWidth, containerHeight, true);
                             break;
                         }
                         case 'line':
@@ -2443,11 +2686,15 @@ document.addEventListener('DOMContentLoaded', ()=>{
                             d.style.fontSize = '0';
                             break;
                         case 'box':
-                                const printBoxThickness = el.props.thickness !== undefined ? el.props.thickness : 2;
+                                const printBoxThickness = el.props.thickness !== undefined ? Number(el.props.thickness) : 2;
                                 if(printBoxThickness > 0){
                                     d.style.border = `${printBoxThickness}px solid ${el.props.color || '#000000'}`;
+                                    d.style.borderWidth = `${printBoxThickness}px`;
                                 } else {
                                     d.style.border = 'none';
+                                    d.style.borderWidth = '0';
+                                    d.style.borderStyle = 'none';
+                                    d.style.borderColor = 'transparent';
                                 }
                             d.style.backgroundColor = el.props.fillColor || 'transparent';
                             break;
@@ -3599,7 +3846,16 @@ document.addEventListener('DOMContentLoaded', ()=>{
             // Se la finestra è molto piccola, probabilmente è in modalità widget
             // Soglia: se width < 600px o height < 400px, consideralo widget mode
             const isWidget = window.innerWidth < 600 || window.innerHeight < 400;
+            const wasFullScreen = isFullScreen;
             isFullScreen = !isWidget;
+            
+            // Se si è appena entrati in full screen, applica fit zoom
+            if(isFullScreen && !wasFullScreen){
+                setTimeout(() => {
+                    fit();
+                }, 100);
+            }
+            
             updateUIVisibility();
         }
 
