@@ -988,19 +988,14 @@ document.addEventListener('DOMContentLoaded', ()=>{
                     
                     // Set whiteSpace and width based on textOverflow mode
                     const overflowMode = el.props.textOverflow || 'clip';
-                    if(overflowMode === 'auto-scale' || overflowMode === 'squeeze'){
-                        span.style.whiteSpace = 'nowrap'; // Prevent wrapping for auto-scale and squeeze
-                        if(overflowMode === 'squeeze'){
-                            span.style.width = 'auto'; // Allow natural text width for squeeze
-                            span.style.overflow = 'visible'; // Don't clip compressed text
-                        } else {
-                            span.style.width = '100%';
-                            span.style.overflow = 'hidden';
-                        }
+                    if(overflowMode === 'squeeze'){
+                        span.style.whiteSpace = 'nowrap'; // No wrapping for squeeze
+                        span.style.width = 'auto'; // Allow natural text width for squeeze
+                        span.style.overflow = 'visible'; // Don't clip compressed text
                     } else {
                         span.style.width = '100%';
                         span.style.overflow = 'hidden';
-                        span.style.whiteSpace = 'pre-wrap'; // Preserve line breaks for clip mode
+                        span.style.whiteSpace = 'pre-wrap'; // Allow wrapping for clip and auto-scale
                     }
                     span.style.wordWrap='break-word';
                     
@@ -1034,19 +1029,14 @@ document.addEventListener('DOMContentLoaded', ()=>{
                     
                     // Set whiteSpace and width based on textOverflow mode
                     const overflowMode = el.props.textOverflow || 'clip';
-                    if(overflowMode === 'auto-scale' || overflowMode === 'squeeze'){
-                        span.style.whiteSpace = 'nowrap'; // Prevent wrapping for auto-scale and squeeze
-                        if(overflowMode === 'squeeze'){
-                            span.style.width = 'auto'; // Allow natural text width for squeeze
-                            span.style.overflow = 'visible'; // Don't clip compressed text
-                        } else {
-                            span.style.width = '100%';
-                            span.style.overflow = 'hidden';
-                        }
+                    if(overflowMode === 'squeeze'){
+                        span.style.whiteSpace = 'nowrap'; // No wrapping for squeeze
+                        span.style.width = 'auto'; // Allow natural text width for squeeze
+                        span.style.overflow = 'visible'; // Don't clip compressed text
                     } else {
                         span.style.width = '100%';
                         span.style.overflow = 'hidden';
-                        span.style.whiteSpace = 'pre-wrap'; // Preserve line breaks for clip mode
+                        span.style.whiteSpace = 'pre-wrap'; // Allow wrapping for clip and auto-scale
                     }
                     span.style.wordWrap='break-word';
                     
@@ -1260,128 +1250,138 @@ document.addEventListener('DOMContentLoaded', ()=>{
             // Get the parent container (d element)
             const container = span.parentElement;
             
-            // Ensure span has nowrap for auto-scale and squeeze
-            if(overflowMode === 'auto-scale' || overflowMode === 'squeeze'){
-                span.style.whiteSpace = 'nowrap';
-                // For squeeze, set width to auto to allow natural text width and visible overflow
-                if(overflowMode === 'squeeze'){
-                    span.style.width = 'auto';
-                    span.style.overflow = 'visible';
-                    span.style.maxWidth = 'none';
-                    // Allow container to show compressed text (don't clip overflow)
-                    if(container){
-                        container.style.overflow = 'visible';
-                    }
-                }
-            }
-            
-            // Calculate available width (accounting for padding and borders)
-            // Add a small safety margin (1-2px) to prevent clipping
-            const safetyMargin = 2;
-            let availableWidth;
-            if(isPrintMode){
-                // In print mode, containerWidth is already the available width
-                availableWidth = containerWidth - safetyMargin;
-            } else {
-                // In normal render mode, calculate from container dimensions
-                const paddingLeft = Number(el.props.paddingLeft) || 0;
-                const paddingRight = Number(el.props.paddingRight) || 0;
-                const borderWidth = (el.props.showBorder && el.props.borderWidth) ? Number(el.props.borderWidth) : 0;
-                const borderLeft = (el.props.borderLeft !== false) ? borderWidth : 0;
-                const borderRight = (el.props.borderRight !== false) ? borderWidth : 0;
-                availableWidth = containerWidth - paddingLeft - paddingRight - borderLeft - borderRight - safetyMargin;
-            }
-            
-            if(availableWidth <= 0) return; // No space available
-            
-            if(overflowMode === 'auto-scale'){
-                // Create a measurement div with same styles as span
-                const measureDiv = document.createElement('div');
-                measureDiv.textContent = span.textContent;
-                measureDiv.style.position = 'absolute';
-                measureDiv.style.visibility = 'hidden';
-                measureDiv.style.whiteSpace = 'nowrap';
-                measureDiv.style.width = 'auto';
-                measureDiv.style.height = 'auto';
-                measureDiv.style.overflow = 'visible';
-                measureDiv.style.maxWidth = 'none';
-                measureDiv.style.padding = '0';
-                measureDiv.style.margin = '0';
-                measureDiv.style.border = 'none';
-                // Copy all relevant styles from span
-                measureDiv.style.fontFamily = span.style.fontFamily || el.props.fontFamily || 'Arial, sans-serif';
-                measureDiv.style.fontWeight = span.style.fontWeight || el.props.fontWeight || 'normal';
-                measureDiv.style.lineHeight = span.style.lineHeight || el.props.lineHeight || '1.2';
-                measureDiv.style.letterSpacing = span.style.letterSpacing || 'normal';
-                document.body.appendChild(measureDiv);
-                
-                let fontSize = Number(el.props.fontSize) || 16;
-                const minFontSize = 6;
-                
-                // Measure text width at current font size
-                measureDiv.style.fontSize = fontSize + 'px';
-                let textWidth = measureDiv.scrollWidth;
-                
-                // Reduce font size until text fits (with a bit of extra space)
-                while(textWidth > availableWidth && fontSize > minFontSize){
-                    fontSize -= 0.5;
-                    measureDiv.style.fontSize = fontSize + 'px';
-                    textWidth = measureDiv.scrollWidth;
-                }
-                
-                // Apply the calculated font size
-                span.style.fontSize = fontSize + 'px';
-                document.body.removeChild(measureDiv);
-                
-            } else if(overflowMode === 'squeeze'){
-                // Create a measurement div to check overflow
-                const measureDiv = document.createElement('div');
-                measureDiv.textContent = span.textContent;
-                measureDiv.style.position = 'absolute';
-                measureDiv.style.visibility = 'hidden';
-                measureDiv.style.whiteSpace = 'nowrap';
-                measureDiv.style.width = 'auto';
-                measureDiv.style.height = 'auto';
-                measureDiv.style.overflow = 'visible';
-                measureDiv.style.maxWidth = 'none';
-                measureDiv.style.padding = '0';
-                measureDiv.style.margin = '0';
-                measureDiv.style.border = 'none';
-                // Copy all relevant styles from span
-                measureDiv.style.fontFamily = span.style.fontFamily || el.props.fontFamily || 'Arial, sans-serif';
-                measureDiv.style.fontSize = span.style.fontSize || (el.props.fontSize || 16) + 'px';
-                measureDiv.style.fontWeight = span.style.fontWeight || el.props.fontWeight || 'normal';
-                measureDiv.style.lineHeight = span.style.lineHeight || el.props.lineHeight || '1.2';
-                measureDiv.style.letterSpacing = span.style.letterSpacing || 'normal';
-                document.body.appendChild(measureDiv);
-                
-                // Measure text width - use offsetWidth for more accurate measurement
-                const textWidth = Math.max(measureDiv.scrollWidth, measureDiv.offsetWidth);
-                document.body.removeChild(measureDiv);
-                
-                if(textWidth > availableWidth){
-                    // Calculate scale factor with a small safety margin
-                    const scaleX = Math.max(0.1, (availableWidth / textWidth));
-                    // Apply horizontal squeeze with transform-origin based on text alignment
-                    const textAlign = el.props.textAlign || 'left';
-                    let transformOrigin = 'left center';
-                    if(textAlign === 'center') transformOrigin = 'center center';
-                    else if(textAlign === 'right') transformOrigin = 'right center';
-                    
-                    // Apply scaleX (rotation is handled by parent container)
-                    span.style.transform = `scaleX(${scaleX})`;
-                    span.style.transformOrigin = transformOrigin;
-                    
-                    // Ensure span can show all compressed text
-                    span.style.width = 'auto';
-                    span.style.overflow = 'visible';
-                    span.style.maxWidth = 'none';
+            if(overflowMode === 'squeeze'){
+                // Horizontal squeeze: compress text horizontally when it's too wide
+                // Calculate available width (accounting for padding and borders)
+                const safetyMargin = 2;
+                let availableWidth;
+                if(isPrintMode){
+                    availableWidth = containerWidth - safetyMargin;
                 } else {
-                    // Reset transform if text fits
-                    span.style.transform = '';
-                    span.style.transformOrigin = '';
+                    const paddingLeft = Number(el.props.paddingLeft) || 0;
+                    const paddingRight = Number(el.props.paddingRight) || 0;
+                    const borderWidth = (el.props.showBorder && el.props.borderWidth) ? Number(el.props.borderWidth) : 0;
+                    const borderLeft = (el.props.borderLeft !== false) ? borderWidth : 0;
+                    const borderRight = (el.props.borderRight !== false) ? borderWidth : 0;
+                    availableWidth = containerWidth - paddingLeft - paddingRight - borderLeft - borderRight - safetyMargin;
                 }
+                
+                if(availableWidth <= 0) return;
+                
+                // Use requestAnimationFrame to wait for layout
+                requestAnimationFrame(() => {
+                    // Create a measurement div to check overflow
+                    const measureDiv = document.createElement('div');
+                    measureDiv.textContent = span.textContent;
+                    measureDiv.style.position = 'absolute';
+                    measureDiv.style.visibility = 'hidden';
+                    measureDiv.style.whiteSpace = 'nowrap';
+                    measureDiv.style.width = 'auto';
+                    measureDiv.style.height = 'auto';
+                    measureDiv.style.overflow = 'visible';
+                    measureDiv.style.maxWidth = 'none';
+                    measureDiv.style.padding = '0';
+                    measureDiv.style.margin = '0';
+                    measureDiv.style.border = 'none';
+                    // Copy all relevant styles from span
+                    measureDiv.style.fontFamily = span.style.fontFamily || el.props.fontFamily || 'Arial, sans-serif';
+                    measureDiv.style.fontSize = span.style.fontSize || (el.props.fontSize || 16) + 'px';
+                    measureDiv.style.fontWeight = span.style.fontWeight || el.props.fontWeight || 'normal';
+                    measureDiv.style.lineHeight = span.style.lineHeight || el.props.lineHeight || '1.2';
+                    measureDiv.style.letterSpacing = span.style.letterSpacing || 'normal';
+                    document.body.appendChild(measureDiv);
+                    
+                    // Measure text width
+                    const textWidth = Math.max(measureDiv.scrollWidth, measureDiv.offsetWidth);
+                    document.body.removeChild(measureDiv);
+                    
+                    if(textWidth > availableWidth){
+                        // Calculate scale factor
+                        const scaleX = Math.max(0.1, (availableWidth / textWidth));
+                        // Apply horizontal squeeze with transform-origin based on text alignment
+                        const textAlign = el.props.textAlign || 'left';
+                        let transformOrigin = 'left center';
+                        if(textAlign === 'center') transformOrigin = 'center center';
+                        else if(textAlign === 'right') transformOrigin = 'right center';
+                        
+                        // Apply scaleX (rotation is handled by parent container)
+                        span.style.transform = `scaleX(${scaleX})`;
+                        span.style.transformOrigin = transformOrigin;
+                        
+                        // Ensure span can show all compressed text
+                        span.style.width = 'auto';
+                        span.style.overflow = 'visible';
+                        span.style.maxWidth = 'none';
+                        
+                        // Allow container to show compressed text
+                        if(container){
+                            container.style.overflow = 'visible';
+                        }
+                    } else {
+                        // Reset transform if text fits
+                        span.style.transform = '';
+                        span.style.transformOrigin = '';
+                    }
+                });
+                return;
             }
+            
+            // For auto-scale: check bottom overflow and reduce font size
+            // Calculate available height (accounting for padding and borders)
+            const safetyMargin = 2;
+            let availableHeight;
+            if(isPrintMode){
+                availableHeight = containerHeight - safetyMargin;
+            } else {
+                const paddingTop = Number(el.props.paddingTop) || 0;
+                const paddingBottom = Number(el.props.paddingBottom) || 0;
+                const borderWidth = (el.props.showBorder && el.props.borderWidth) ? Number(el.props.borderWidth) : 0;
+                const borderTop = (el.props.borderTop !== false) ? borderWidth : 0;
+                const borderBottom = (el.props.borderBottom !== false) ? borderWidth : 0;
+                availableHeight = containerHeight - paddingTop - paddingBottom - borderTop - borderBottom - safetyMargin;
+            }
+            
+            if(availableHeight <= 0) return; // No space available
+            
+            // Check if text overflows at the bottom (after natural wrapping)
+            requestAnimationFrame(() => {
+                requestAnimationFrame(() => {
+                    const spanHeight = span.scrollHeight;
+                    const spanClientHeight = span.clientHeight || span.offsetHeight;
+                    
+                    // Check if there's bottom overflow (text is cut off at bottom)
+                    const hasBottomOverflow = spanHeight > spanClientHeight || spanHeight > availableHeight;
+                    
+                    if(!hasBottomOverflow) return; // No overflow, keep default behavior
+                    
+                    // Text overflows at bottom - reduce font size
+                    let fontSize = Number(el.props.fontSize) || 16;
+                    const minFontSize = 6;
+                    
+                    // Create a measurement div with same styles and wrapping
+                    const measureDiv = span.cloneNode(true);
+                    measureDiv.style.position = 'absolute';
+                    measureDiv.style.visibility = 'hidden';
+                    measureDiv.style.width = span.offsetWidth + 'px';
+                    measureDiv.style.height = 'auto';
+                    measureDiv.style.overflow = 'visible';
+                    measureDiv.style.maxHeight = 'none';
+                    measureDiv.style.padding = '0';
+                    measureDiv.style.margin = '0';
+                    measureDiv.style.border = 'none';
+                    document.body.appendChild(measureDiv);
+                    
+                    // Reduce font size until text fits
+                    while(measureDiv.scrollHeight > availableHeight && fontSize > minFontSize){
+                        fontSize -= 0.5;
+                        measureDiv.style.fontSize = fontSize + 'px';
+                    }
+                    
+                    // Apply the calculated font size
+                    span.style.fontSize = fontSize + 'px';
+                    document.body.removeChild(measureDiv);
+                });
+            });
         }
         
         // Helper function to replace **column** syntax with actual data
@@ -2610,19 +2610,14 @@ document.addEventListener('DOMContentLoaded', ()=>{
                             
                             // Set whiteSpace and width based on textOverflow mode
                             const overflowMode = el.props.textOverflow || 'clip';
-                            if(overflowMode === 'auto-scale' || overflowMode === 'squeeze'){
-                                span.style.whiteSpace = 'nowrap'; // Prevent wrapping for auto-scale and squeeze
-                                if(overflowMode === 'squeeze'){
-                                    span.style.width = 'auto'; // Allow natural text width for squeeze
-                                    span.style.overflow = 'visible'; // Don't clip compressed text
-                                } else {
-                                    span.style.width = '100%';
-                                    span.style.overflow = 'hidden';
-                                }
+                            if(overflowMode === 'squeeze'){
+                                span.style.whiteSpace = 'nowrap'; // No wrapping for squeeze
+                                span.style.width = 'auto'; // Allow natural text width for squeeze
+                                span.style.overflow = 'visible'; // Don't clip compressed text
                             } else {
                                 span.style.width = '100%';
                                 span.style.overflow = 'hidden';
-                                span.style.whiteSpace = 'pre-wrap'; // Preserve line breaks for clip mode
+                                span.style.whiteSpace = 'pre-wrap'; // Allow wrapping for clip and auto-scale
                             }
                             span.style.wordWrap='break-word';
                             
@@ -2656,25 +2651,11 @@ document.addEventListener('DOMContentLoaded', ()=>{
                         case 'data': {
                             const span = document.createElement('div');
                             span.style.display='block';
+                            span.style.width='100%';
                             span.style.pointerEvents='none';
-                            
-                            // Set whiteSpace and width based on textOverflow mode
-                            const overflowMode = el.props.textOverflow || 'clip';
-                            if(overflowMode === 'auto-scale' || overflowMode === 'squeeze'){
-                                span.style.whiteSpace = 'nowrap'; // Prevent wrapping for auto-scale and squeeze
-                                if(overflowMode === 'squeeze'){
-                                    span.style.width = 'auto'; // Allow natural text width for squeeze
-                                    span.style.overflow = 'visible'; // Don't clip compressed text
-                                } else {
-                                    span.style.width = '100%';
-                                    span.style.overflow = 'hidden';
-                                }
-                            } else {
-                                span.style.width = '100%';
-                                span.style.overflow = 'hidden';
-                                span.style.whiteSpace = 'pre-wrap'; // Preserve line breaks for clip mode
-                            }
+                            span.style.overflow='hidden';
                             span.style.wordWrap='break-word';
+                            span.style.whiteSpace='pre-wrap'; // Always allow wrapping first
                             
                             span.textContent = getData(el);
                             // Copy font styles to span for overflow calculation
