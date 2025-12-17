@@ -977,25 +977,32 @@ document.addEventListener('DOMContentLoaded', ()=>{
                     } else {
                         d.style.borderRadius = '';
                     }
-                }
+            }
 
             // content
             switch(el.type){
                 case 'text': {
                     const span = document.createElement('div');
                     span.style.display='block';
-                    span.style.width='100%';
                     span.style.pointerEvents='none';
-                    span.style.overflow='hidden';
-                    span.style.wordWrap='break-word';
                     
-                    // Set whiteSpace based on textOverflow mode
+                    // Set whiteSpace and width based on textOverflow mode
                     const overflowMode = el.props.textOverflow || 'clip';
                     if(overflowMode === 'auto-scale' || overflowMode === 'squeeze'){
                         span.style.whiteSpace = 'nowrap'; // Prevent wrapping for auto-scale and squeeze
+                        if(overflowMode === 'squeeze'){
+                            span.style.width = 'auto'; // Allow natural text width for squeeze
+                            span.style.overflow = 'visible'; // Don't clip compressed text
+                        } else {
+                            span.style.width = '100%';
+                            span.style.overflow = 'hidden';
+                        }
                     } else {
+                        span.style.width = '100%';
+                        span.style.overflow = 'hidden';
                         span.style.whiteSpace = 'pre-wrap'; // Preserve line breaks for clip mode
                     }
+                    span.style.wordWrap='break-word';
                     
                     span.textContent = getData(el);
                     // Copy font styles to span for overflow calculation
@@ -1023,18 +1030,25 @@ document.addEventListener('DOMContentLoaded', ()=>{
                 case 'data': {
                     const span = document.createElement('div');
                     span.style.display='block';
-                    span.style.width='100%';
                     span.style.pointerEvents='none';
-                    span.style.overflow='hidden';
-                    span.style.wordWrap='break-word';
                     
-                    // Set whiteSpace based on textOverflow mode
+                    // Set whiteSpace and width based on textOverflow mode
                     const overflowMode = el.props.textOverflow || 'clip';
                     if(overflowMode === 'auto-scale' || overflowMode === 'squeeze'){
                         span.style.whiteSpace = 'nowrap'; // Prevent wrapping for auto-scale and squeeze
+                        if(overflowMode === 'squeeze'){
+                            span.style.width = 'auto'; // Allow natural text width for squeeze
+                            span.style.overflow = 'visible'; // Don't clip compressed text
+                        } else {
+                            span.style.width = '100%';
+                            span.style.overflow = 'hidden';
+                        }
                     } else {
+                        span.style.width = '100%';
+                        span.style.overflow = 'hidden';
                         span.style.whiteSpace = 'pre-wrap'; // Preserve line breaks for clip mode
                     }
+                    span.style.wordWrap='break-word';
                     
                     span.textContent = getData(el);
                     // Copy font styles to span for overflow calculation
@@ -1243,13 +1257,21 @@ document.addEventListener('DOMContentLoaded', ()=>{
             const overflowMode = el.props.textOverflow || 'clip';
             if(overflowMode === 'clip') return; // Default behavior, no changes needed
             
+            // Get the parent container (d element)
+            const container = span.parentElement;
+            
             // Ensure span has nowrap for auto-scale and squeeze
             if(overflowMode === 'auto-scale' || overflowMode === 'squeeze'){
                 span.style.whiteSpace = 'nowrap';
-                // For squeeze, set width to auto to allow natural text width
+                // For squeeze, set width to auto to allow natural text width and visible overflow
                 if(overflowMode === 'squeeze'){
                     span.style.width = 'auto';
-                    span.style.maxWidth = '100%';
+                    span.style.overflow = 'visible';
+                    span.style.maxWidth = 'none';
+                    // Allow container to show compressed text (don't clip overflow)
+                    if(container){
+                        container.style.overflow = 'visible';
+                    }
                 }
             }
             
@@ -1349,6 +1371,11 @@ document.addEventListener('DOMContentLoaded', ()=>{
                     // Apply scaleX (rotation is handled by parent container)
                     span.style.transform = `scaleX(${scaleX})`;
                     span.style.transformOrigin = transformOrigin;
+                    
+                    // Ensure span can show all compressed text
+                    span.style.width = 'auto';
+                    span.style.overflow = 'visible';
+                    span.style.maxWidth = 'none';
                 } else {
                     // Reset transform if text fits
                     span.style.transform = '';
@@ -1375,8 +1402,8 @@ document.addEventListener('DOMContentLoaded', ()=>{
                 }
                 // Return the original match if column not found (so user can see what's missing)
                 return match;
-            });
-        }
+        });
+    }
 
     function getData(el){
             let text = el.props.text || '';
@@ -2579,18 +2606,25 @@ document.addEventListener('DOMContentLoaded', ()=>{
                         case 'text': {
                             const span = document.createElement('div');
                             span.style.display='block';
-                            span.style.width='100%';
                             span.style.pointerEvents='none';
-                            span.style.overflow='hidden';
-                            span.style.wordWrap='break-word';
                             
-                            // Set whiteSpace based on textOverflow mode
+                            // Set whiteSpace and width based on textOverflow mode
                             const overflowMode = el.props.textOverflow || 'clip';
                             if(overflowMode === 'auto-scale' || overflowMode === 'squeeze'){
                                 span.style.whiteSpace = 'nowrap'; // Prevent wrapping for auto-scale and squeeze
+                                if(overflowMode === 'squeeze'){
+                                    span.style.width = 'auto'; // Allow natural text width for squeeze
+                                    span.style.overflow = 'visible'; // Don't clip compressed text
+                                } else {
+                                    span.style.width = '100%';
+                                    span.style.overflow = 'hidden';
+                                }
                             } else {
+                                span.style.width = '100%';
+                                span.style.overflow = 'hidden';
                                 span.style.whiteSpace = 'pre-wrap'; // Preserve line breaks for clip mode
                             }
+                            span.style.wordWrap='break-word';
                             
                             span.textContent = getData(el);
                             // Copy font styles to span for overflow calculation
@@ -2622,18 +2656,25 @@ document.addEventListener('DOMContentLoaded', ()=>{
                         case 'data': {
                             const span = document.createElement('div');
                             span.style.display='block';
-                            span.style.width='100%';
                             span.style.pointerEvents='none';
-                            span.style.overflow='hidden';
-                            span.style.wordWrap='break-word';
                             
-                            // Set whiteSpace based on textOverflow mode
+                            // Set whiteSpace and width based on textOverflow mode
                             const overflowMode = el.props.textOverflow || 'clip';
                             if(overflowMode === 'auto-scale' || overflowMode === 'squeeze'){
                                 span.style.whiteSpace = 'nowrap'; // Prevent wrapping for auto-scale and squeeze
+                                if(overflowMode === 'squeeze'){
+                                    span.style.width = 'auto'; // Allow natural text width for squeeze
+                                    span.style.overflow = 'visible'; // Don't clip compressed text
+                                } else {
+                                    span.style.width = '100%';
+                                    span.style.overflow = 'hidden';
+                                }
                             } else {
+                                span.style.width = '100%';
+                                span.style.overflow = 'hidden';
                                 span.style.whiteSpace = 'pre-wrap'; // Preserve line breaks for clip mode
                             }
+                            span.style.wordWrap='break-word';
                             
                             span.textContent = getData(el);
                             // Copy font styles to span for overflow calculation
@@ -3400,7 +3441,7 @@ document.addEventListener('DOMContentLoaded', ()=>{
                 } else {
                     groupSelected();
                 }
-            }
+        }
     });
 
     // ---------- Property edits (apply to single or multiple) ----------
@@ -4089,7 +4130,7 @@ document.addEventListener('DOMContentLoaded', ()=>{
                             groups.forEach(group => {
                                 group.bounds = getGroupBounds(group.elementIds);
                             });
-                        }
+                    }
                 }
             }
         } catch(e) {
