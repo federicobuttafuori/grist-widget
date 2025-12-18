@@ -1330,11 +1330,20 @@ document.addEventListener('DOMContentLoaded', ()=>{
             // Calculate available height (accounting for padding and borders)
             const safetyMargin = 2;
             let availableHeight;
+            let paddingTop, paddingBottom;
+            
             if(isPrintMode){
-                availableHeight = containerHeight - safetyMargin;
+                // In print mode, convert padding from cm to pixels
+                paddingTop = (Number(el.props.paddingTop) || 0) * PIXELS_PER_CM;
+                paddingBottom = (Number(el.props.paddingBottom) || 0) * PIXELS_PER_CM;
+                const borderWidth = (el.props.showBorder && el.props.borderWidth) ? Number(el.props.borderWidth) : 0;
+                const borderTop = (el.props.borderTop !== false) ? borderWidth : 0;
+                const borderBottom = (el.props.borderBottom !== false) ? borderWidth : 0;
+                availableHeight = containerHeight - paddingTop - paddingBottom - borderTop - borderBottom - safetyMargin;
             } else {
-                const paddingTop = Number(el.props.paddingTop) || 0;
-                const paddingBottom = Number(el.props.paddingBottom) || 0;
+                // In normal render mode, padding is in cm, need to convert to pixels
+                paddingTop = (Number(el.props.paddingTop) || 0) * PIXELS_PER_CM;
+                paddingBottom = (Number(el.props.paddingBottom) || 0) * PIXELS_PER_CM;
                 const borderWidth = (el.props.showBorder && el.props.borderWidth) ? Number(el.props.borderWidth) : 0;
                 const borderTop = (el.props.borderTop !== false) ? borderWidth : 0;
                 const borderBottom = (el.props.borderBottom !== false) ? borderWidth : 0;
@@ -1346,10 +1355,12 @@ document.addEventListener('DOMContentLoaded', ()=>{
             // Check if text overflows at the bottom (after natural wrapping)
             requestAnimationFrame(() => {
                 requestAnimationFrame(() => {
+                    // Get the actual available height for the span (container height minus padding)
                     const spanHeight = span.scrollHeight;
                     const spanClientHeight = span.clientHeight || span.offsetHeight;
                     
                     // Check if there's bottom overflow (text is cut off at bottom)
+                    // availableHeight already accounts for padding, so compare directly
                     const hasBottomOverflow = spanHeight > spanClientHeight || spanHeight > availableHeight;
                     
                     if(!hasBottomOverflow) return; // No overflow, keep default behavior
@@ -1359,6 +1370,7 @@ document.addEventListener('DOMContentLoaded', ()=>{
                     const minFontSize = 6;
                     
                     // Create a measurement div with same styles and wrapping
+                    // Use the same width as the span (which is inside the padded container)
                     const measureDiv = span.cloneNode(true);
                     measureDiv.style.position = 'absolute';
                     measureDiv.style.visibility = 'hidden';
@@ -1371,7 +1383,7 @@ document.addEventListener('DOMContentLoaded', ()=>{
                     measureDiv.style.border = 'none';
                     document.body.appendChild(measureDiv);
                     
-                    // Reduce font size until text fits
+                    // Reduce font size until text fits within available height (which includes padding consideration)
                     while(measureDiv.scrollHeight > availableHeight && fontSize > minFontSize){
                         fontSize -= 0.5;
                         measureDiv.style.fontSize = fontSize + 'px';
