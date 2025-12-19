@@ -1256,7 +1256,13 @@ document.addEventListener('DOMContentLoaded', ()=>{
                 const safetyMargin = 2;
                 let availableWidth;
                 if(isPrintMode){
-                    availableWidth = containerWidth - safetyMargin;
+                    // In print mode, convert padding from cm to pixels
+                    const paddingLeft = (Number(el.props.paddingLeft) || 0) * PIXELS_PER_CM;
+                    const paddingRight = (Number(el.props.paddingRight) || 0) * PIXELS_PER_CM;
+                    const borderWidth = (el.props.showBorder && el.props.borderWidth) ? Number(el.props.borderWidth) : 0;
+                    const borderLeft = (el.props.borderLeft !== false) ? borderWidth : 0;
+                    const borderRight = (el.props.borderRight !== false) ? borderWidth : 0;
+                    availableWidth = containerWidth - paddingLeft - paddingRight - borderLeft - borderRight - safetyMargin;
                 } else {
                     const paddingLeft = Number(el.props.paddingLeft) || 0;
                     const paddingRight = Number(el.props.paddingRight) || 0;
@@ -1268,8 +1274,8 @@ document.addEventListener('DOMContentLoaded', ()=>{
                 
                 if(availableWidth <= 0) return;
                 
-                // Use requestAnimationFrame to wait for layout
-                requestAnimationFrame(() => {
+                // For print mode, execute synchronously; for normal mode, use requestAnimationFrame
+                const executeSqueeze = () => {
                     // Create a measurement div to check overflow
                     const measureDiv = document.createElement('div');
                     measureDiv.textContent = span.textContent;
@@ -1322,7 +1328,15 @@ document.addEventListener('DOMContentLoaded', ()=>{
                         span.style.transform = '';
                         span.style.transformOrigin = '';
                     }
-                });
+                };
+                
+                if(isPrintMode){
+                    // Execute synchronously for print
+                    executeSqueeze();
+                } else {
+                    // Use requestAnimationFrame for normal rendering
+                    requestAnimationFrame(executeSqueeze);
+                }
                 return;
             }
             
@@ -1352,48 +1366,57 @@ document.addEventListener('DOMContentLoaded', ()=>{
             
             if(availableHeight <= 0) return; // No space available
             
+            // Function to apply auto-scale
+            const executeAutoScale = () => {
+                // Get the actual available height for the span (container height minus padding)
+                const spanHeight = span.scrollHeight;
+                const spanClientHeight = span.clientHeight || span.offsetHeight;
+                
+                // Check if there's bottom overflow (text is cut off at bottom)
+                // availableHeight already accounts for padding, so compare directly
+                const hasBottomOverflow = spanHeight > spanClientHeight || spanHeight > availableHeight;
+                
+                if(!hasBottomOverflow) return; // No overflow, keep default behavior
+                
+                // Text overflows at bottom - reduce font size
+                let fontSize = Number(el.props.fontSize) || 16;
+                const minFontSize = 6;
+                
+                // Create a measurement div with same styles and wrapping
+                // Use the same width as the span (which is inside the padded container)
+                const measureDiv = span.cloneNode(true);
+                measureDiv.style.position = 'absolute';
+                measureDiv.style.visibility = 'hidden';
+                measureDiv.style.width = span.offsetWidth + 'px';
+                measureDiv.style.height = 'auto';
+                measureDiv.style.overflow = 'visible';
+                measureDiv.style.maxHeight = 'none';
+                measureDiv.style.padding = '0';
+                measureDiv.style.margin = '0';
+                measureDiv.style.border = 'none';
+                document.body.appendChild(measureDiv);
+                
+                // Reduce font size until text fits within available height (which includes padding consideration)
+                while(measureDiv.scrollHeight > availableHeight && fontSize > minFontSize){
+                    fontSize -= 0.5;
+                    measureDiv.style.fontSize = fontSize + 'px';
+                }
+                
+                // Apply the calculated font size
+                span.style.fontSize = fontSize + 'px';
+                document.body.removeChild(measureDiv);
+            };
+            
             // Check if text overflows at the bottom (after natural wrapping)
-            requestAnimationFrame(() => {
+            if(isPrintMode){
+                // Execute synchronously for print
+                executeAutoScale();
+            } else {
+                // Use requestAnimationFrame for normal rendering
                 requestAnimationFrame(() => {
-                    // Get the actual available height for the span (container height minus padding)
-                    const spanHeight = span.scrollHeight;
-                    const spanClientHeight = span.clientHeight || span.offsetHeight;
-                    
-                    // Check if there's bottom overflow (text is cut off at bottom)
-                    // availableHeight already accounts for padding, so compare directly
-                    const hasBottomOverflow = spanHeight > spanClientHeight || spanHeight > availableHeight;
-                    
-                    if(!hasBottomOverflow) return; // No overflow, keep default behavior
-                    
-                    // Text overflows at bottom - reduce font size
-                    let fontSize = Number(el.props.fontSize) || 16;
-                    const minFontSize = 6;
-                    
-                    // Create a measurement div with same styles and wrapping
-                    // Use the same width as the span (which is inside the padded container)
-                    const measureDiv = span.cloneNode(true);
-                    measureDiv.style.position = 'absolute';
-                    measureDiv.style.visibility = 'hidden';
-                    measureDiv.style.width = span.offsetWidth + 'px';
-                    measureDiv.style.height = 'auto';
-                    measureDiv.style.overflow = 'visible';
-                    measureDiv.style.maxHeight = 'none';
-                    measureDiv.style.padding = '0';
-                    measureDiv.style.margin = '0';
-                    measureDiv.style.border = 'none';
-                    document.body.appendChild(measureDiv);
-                    
-                    // Reduce font size until text fits within available height (which includes padding consideration)
-                    while(measureDiv.scrollHeight > availableHeight && fontSize > minFontSize){
-                        fontSize -= 0.5;
-                        measureDiv.style.fontSize = fontSize + 'px';
-                    }
-                    
-                    // Apply the calculated font size
-                    span.style.fontSize = fontSize + 'px';
-                    document.body.removeChild(measureDiv);
+                    requestAnimationFrame(executeAutoScale);
                 });
-            });
+            }
         }
         
         // Helper function to replace **column** syntax with actual data
@@ -2649,15 +2672,9 @@ document.addEventListener('DOMContentLoaded', ()=>{
                             d.appendChild(span);
                             
                             // Apply text overflow handling for print
-                            const paddingLeft = Number(el.props.paddingLeft) || 0;
-                            const paddingRight = Number(el.props.paddingRight) || 0;
-                            const borderWidth = (el.props.showBorder && el.props.borderWidth) ? Number(el.props.borderWidth) : 0;
-                            const borderLeft = (el.props.borderLeft !== false) ? borderWidth : 0;
-                            const borderRight = (el.props.borderRight !== false) ? borderWidth : 0;
                             const containerWidth = el.width * PIXELS_PER_CM;
-                            const availableWidth = containerWidth - paddingLeft - paddingRight - borderLeft - borderRight;
                             const containerHeight = el.height * PIXELS_PER_CM;
-                            applyTextOverflow(span, el, availableWidth, containerHeight, true);
+                            applyTextOverflow(span, el, containerWidth, containerHeight, true);
                             break;
                         }
                         case 'data': {
@@ -2685,15 +2702,9 @@ document.addEventListener('DOMContentLoaded', ()=>{
                             d.appendChild(span);
                             
                             // Apply text overflow handling for print
-                            const paddingLeft = Number(el.props.paddingLeft) || 0;
-                            const paddingRight = Number(el.props.paddingRight) || 0;
-                            const borderWidth = (el.props.showBorder && el.props.borderWidth) ? Number(el.props.borderWidth) : 0;
-                            const borderLeft = (el.props.borderLeft !== false) ? borderWidth : 0;
-                            const borderRight = (el.props.borderRight !== false) ? borderWidth : 0;
                             const containerWidth = el.width * PIXELS_PER_CM;
-                            const availableWidth = containerWidth - paddingLeft - paddingRight - borderLeft - borderRight;
                             const containerHeight = el.height * PIXELS_PER_CM;
-                            applyTextOverflow(span, el, availableWidth, containerHeight, true);
+                            applyTextOverflow(span, el, containerWidth, containerHeight, true);
                             break;
                         }
                         case 'line':
