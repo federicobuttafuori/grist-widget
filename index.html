@@ -275,6 +275,8 @@ document.addEventListener('DOMContentLoaded', ()=>{
         let currentProfile = '8x5';
         let currentDesign = 'default';
         let currentCanvas = 1; // 1 or 2
+        let lastDesignByProfile = {}; // Maps profileKey -> designKey (last selected design per profile)
+        let lastCanvasByProfile = {}; // Maps profileKey -> canvasNum (last selected canvas per profile)
 
         // History stacks for undo/redo (per design/canvas)
         let historyStacks = {}; // Key: "profile-design-canvas", Value: { history: [], historyIndex: -1 }
@@ -471,12 +473,37 @@ document.addEventListener('DOMContentLoaded', ()=>{
 
         function switchProfile(profileKey){
             if(!profiles[profileKey]) return;
-            // Save current design before switching
+            // Save current design and canvas before switching
             saveCurrentDesign();
+            // Save current canvas for previous profile
+            if(currentProfile){
+                lastCanvasByProfile[currentProfile] = currentCanvas;
+            }
             // Switch profile
             currentProfile = profileKey;
-            // Switch to first design in new profile
-            currentDesign = Object.keys(profiles[profileKey].designs)[0] || 'default';
+            // Switch to last selected design for this profile, or first if none exists
+            const lastDesign = lastDesignByProfile[profileKey];
+            const designKeys = Object.keys(profiles[profileKey].designs);
+            if(lastDesign && designKeys.includes(lastDesign)){
+                currentDesign = lastDesign;
+            } else {
+                currentDesign = designKeys[0] || 'default';
+            }
+            // Switch to last selected canvas for this profile, or 1 if none exists
+            const lastCanvas = lastCanvasByProfile[profileKey];
+            if(lastCanvas === 1 || lastCanvas === 2){
+                const design = profiles[profileKey].designs[currentDesign];
+                // Only restore canvas 2 if it's enabled for this design
+                if(lastCanvas === 2 && design && design.canvas2Enabled){
+                    currentCanvas = 2;
+                } else if(lastCanvas === 1){
+                    currentCanvas = 1;
+                } else {
+                    currentCanvas = 1; // Fallback
+                }
+            } else {
+                currentCanvas = 1; // Default to canvas 1
+            }
             // Load the design
             loadCurrentDesign();
             updateCanvasSize();
@@ -494,6 +521,8 @@ document.addEventListener('DOMContentLoaded', ()=>{
             saveCurrentDesign();
             // Switch design
             currentDesign = designKey;
+            // Save this as the last selected design for current profile
+            lastDesignByProfile[currentProfile] = designKey;
             // Load the new design
             loadCurrentDesign();
             updateDesignSelector();
@@ -517,6 +546,8 @@ document.addEventListener('DOMContentLoaded', ()=>{
             saveCurrentDesign();
             // Switch canvas
             currentCanvas = canvasNum;
+            // Save this as the last selected canvas for current profile
+            lastCanvasByProfile[currentProfile] = canvasNum;
             // Load the new canvas
             loadCurrentDesign();
             canvasSelector.value = canvasNum.toString();
@@ -563,7 +594,8 @@ document.addEventListener('DOMContentLoaded', ()=>{
                     currentProfile: currentProfile,
                     currentDesign: currentDesign,
                         currentCanvas: currentCanvas,
-                        groups: groups
+                        groups: groups,
+                        lastDesignByProfile: lastDesignByProfile
                 };
                 localStorage.setItem(KEY, JSON.stringify(payloadObj));
             } catch(e) {
@@ -670,6 +702,8 @@ document.addEventListener('DOMContentLoaded', ()=>{
             delete profile.designs[currentDesign];
             // Switch to renamed design
             currentDesign = newKey;
+            // Update last selected design for current profile
+            lastDesignByProfile[currentProfile] = newKey;
             updateDesignSelector();
             msg(`Design renamed to "${newKey}"`);
             saveCurrentDesign();
@@ -2886,42 +2920,61 @@ document.addEventListener('DOMContentLoaded', ()=>{
                 });
             });
             
-            // Update print CSS for multiple pages
-            const styleId = 'dynamic-print-css';
-            let styleEl = document.getElementById(styleId);
-            if(!styleEl){
-                styleEl = document.createElement('style');
-                styleEl.id = styleId;
-                document.head.appendChild(styleEl);
-            }
-            styleEl.textContent = `
-                @media print{
-                    @page{size:${profile.width}cm ${profile.height}cm;margin:0}
-                    html,body{margin:0!important;padding:0!important;background:#fff!important;width:${profile.width}cm!important;height:auto!important}
-                    #toolbar,#sidebar,#marquee,.status-message{display:none!important}
-                    .print-page{width:${profile.width}cm!important;height:${profile.height}cm!important;page-break-after:always!important;page-break-inside:avoid!important;overflow:visible!important;background:#fff!important;position:relative!important;margin:0!important;padding:0!important;display:block!important}
-                    .print-page:last-child{page-break-after:auto!important}
-                    .print-container{display:block!important;position:static!important;left:auto!important;top:auto!important}
-                    #main-content,#canvas-container,#canvas-wrapper,#label-canvas{display:none!important}
-                    .label-element{print-color-adjust:exact!important;-webkit-print-color-adjust:exact!important}
+            // Wait for all images to load before printing
+            const allImages = printContainer.querySelectorAll('img');
+            const imagePromises = Array.from(allImages).map(img => {
+                // If image is already loaded (complete), resolve immediately
+                if(img.complete && img.naturalWidth > 0){
+                    return Promise.resolve();
                 }
-            `;
+                // Otherwise wait for load or error
+                return new Promise((resolve) => {
+                    img.onload = resolve;
+                    img.onerror = resolve; // Resolve even on error so print can proceed
+                    // Timeout after 5 seconds to prevent hanging
+                    setTimeout(resolve, 5000);
+                });
+            });
             
-            // Print
-            window.print();
-            
-            // Restore state after a delay
-            setTimeout(()=>{
-                currentCanvas = prevCanvas;
-                S = prevS;
-                selectedIds = prevSel;
-                render();
-                updateProps();
-                if(printContainer.parentNode){
-                    document.body.removeChild(printContainer);
+            // Wait for all images, then proceed with print
+            Promise.all(imagePromises).then(() => {
+                // Update print CSS for multiple pages
+                const styleId = 'dynamic-print-css';
+                let styleEl = document.getElementById(styleId);
+                if(!styleEl){
+                    styleEl = document.createElement('style');
+                    styleEl.id = styleId;
+                    document.head.appendChild(styleEl);
                 }
-                updatePrintCSS(); // Restore normal print CSS
-            }, 100);
+                styleEl.textContent = `
+                    @media print{
+                        @page{size:${profile.width}cm ${profile.height}cm;margin:0}
+                        html,body{margin:0!important;padding:0!important;background:#fff!important;width:${profile.width}cm!important;height:auto!important}
+                        #toolbar,#sidebar,#marquee,.status-message{display:none!important}
+                        .print-page{width:${profile.width}cm!important;height:${profile.height}cm!important;page-break-after:always!important;page-break-inside:avoid!important;overflow:visible!important;background:#fff!important;position:relative!important;margin:0!important;padding:0!important;display:block!important}
+                        .print-page:last-child{page-break-after:auto!important}
+                        .print-container{display:block!important;position:static!important;left:auto!important;top:auto!important}
+                        #main-content,#canvas-container,#canvas-wrapper,#label-canvas{display:none!important}
+                        .label-element{print-color-adjust:exact!important;-webkit-print-color-adjust:exact!important}
+                    }
+                `;
+                
+                // Print
+                window.print();
+                
+                // Restore state after a delay
+                setTimeout(()=>{
+                    currentCanvas = prevCanvas;
+                    S = prevS;
+                    selectedIds = prevSel;
+                    render();
+                    updateProps();
+                    if(printContainer.parentNode){
+                        document.body.removeChild(printContainer);
+                    }
+                    updatePrintCSS(); // Restore normal print CSS
+                }, 100);
+            });
     }
 
     // ---------- Mouse interactions: marquee, selection, drag, resize ----------
@@ -4120,27 +4173,58 @@ document.addEventListener('DOMContentLoaded', ()=>{
                 const parsed = JSON.parse(saved);
                 if(parsed && parsed.version === 2 && parsed.profiles){
                     profiles = parsed.profiles;
+                    // Load lastDesignByProfile if saved (before restoring current profile/design)
+                    if(parsed.lastDesignByProfile && typeof parsed.lastDesignByProfile === 'object'){
+                        lastDesignByProfile = parsed.lastDesignByProfile;
+                    }
+                    // Load lastCanvasByProfile if saved
+                    if(parsed.lastCanvasByProfile && typeof parsed.lastCanvasByProfile === 'object'){
+                        lastCanvasByProfile = parsed.lastCanvasByProfile;
+                    }
                     // Restore current profile, design and canvas if saved
                     if(parsed.currentProfile && profiles[parsed.currentProfile]){
                         currentProfile = parsed.currentProfile;
                         const profile = profiles[currentProfile];
                         if(parsed.currentDesign && profile.designs[parsed.currentDesign]){
                             currentDesign = parsed.currentDesign;
+                            // Also update lastDesignByProfile for this profile
+                            lastDesignByProfile[currentProfile] = currentDesign;
                         } else {
-                            // Fallback to first design if saved design doesn't exist
+                            // Try to use last selected design for this profile
+                            const lastDesign = lastDesignByProfile[currentProfile];
                             const designKeys = Object.keys(profile.designs);
-                            if(designKeys.length > 0){
+                            if(lastDesign && designKeys.includes(lastDesign)){
+                                currentDesign = lastDesign;
+                            } else if(designKeys.length > 0){
+                                // Fallback to first design if saved design doesn't exist
                                 currentDesign = designKeys[0];
                             }
                         }
-                        // Restore canvas (1 or 2)
+                        // Restore canvas: try saved canvas, then last canvas for profile, then default
+                        const design = profile.designs[currentDesign];
                         if(parsed.currentCanvas === 1 || parsed.currentCanvas === 2){
                             currentCanvas = parsed.currentCanvas;
-                            // Verify canvas 2 is enabled if trying to restore to canvas 2
-                            const design = profile.designs[currentDesign];
                             if(currentCanvas === 2 && !(design && design.canvas2Enabled)){
-                                currentCanvas = 1; // Fallback to canvas 1 if canvas 2 is not enabled
+                                // Fallback: try last canvas for this profile
+                                const lastCanvas = lastCanvasByProfile[currentProfile];
+                                if(lastCanvas === 1 || (lastCanvas === 2 && design && design.canvas2Enabled)){
+                                    currentCanvas = lastCanvas;
+                                } else {
+                                    currentCanvas = 1; // Fallback to canvas 1
+                                }
                             }
+                            // Also update lastCanvasByProfile for this profile
+                            lastCanvasByProfile[currentProfile] = currentCanvas;
+                        } else {
+                            // Try to use last selected canvas for this profile
+                            const lastCanvas = lastCanvasByProfile[currentProfile];
+                            if(lastCanvas === 1 || (lastCanvas === 2 && design && design.canvas2Enabled)){
+                                currentCanvas = lastCanvas;
+                            } else {
+                                currentCanvas = 1; // Default to canvas 1
+                            }
+                            // Also update lastCanvasByProfile for this profile
+                            lastCanvasByProfile[currentProfile] = currentCanvas;
                         }
                     } else {
                         // Fallback: use first available profile and design
@@ -4149,7 +4233,26 @@ document.addEventListener('DOMContentLoaded', ()=>{
                             currentProfile = profileKeys[0];
                             const designKeys = Object.keys(profiles[currentProfile].designs);
                             if(designKeys.length > 0){
-                                currentDesign = designKeys[0];
+                                // Try to use last selected design for this profile
+                                const lastDesign = lastDesignByProfile[currentProfile];
+                                if(lastDesign && designKeys.includes(lastDesign)){
+                                    currentDesign = lastDesign;
+                                } else {
+                                    currentDesign = designKeys[0];
+                                }
+                                // Update last selected design for current profile
+                                lastDesignByProfile[currentProfile] = currentDesign;
+                                
+                                // Try to use last selected canvas for this profile
+                                const design = profiles[currentProfile].designs[currentDesign];
+                                const lastCanvas = lastCanvasByProfile[currentProfile];
+                                if(lastCanvas === 1 || (lastCanvas === 2 && design && design.canvas2Enabled)){
+                                    currentCanvas = lastCanvas;
+                                } else {
+                                    currentCanvas = 1; // Default to canvas 1
+                                }
+                                // Update last selected canvas for current profile
+                                lastCanvasByProfile[currentProfile] = currentCanvas;
                             }
                         }
                     }
