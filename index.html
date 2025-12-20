@@ -1344,36 +1344,43 @@ document.addEventListener('DOMContentLoaded', ()=>{
             // Calculate available height (accounting for padding and borders)
             const safetyMargin = 2;
             let availableHeight;
-            let paddingTop, paddingBottom;
             
-            if(isPrintMode){
-                // In print mode, convert padding from cm to pixels
-                paddingTop = (Number(el.props.paddingTop) || 0) * PIXELS_PER_CM;
-                paddingBottom = (Number(el.props.paddingBottom) || 0) * PIXELS_PER_CM;
-                const borderWidth = (el.props.showBorder && el.props.borderWidth) ? Number(el.props.borderWidth) : 0;
-                const borderTop = (el.props.borderTop !== false) ? borderWidth : 0;
-                const borderBottom = (el.props.borderBottom !== false) ? borderWidth : 0;
-                availableHeight = containerHeight - paddingTop - paddingBottom - borderTop - borderBottom - safetyMargin;
-            } else {
-                // In normal render mode, padding is in cm, need to convert to pixels
-                paddingTop = (Number(el.props.paddingTop) || 0) * PIXELS_PER_CM;
-                paddingBottom = (Number(el.props.paddingBottom) || 0) * PIXELS_PER_CM;
-                const borderWidth = (el.props.showBorder && el.props.borderWidth) ? Number(el.props.borderWidth) : 0;
-                const borderTop = (el.props.borderTop !== false) ? borderWidth : 0;
-                const borderBottom = (el.props.borderBottom !== false) ? borderWidth : 0;
-                availableHeight = containerHeight - paddingTop - paddingBottom - borderTop - borderBottom - safetyMargin;
-            }
+            // Calculate padding and borders in pixels
+            const paddingTop = (Number(el.props.paddingTop) || 0) * PIXELS_PER_CM;
+            const paddingBottom = (Number(el.props.paddingBottom) || 0) * PIXELS_PER_CM;
+            const borderWidth = (el.props.showBorder && el.props.borderWidth) ? Number(el.props.borderWidth) : 0;
+            const borderTop = (el.props.borderTop !== false) ? borderWidth : 0;
+            const borderBottom = (el.props.borderBottom !== false) ? borderWidth : 0;
+            
+            // In print mode, padding is applied to container via CSS (in cm)
+            // containerHeight is the total element height in pixels
+            // The span is inside the container, so available height = containerHeight - padding - border
+            availableHeight = containerHeight - paddingTop - paddingBottom - borderTop - borderBottom - safetyMargin;
             
             if(availableHeight <= 0) return; // No space available
             
             // Function to apply auto-scale
             const executeAutoScale = () => {
-                // Get the actual available height for the span (container height minus padding)
-                const spanHeight = span.scrollHeight;
-                const spanClientHeight = span.clientHeight || span.offsetHeight;
+                // Get the span width
+                let spanWidth;
+                if(isPrintMode){
+                    // In print mode, calculate from containerWidth minus padding/border
+                    const paddingLeft = (Number(el.props.paddingLeft) || 0) * PIXELS_PER_CM;
+                    const paddingRight = (Number(el.props.paddingRight) || 0) * PIXELS_PER_CM;
+                    const borderLeft = (el.props.borderLeft !== false) ? borderWidth : 0;
+                    const borderRight = (el.props.borderRight !== false) ? borderWidth : 0;
+                    spanWidth = containerWidth - paddingLeft - paddingRight - borderLeft - borderRight;
+                } else {
+                    spanWidth = span.offsetWidth || containerWidth;
+                }
                 
-                // Check if there's bottom overflow (text is cut off at bottom)
-                // availableHeight already accounts for padding, so compare directly
+                if(spanWidth <= 0) return;
+                
+                // Get the actual height of the span
+                const spanHeight = span.scrollHeight || 0;
+                const spanClientHeight = span.clientHeight || span.offsetHeight || 0;
+                
+                // Check if there's bottom overflow
                 const hasBottomOverflow = spanHeight > spanClientHeight || spanHeight > availableHeight;
                 
                 if(!hasBottomOverflow) return; // No overflow, keep default behavior
@@ -1383,20 +1390,26 @@ document.addEventListener('DOMContentLoaded', ()=>{
                 const minFontSize = 6;
                 
                 // Create a measurement div with same styles and wrapping
-                // Use the same width as the span (which is inside the padded container)
-                const measureDiv = span.cloneNode(true);
+                const measureDiv = document.createElement('div');
+                measureDiv.textContent = span.textContent;
                 measureDiv.style.position = 'absolute';
                 measureDiv.style.visibility = 'hidden';
-                measureDiv.style.width = span.offsetWidth + 'px';
+                measureDiv.style.width = spanWidth + 'px';
                 measureDiv.style.height = 'auto';
                 measureDiv.style.overflow = 'visible';
                 measureDiv.style.maxHeight = 'none';
                 measureDiv.style.padding = '0';
                 measureDiv.style.margin = '0';
                 measureDiv.style.border = 'none';
+                // Copy all relevant styles from span
+                measureDiv.style.fontFamily = span.style.fontFamily || el.props.fontFamily || 'Arial, sans-serif';
+                measureDiv.style.fontWeight = span.style.fontWeight || el.props.fontWeight || 'normal';
+                measureDiv.style.lineHeight = span.style.lineHeight || el.props.lineHeight || '1.2';
+                measureDiv.style.whiteSpace = span.style.whiteSpace || 'pre-wrap';
+                measureDiv.style.wordWrap = span.style.wordWrap || 'break-word';
                 document.body.appendChild(measureDiv);
                 
-                // Reduce font size until text fits within available height (which includes padding consideration)
+                // Reduce font size until text fits within available height
                 while(measureDiv.scrollHeight > availableHeight && fontSize > minFontSize){
                     fontSize -= 0.5;
                     measureDiv.style.fontSize = fontSize + 'px';
@@ -1409,7 +1422,7 @@ document.addEventListener('DOMContentLoaded', ()=>{
             
             // Check if text overflows at the bottom (after natural wrapping)
             if(isPrintMode){
-                // Execute synchronously for print
+                // For print mode, execute immediately
                 executeAutoScale();
             } else {
                 // Use requestAnimationFrame for normal rendering
@@ -2670,11 +2683,6 @@ document.addEventListener('DOMContentLoaded', ()=>{
                             span.style.color = el.props.color || '#000000';
                             
                             d.appendChild(span);
-                            
-                            // Apply text overflow handling for print
-                            const containerWidth = el.width * PIXELS_PER_CM;
-                            const containerHeight = el.height * PIXELS_PER_CM;
-                            applyTextOverflow(span, el, containerWidth, containerHeight, true);
                             break;
                         }
                         case 'data': {
@@ -2700,11 +2708,6 @@ document.addEventListener('DOMContentLoaded', ()=>{
                             span.style.color = el.props.color || '#000000';
                             
                             d.appendChild(span);
-                            
-                            // Apply text overflow handling for print
-                            const containerWidth = el.width * PIXELS_PER_CM;
-                            const containerHeight = el.height * PIXELS_PER_CM;
-                            applyTextOverflow(span, el, containerWidth, containerHeight, true);
                             break;
                         }
                         case 'line':
@@ -2836,24 +2839,52 @@ document.addEventListener('DOMContentLoaded', ()=>{
                             break;
                         }
                     }
+                    
                     page.appendChild(d);
                 });
                 
                 return page;
             }
             
+            // Add print container to DOM first so measurements work correctly
+            document.body.appendChild(printContainer);
+            
             // Add canvas 1
             const page1 = renderCanvasToPage(1);
             printContainer.appendChild(page1);
             
             // Add canvas 2 if enabled
+            let page2 = null;
             if(canvas2Enabled){
-                const page2 = renderCanvasToPage(2);
+                page2 = renderCanvasToPage(2);
                 printContainer.appendChild(page2);
             }
             
-            // Add to body temporarily
-            document.body.appendChild(printContainer);
+            // Now apply text overflow handling after all elements are in DOM
+            // Need to get the canvas data for each page
+            const canvas1Data = design.canvas1 || [];
+            const canvas2Data = design.canvas2 || [];
+            
+            [page1, page2].filter(Boolean).forEach((page, pageIndex) => {
+                const canvasData = pageIndex === 0 ? canvas1Data : canvas2Data;
+                const tempS = canvasData.map(normalizeElement);
+                const sorted = tempS.slice().sort((a,b)=> (a.zIndex||0) - (b.zIndex||0));
+                
+                page.querySelectorAll('.label-element').forEach((d, index) => {
+                    if(index < sorted.length){
+                        const el = sorted[index];
+                        if((el.type === 'text' || el.type === 'data') && (el.props.textOverflow === 'auto-scale' || el.props.textOverflow === 'squeeze')){
+                            const span = d.querySelector('div[style*="pointer-events: none"]');
+                            if(span){
+                                // Use real browser dimensions
+                                const containerWidth = d.offsetWidth;
+                                const containerHeight = d.offsetHeight;
+                                applyTextOverflow(span, el, containerWidth, containerHeight, true);
+                            }
+                        }
+                    }
+                });
+            });
             
             // Update print CSS for multiple pages
             const styleId = 'dynamic-print-css';
