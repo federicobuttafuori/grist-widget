@@ -519,10 +519,46 @@ document.addEventListener('DOMContentLoaded', ()=>{
             if(!profile || !profile.designs[designKey]) return;
             // Save current design before switching
             saveCurrentDesign();
+            // Save current canvas for previous design
+            if(currentProfile && currentDesign){
+                const prevDesignKey = `${currentProfile}.${currentDesign}`;
+                lastCanvasByDesign[prevDesignKey] = currentCanvas;
+            }
             // Switch design
             currentDesign = designKey;
             // Save this as the last selected design for current profile
             lastDesignByProfile[currentProfile] = designKey;
+            // Restore canvas for this design, or use last canvas for profile, or default to 1
+            const designKeyForCanvas = `${currentProfile}.${designKey}`;
+            const savedCanvas = lastCanvasByDesign[designKeyForCanvas];
+            const design = profile.designs[designKey];
+            
+            if(savedCanvas === 1 || savedCanvas === 2){
+                // Only restore canvas 2 if it's enabled for this design
+                if(savedCanvas === 2 && design && design.canvas2Enabled){
+                    currentCanvas = 2;
+                } else if(savedCanvas === 1){
+                    currentCanvas = 1;
+                } else {
+                    // Fallback: try last canvas for profile
+                    const lastCanvas = lastCanvasByProfile[currentProfile];
+                    if(lastCanvas === 1 || (lastCanvas === 2 && design && design.canvas2Enabled)){
+                        currentCanvas = lastCanvas;
+                    } else {
+                        currentCanvas = 1;
+                    }
+                }
+            } else {
+                // Try to use last selected canvas for this profile
+                const lastCanvas = lastCanvasByProfile[currentProfile];
+                if(lastCanvas === 1 || (lastCanvas === 2 && design && design.canvas2Enabled)){
+                    currentCanvas = lastCanvas;
+                } else {
+                    currentCanvas = 1; // Default to canvas 1
+                }
+            }
+            // Save the restored canvas for this design
+            lastCanvasByDesign[designKeyForCanvas] = currentCanvas;
             // Load the new design
             loadCurrentDesign();
             updateDesignSelector();
@@ -548,6 +584,11 @@ document.addEventListener('DOMContentLoaded', ()=>{
             currentCanvas = canvasNum;
             // Save this as the last selected canvas for current profile
             lastCanvasByProfile[currentProfile] = canvasNum;
+            // Save this as the last selected canvas for current design
+            if(currentProfile && currentDesign){
+                const designKey = `${currentProfile}.${currentDesign}`;
+                lastCanvasByDesign[designKey] = canvasNum;
+            }
             // Load the new canvas
             loadCurrentDesign();
             canvasSelector.value = canvasNum.toString();
@@ -595,7 +636,9 @@ document.addEventListener('DOMContentLoaded', ()=>{
                     currentDesign: currentDesign,
                         currentCanvas: currentCanvas,
                         groups: groups,
-                        lastDesignByProfile: lastDesignByProfile
+                        lastDesignByProfile: lastDesignByProfile,
+                        lastCanvasByProfile: lastCanvasByProfile,
+                        lastCanvasByDesign: lastCanvasByDesign
                 };
                 localStorage.setItem(KEY, JSON.stringify(payloadObj));
             } catch(e) {
@@ -1998,34 +2041,6 @@ document.addEventListener('DOMContentLoaded', ()=>{
                             return false;
                         }
                     });
-                    
-                    // Also handle wheel events on the input (alternative way to use spinner)
-                    input.addEventListener('wheel', function(e){
-                        if(this.value === '' || this.value === null || isNaN(this.value)){
-                            e.preventDefault();
-                            e.stopPropagation();
-                            
-                            const propKey = propName.split('.')[1];
-                            const elements = selectedIds.map(id => S.find(e => e.id === id)).filter(Boolean);
-                            if(elements.length === 0) return;
-                            
-                            pushBeforeChange();
-                            
-                            // Convert 1 pixel to cm (1 pixel = 1/37.795276 cm)
-                            const onePixelInCm = 1 / PIXELS_PER_CM;
-                            const delta = e.deltaY < 0 ? onePixelInCm : -onePixelInCm; // Scroll up = increment, scroll down = decrement
-                            
-                            elements.forEach(el => {
-                                const currentVal = el[propKey] || 0;
-                                const newVal = currentVal + delta;
-                                el[propKey] = snapToPixel(newVal);
-                            });
-                            
-                            render();
-                            updateProps();
-                            saveCurrentDesign();
-                        }
-                    }, { passive: false });
                     
                     // Track value changes to detect spinner usage via keyboard
                     input.addEventListener('input', function(e){
@@ -4369,6 +4384,10 @@ document.addEventListener('DOMContentLoaded', ()=>{
                     // Load lastCanvasByProfile if saved
                     if(parsed.lastCanvasByProfile && typeof parsed.lastCanvasByProfile === 'object'){
                         lastCanvasByProfile = parsed.lastCanvasByProfile;
+                    }
+                    // Load lastCanvasByDesign if saved
+                    if(parsed.lastCanvasByDesign && typeof parsed.lastCanvasByDesign === 'object'){
+                        lastCanvasByDesign = parsed.lastCanvasByDesign;
                     }
                     // Restore current profile, design and canvas if saved
                     if(parsed.currentProfile && profiles[parsed.currentProfile]){
