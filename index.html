@@ -1942,6 +1942,141 @@ document.addEventListener('DOMContentLoaded', ()=>{
                 });
             }
             
+            // Add spinner handlers for x, y, width, height when input is empty (indeterminate state)
+            const positionInputs = ['multi.x', 'multi.y', 'multi.width', 'multi.height'];
+            positionInputs.forEach(propName => {
+                const input = pp.querySelector(`input[data-prop="${propName}"]`);
+                if(input){
+                    // Initialize previous value
+                    input.dataset.previousValue = input.value || '';
+                    let previousValue = input.value;
+                    let isSpinnerClick = false;
+                    
+                    // Detect spinner clicks (mouse clicks on spinner buttons)
+                    input.addEventListener('mousedown', function(e){
+                        // Check if click is on spinner (right side of input)
+                        const rect = this.getBoundingClientRect();
+                        const clickX = e.clientX;
+                        const clickY = e.clientY;
+                        const isOnSpinner = clickX > rect.right - 20; // Spinner is usually ~20px wide
+                        
+                        if(isOnSpinner && (this.value === '' || this.value === null || isNaN(this.value))){
+                            isSpinnerClick = true;
+                            // Determine if up or down based on Y position (vertical position in spinner)
+                            const relativeY = clickY - rect.top;
+                            const spinnerHeight = rect.height;
+                            const isUp = relativeY < spinnerHeight / 2; // Top half = up, bottom half = down
+                            
+                            e.preventDefault();
+                            e.stopPropagation();
+                            
+                            // Get the property name (x, y, width, or height)
+                            const propKey = propName.split('.')[1];
+                            
+                            // Get all selected elements and their current values
+                            const elements = selectedIds.map(id => S.find(e => e.id === id)).filter(Boolean);
+                            if(elements.length === 0) return;
+                            
+                            pushBeforeChange();
+                            
+                            // Convert 1 pixel to cm (1 pixel = 1/37.795276 cm)
+                            const onePixelInCm = 1 / PIXELS_PER_CM;
+                            const delta = isUp ? onePixelInCm : -onePixelInCm;
+                            
+                            // Increment or decrement all values by 1 pixel
+                            elements.forEach(el => {
+                                const currentVal = el[propKey] || 0;
+                                const newVal = currentVal + delta;
+                                el[propKey] = snapToPixel(newVal);
+                            });
+                            
+                            render();
+                            updateProps();
+                            saveCurrentDesign();
+                            
+                            // Prevent default spinner behavior
+                            return false;
+                        }
+                    });
+                    
+                    // Also handle wheel events on the input (alternative way to use spinner)
+                    input.addEventListener('wheel', function(e){
+                        if(this.value === '' || this.value === null || isNaN(this.value)){
+                            e.preventDefault();
+                            e.stopPropagation();
+                            
+                            const propKey = propName.split('.')[1];
+                            const elements = selectedIds.map(id => S.find(e => e.id === id)).filter(Boolean);
+                            if(elements.length === 0) return;
+                            
+                            pushBeforeChange();
+                            
+                            // Convert 1 pixel to cm (1 pixel = 1/37.795276 cm)
+                            const onePixelInCm = 1 / PIXELS_PER_CM;
+                            const delta = e.deltaY < 0 ? onePixelInCm : -onePixelInCm; // Scroll up = increment, scroll down = decrement
+                            
+                            elements.forEach(el => {
+                                const currentVal = el[propKey] || 0;
+                                const newVal = currentVal + delta;
+                                el[propKey] = snapToPixel(newVal);
+                            });
+                            
+                            render();
+                            updateProps();
+                            saveCurrentDesign();
+                        }
+                    }, { passive: false });
+                    
+                    // Track value changes to detect spinner usage via keyboard
+                    input.addEventListener('input', function(e){
+                        if(isSpinnerClick){
+                            isSpinnerClick = false;
+                            return;
+                        }
+                        
+                        // If input was empty and now has a value, it might be from spinner
+                        if((previousValue === '' || previousValue === null || isNaN(previousValue)) && 
+                           this.value !== '' && !isNaN(this.value)){
+                            // Check if this looks like a spinner increment (step value)
+                            const newVal = Number(this.value);
+                            const propKey = propName.split('.')[1];
+                            const elements = selectedIds.map(id => S.find(e => e.id === id)).filter(Boolean);
+                            
+                            if(elements.length > 0){
+                                // Get the first element's current value
+                                const firstVal = elements[0][propKey] || 0;
+                                const step = Number(input.step) || 0.01;
+                                
+                                // If the new value is close to firstVal + step, it's likely a spinner up
+                                // If the new value is close to firstVal - step, it's likely a spinner down
+                                const diff = Math.abs(newVal - firstVal);
+                                const onePixelInCm = 1 / PIXELS_PER_CM;
+                                if(diff <= step * 2){ // Allow some tolerance
+                                    e.preventDefault();
+                                    e.stopPropagation();
+                                    
+                                    pushBeforeChange();
+                                    
+                                    // Convert 1 pixel to cm (1 pixel = 1/37.795276 cm)
+                                    const delta = newVal > firstVal ? onePixelInCm : -onePixelInCm;
+                                    elements.forEach(el => {
+                                        const currentVal = el[propKey] || 0;
+                                        const newVal = currentVal + delta;
+                                        el[propKey] = snapToPixel(newVal);
+                                    });
+                                    
+                                    render();
+                                    updateProps();
+                                    saveCurrentDesign();
+                                    return false;
+                                }
+                            }
+                        }
+                        previousValue = this.value;
+                    });
+                }
+            });
+            
             // Add favorite button listener
             if(multiFavoriteBtn){
                 multiFavoriteBtn.addEventListener('click', function(e){
@@ -3577,6 +3712,60 @@ document.addEventListener('DOMContentLoaded', ()=>{
 
         if(prop.startsWith('multi.')){
             const keyPath = prop.slice('multi.'.length);
+            
+            // Special handling for x, y, width, height when input is empty (indeterminate state)
+            // Allow spinner to increment/decrement all values by 1
+            if(['x', 'y', 'width', 'height'].includes(keyPath) && target.type === 'number'){
+                const previousValue = target.dataset.previousValue || '';
+                const currentValue = target.value;
+                
+                // Check if input was empty and now has a value (spinner was used)
+                if((previousValue === '' || previousValue === null || previousValue === undefined || isNaN(previousValue)) && 
+                   currentValue !== '' && !isNaN(currentValue)){
+                    
+                    // Get all selected elements
+                    const elements = selectedIds.map(id => S.find(e => e.id === id)).filter(Boolean);
+                    if(elements.length === 0) return;
+                    
+                    // Determine if increment or decrement based on the new value
+                    // Compare with first element's current value
+                    const firstVal = elements[0][keyPath] || 0;
+                    const newVal = Number(currentValue);
+                    const step = Number(target.step) || 0.01;
+                    
+                    // Check if this looks like a spinner action (value changed by step amount)
+                    const diff = newVal - firstVal;
+                    const absDiff = Math.abs(diff);
+                    
+                    // If the difference is small (within 2 steps), treat as spinner action
+                    if(absDiff <= step * 2){
+                        e.preventDefault();
+                        e.stopPropagation();
+                        
+                        pushBeforeChange();
+                        
+                        // Convert 1 pixel to cm (1 pixel = 1/37.795276 cm)
+                        const onePixelInCm = 1 / PIXELS_PER_CM;
+                        // Determine direction: if newVal > firstVal, increment; otherwise decrement
+                        const delta = diff > 0 ? onePixelInCm : -onePixelInCm;
+                        
+                        elements.forEach(el => {
+                            const currentVal = el[keyPath] || 0;
+                            const updatedVal = currentVal + delta;
+                            el[keyPath] = snapToPixel(updatedVal);
+                        });
+                        
+                        render();
+                        updateProps();
+                        saveCurrentDesign();
+                        return;
+                    }
+                }
+                
+                // Store current value for next comparison
+                target.dataset.previousValue = currentValue;
+            }
+            
             const value = (target.type === 'checkbox') ? target.checked : (target.type === 'number' ? Number(target.value) : target.value);
                 
                 // Special handling: when showBorder is enabled, activate all border sides
