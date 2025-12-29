@@ -1251,11 +1251,23 @@ document.addEventListener('DOMContentLoaded', ()=>{
                     d.style.backgroundColor = el.props.fillColor || 'transparent';
                     break;
                 case 'qr': {
-                    const c = getData(el, sequenceIndex);
+                    const c = getData(el, sequenceIndex) || '';
+                    let prefix = el.props.prefix || '';
+                    let suffix = el.props.suffix || '';
+                    
+                    // Apply sequence placeholder to prefix and suffix
+                    prefix = replaceColumnSyntax(prefix, el);
+                    prefix = applySequencePlaceholder(prefix, sequenceIndex);
+                    suffix = replaceColumnSyntax(suffix, el);
+                    suffix = applySequencePlaceholder(suffix, sequenceIndex);
+                    
+                    // Combine prefix + code + suffix into the QR code value
+                    const qrValue = prefix + String(c) + suffix;
+                    
                     const q = document.createElement('img');
                     const dpi = 37.795276;
                     const qs = Math.min(el.width, el.height) * dpi;
-                    q.src = `https://api.qrserver.com/v1/create-qr-code/?size=${Math.round(qs)}x${Math.round(qs)}&data=${encodeURIComponent(c)}`;
+                    q.src = `https://api.qrserver.com/v1/create-qr-code/?size=${Math.round(qs)}x${Math.round(qs)}&data=${encodeURIComponent(qrValue)}`;
                     q.style.pointerEvents='none';
                     q.style.width='100%';
                     q.style.height='100%';
@@ -1940,6 +1952,11 @@ document.addEventListener('DOMContentLoaded', ()=>{
 
         if(el.type==='qr' || el.type==='barcode'){
             h += `<label>Fallback Text</label><input type="text" data-prop="props.text" value="${escapeHtml(el.props.text||'')}">`;
+        }
+
+        if(el.type==='qr'){
+            h += `<label>Prefix</label><textarea data-prop="props.prefix" rows="2">${escapeHtml(el.props.prefix||'')}</textarea>`;
+            h += `<label>Suffix</label><textarea data-prop="props.suffix" rows="2">${escapeHtml(el.props.suffix||'')}</textarea>`;
         }
 
         if(el.type==='barcode'){
@@ -3222,11 +3239,23 @@ document.addEventListener('DOMContentLoaded', ()=>{
                             d.style.backgroundColor = el.props.fillColor || 'transparent';
                             break;
                         case 'qr': {
-                            const c = getData(el, sequenceIndex);
+                            const c = getData(el, sequenceIndex) || '';
+                            let prefix = el.props.prefix || '';
+                            let suffix = el.props.suffix || '';
+                            
+                            // Apply sequence placeholder to prefix and suffix
+                            prefix = replaceColumnSyntax(prefix, el);
+                            prefix = applySequencePlaceholder(prefix, sequenceIndex);
+                            suffix = replaceColumnSyntax(suffix, el);
+                            suffix = applySequencePlaceholder(suffix, sequenceIndex);
+                            
+                            // Combine prefix + code + suffix into the QR code value
+                            const qrValue = prefix + String(c) + suffix;
+                            
                             const q = document.createElement('img');
                             const dpi = 37.795276;
                             const qs = Math.min(el.width, el.height) * dpi;
-                            q.src = `https://api.qrserver.com/v1/create-qr-code/?size=${Math.round(qs)}x${Math.round(qs)}&data=${encodeURIComponent(c)}`;
+                            q.src = `https://api.qrserver.com/v1/create-qr-code/?size=${Math.round(qs)}x${Math.round(qs)}&data=${encodeURIComponent(qrValue)}`;
                             q.style.pointerEvents='none';
                             q.style.width='100%';
                             q.style.height='100%';
@@ -3699,11 +3728,23 @@ document.addEventListener('DOMContentLoaded', ()=>{
                         d.style.backgroundColor = el.props.fillColor || 'transparent';
                         break;
                     case 'qr': {
-                        const c = getData(el, sequenceIndex);
+                        const c = getData(el, sequenceIndex) || '';
+                        let prefix = el.props.prefix || '';
+                        let suffix = el.props.suffix || '';
+                        
+                        // Apply sequence placeholder to prefix and suffix
+                        prefix = replaceColumnSyntax(prefix, el);
+                        prefix = applySequencePlaceholder(prefix, sequenceIndex);
+                        suffix = replaceColumnSyntax(suffix, el);
+                        suffix = applySequencePlaceholder(suffix, sequenceIndex);
+                        
+                        // Combine prefix + code + suffix into the QR code value
+                        const qrValue = prefix + String(c) + suffix;
+                        
                         const q = document.createElement('img');
                         const dpi = 37.795276;
                         const qs = Math.min(el.width, el.height) * dpi;
-                        q.src = `https://api.qrserver.com/v1/create-qr-code/?size=${Math.round(qs)}x${Math.round(qs)}&data=${encodeURIComponent(c)}`;
+                        q.src = `https://api.qrserver.com/v1/create-qr-code/?size=${Math.round(qs)}x${Math.round(qs)}&data=${encodeURIComponent(qrValue)}`;
                         q.style.pointerEvents='none';
                         q.style.width='100%';
                         q.style.height='100%';
