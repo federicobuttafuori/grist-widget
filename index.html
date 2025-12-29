@@ -976,7 +976,7 @@ document.addEventListener('DOMContentLoaded', ()=>{
         
         let countToRender = 1;
         const MAX_PREVIEW_LABELS = 50;
-        const VERTICAL_SPACING = 0.2; // cm spacing between labels
+        const labelSpacing = 1.0; // cm spacing between labels (increased for better visibility)
         
         if(sequenceCountColumn && R && Object.prototype.hasOwnProperty.call(R, sequenceCountColumn)){
             const countRaw = R[sequenceCountColumn];
@@ -995,7 +995,10 @@ document.addEventListener('DOMContentLoaded', ()=>{
             d.style.top = `${el.y + baseOffsetY}cm`;
             d.style.width = `${el.width}cm`;
             d.style.height = `${el.height}cm`;
-            d.style.zIndex = el.zIndex || 0;
+            // Ensure z-index is set properly for sequence mode
+            // Base z-index from element, but ensure it's at least 0 for interactivity
+            const baseZIndex = el.zIndex || 0;
+            d.style.zIndex = baseZIndex >= 0 ? baseZIndex : 0;
             d.style.fontSize = `${el.props.fontSize || 16}px`;
                 const fontWeight = el.props.fontWeight;
                 if(typeof fontWeight === 'number'){
@@ -1423,35 +1426,23 @@ document.addEventListener('DOMContentLoaded', ()=>{
             });
         }
         
-        // Render labels - if sequence column is set and count > 1, show sequence mode
-        // Otherwise show only the current selected canvas
-        if(sequenceCountColumn && countToRender > 1){
-            // Sequence mode: show multiple labels with both canvases
-            // IMPORTANT: Use S for the current canvas being edited (so edits are visible)
-            // Use design data for the other canvas
-            const canvas1Data = currentCanvas === 1 ? S : (design.canvas1 || []);
-            const canvas2Data = currentCanvas === 2 ? S : (design.canvas2 || []);
-            
-            for(let sequenceIndex = 1; sequenceIndex <= countToRender; sequenceIndex++){
-                // Calculate offset for this sequence index
-                // Each pair (canvas1 + canvas2) takes (H * 2 + VERTICAL_SPACING) space if canvas2 is enabled
-                // Otherwise just (H + VERTICAL_SPACING)
-                const pairHeight = canvas2Flag ? (H * 2 + VERTICAL_SPACING) : (H + VERTICAL_SPACING);
-                const offsetY = (sequenceIndex - 1) * pairHeight;
-                
-                // Render canvas1 with this sequence index
-                renderElementsForCanvas(canvas1Data, sequenceIndex, offsetY);
-                
-                // Render canvas2 with the same sequence index if enabled
-                if(canvas2Flag){
-                    const canvas2OffsetY = offsetY + H;
-                    renderElementsForCanvas(canvas2Data, sequenceIndex, canvas2OffsetY);
-                }
-            }
+        // Always show only sequence 1 in canvas preview (single label view)
+        // Sequence mode is used only for printing, not for canvas preview
+        // Show only the current selected canvas with sequence index 1
+        const canvas1Data = currentCanvas === 1 ? S : (design.canvas1 || []);
+        const canvas2Data = currentCanvas === 2 ? S : (design.canvas2 || []);
+        
+        if(canvas2Flag){
+            // Show both canvases stacked vertically (sequence 1 only)
+            renderElementsForCanvas(canvas1Data, 1, 0);
+            renderElementsForCanvas(canvas2Data, 1, H);
+            // Container height for both canvases
+            lc.style.height = `${H * 2}cm`;
         } else {
-            // Normal mode: show only the current selected canvas
-            // Use S which contains the current canvas data loaded by loadCurrentDesign()
+            // Show only current canvas (sequence 1)
             renderElementsForCanvas(S, 1, 0);
+            // Reset container height to single label height
+            lc.style.height = `${H}cm`;
         }
     }
 
