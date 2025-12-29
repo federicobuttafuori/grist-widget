@@ -963,6 +963,7 @@ document.addEventListener('DOMContentLoaded', ()=>{
         const design = profile && profile.designs[currentDesign] ? profile.designs[currentDesign] : null;
         const sequenceEnabled = design && design.sequenceEnabled ? true : false;
         const sequenceCountColumn = design && design.sequenceCountColumn ? design.sequenceCountColumn : '';
+        const canvas2Enabled = design && design.canvas2Enabled ? true : false;
         
         let countToRender = 1;
         const MAX_PREVIEW_LABELS = 50;
@@ -974,17 +975,15 @@ document.addEventListener('DOMContentLoaded', ()=>{
             countToRender = Math.min(count, MAX_PREVIEW_LABELS);
         }
         
-        // Render labels for each sequence index
-        for(let sequenceIndex = 1; sequenceIndex <= countToRender; sequenceIndex++){
-            const offsetY = (sequenceIndex - 1) * (H + VERTICAL_SPACING);
-            
-            const sorted = S.slice().sort((a,b)=> (a.zIndex||0) - (b.zIndex||0));
+        // Helper function to render elements for a specific canvas and sequence index
+        function renderElementsForCanvas(canvasData, sequenceIndex, baseOffsetY){
+            const sorted = canvasData.map(normalizeElement).slice().sort((a,b)=> (a.zIndex||0) - (b.zIndex||0));
             sorted.forEach(el=>{
             const d = document.createElement('div');
             d.classList.add('label-element');
             d.dataset.id = el.id;
             d.style.left = `${el.x}cm`;
-            d.style.top = `${el.y + offsetY}cm`;
+            d.style.top = `${el.y + baseOffsetY}cm`;
             d.style.width = `${el.width}cm`;
             d.style.height = `${el.height}cm`;
             d.style.zIndex = el.zIndex || 0;
@@ -1413,6 +1412,34 @@ document.addEventListener('DOMContentLoaded', ()=>{
 
             lc.appendChild(d);
             });
+        }
+        
+        // Render labels for each sequence index
+        if(sequenceEnabled){
+            // Get canvas data
+            const canvas1Data = design.canvas1 || [];
+            const canvas2Data = design.canvas2 || [];
+            
+            for(let sequenceIndex = 1; sequenceIndex <= countToRender; sequenceIndex++){
+                // Calculate offset for this sequence index
+                // Each pair (canvas1 + canvas2) takes (H * 2 + VERTICAL_SPACING) space if canvas2 is enabled
+                // Otherwise just (H + VERTICAL_SPACING)
+                const pairHeight = canvas2Enabled ? (H * 2 + VERTICAL_SPACING) : (H + VERTICAL_SPACING);
+                const offsetY = (sequenceIndex - 1) * pairHeight;
+                
+                // Render canvas1 with this sequence index
+                renderElementsForCanvas(canvas1Data, sequenceIndex, offsetY);
+                
+                // Render canvas2 with the same sequence index if enabled
+                if(canvas2Enabled){
+                    const canvas2OffsetY = offsetY + H;
+                    renderElementsForCanvas(canvas2Data, sequenceIndex, canvas2OffsetY);
+                }
+            }
+        } else {
+            // Normal mode: render only current canvas
+            const canvasData = currentCanvas === 1 ? (design.canvas1 || []) : (design.canvas2 || []);
+            renderElementsForCanvas(canvasData, 1, 0);
         }
     }
 
@@ -2936,9 +2963,15 @@ document.addEventListener('DOMContentLoaded', ()=>{
             printContainer.style.top = '0';
             printContainer.style.width = `${profile.width}cm`;
             // Height will be adjusted based on sequence mode
-            const totalHeight = sequenceEnabled ? 
-                count * (profile.height + VERTICAL_SPACING) - VERTICAL_SPACING : 
-                (canvas2Enabled ? profile.height * 2 : profile.height);
+            let totalHeight;
+            if(sequenceEnabled){
+                // Each pair (canvas1 + canvas2) takes (height * 2 + VERTICAL_SPACING) space if canvas2 is enabled
+                // Otherwise just (height + VERTICAL_SPACING)
+                const pairHeight = canvas2Enabled ? (profile.height * 2 + VERTICAL_SPACING) : (profile.height + VERTICAL_SPACING);
+                totalHeight = count * pairHeight - VERTICAL_SPACING;
+            } else {
+                totalHeight = canvas2Enabled ? profile.height * 2 : profile.height;
+            }
             printContainer.style.height = `${totalHeight}cm`;
             
             // Helper function to render canvas to print page
@@ -3351,14 +3384,19 @@ document.addEventListener('DOMContentLoaded', ()=>{
             
             if(sequenceEnabled){
                 // Sequence mode: render multiple labels stacked vertically
+                // Each pair (canvas1 + canvas2) shares the same sequenceIndex
                 for(let sequenceIndex = 1; sequenceIndex <= count; sequenceIndex++){
-                    const offsetY = (sequenceIndex - 1) * (profile.height + VERTICAL_SPACING);
+                    // Calculate offset for this sequence index
+                    // Each pair (canvas1 + canvas2) takes (height * 2 + VERTICAL_SPACING) space if canvas2 is enabled
+                    // Otherwise just (height + VERTICAL_SPACING)
+                    const pairHeight = canvas2Enabled ? (profile.height * 2 + VERTICAL_SPACING) : (profile.height + VERTICAL_SPACING);
+                    const offsetY = (sequenceIndex - 1) * pairHeight;
                     
                     // Add canvas 1 for this sequence index
                     const page1 = renderCanvasToPage(1, sequenceIndex, offsetY);
                     printContainer.appendChild(page1);
                     
-                    // Add canvas 2 if enabled for this sequence index
+                    // Add canvas 2 with the same sequence index if enabled
                     if(canvas2Enabled){
                         const page2OffsetY = offsetY + profile.height;
                         const page2 = renderCanvasToPage(2, sequenceIndex, page2OffsetY);
@@ -4834,7 +4872,7 @@ document.addEventListener('DOMContentLoaded', ()=>{
                         if(profileKeys.length > 0){
                             currentProfile = profileKeys[0];
                             const designKeys = Object.keys(profiles[currentProfile].designs);
-                            if(designKeys.length > 0){
+                            if(designKeys.length > 0){a
                                 // Try to use last selected design for this profile
                                 const lastDesign = lastDesignByProfile[currentProfile];
                                 if(lastDesign && designKeys.includes(lastDesign)){
