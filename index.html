@@ -543,10 +543,13 @@ document.addEventListener('DOMContentLoaded', ()=>{
             }
             // Load the new design
             loadCurrentDesign();
+            updateCanvasSize();
             updateDesignSelector();
             updateCanvasControls();
             render();
             updateProps();
+            // Force canvas refresh
+            fit();
         }
 
         function switchCanvas(canvasNum){
