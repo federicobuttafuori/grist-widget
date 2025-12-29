@@ -1418,8 +1418,10 @@ document.addEventListener('DOMContentLoaded', ()=>{
         // Otherwise show only the current selected canvas
         if(sequenceCountColumn && countToRender > 1){
             // Sequence mode: show multiple labels with both canvases
-            const canvas1Data = design.canvas1 || [];
-            const canvas2Data = design.canvas2 || [];
+            // IMPORTANT: Use S for the current canvas being edited (so edits are visible)
+            // Use design data for the other canvas
+            const canvas1Data = currentCanvas === 1 ? S : (design.canvas1 || []);
+            const canvas2Data = currentCanvas === 2 ? S : (design.canvas2 || []);
             
             for(let sequenceIndex = 1; sequenceIndex <= countToRender; sequenceIndex++){
                 // Calculate offset for this sequence index
@@ -1439,9 +1441,8 @@ document.addEventListener('DOMContentLoaded', ()=>{
             }
         } else {
             // Normal mode: show only the current selected canvas
-            const canvasKey = `canvas${currentCanvas}`;
-            const canvasData = design[canvasKey] || [];
-            renderElementsForCanvas(canvasData, 1, 0);
+            // Use S which contains the current canvas data loaded by loadCurrentDesign()
+            renderElementsForCanvas(S, 1, 0);
         }
     }
 
@@ -2965,7 +2966,6 @@ document.addEventListener('DOMContentLoaded', ()=>{
             const prevS = deepCopy(S);
             
             // Calculate count for sequence mode (always enabled)
-            const VERTICAL_SPACING = 0.2; // cm spacing between labels
             const countRaw = R[sequenceCountColumn];
             const count = Math.max(0, Math.floor(Number(countRaw)));
             if(count <= 0){
@@ -2980,15 +2980,14 @@ document.addEventListener('DOMContentLoaded', ()=>{
             printContainer.style.left = '-9999px';
             printContainer.style.top = '0';
             printContainer.style.width = `${profile.width}cm`;
-            // Height calculation - sequence mode is always enabled
-            // Each pair (canvas1 + canvas2) takes (height * 2 + VERTICAL_SPACING) space if canvas2 is enabled
-            // Otherwise just (height + VERTICAL_SPACING)
-            const pairHeight = canvas2Enabled ? (profile.height * 2 + VERTICAL_SPACING) : (profile.height + VERTICAL_SPACING);
-            const totalHeight = count * pairHeight - VERTICAL_SPACING;
-            printContainer.style.height = `${totalHeight}cm`;
+            // Height is auto - pages will be stacked naturally
+            printContainer.style.height = 'auto';
+            
+            // Calculate total pages
+            const totalPages = canvas2Enabled ? count * 2 : count;
             
             // Helper function to render canvas to print page
-            function renderCanvasToPage(canvasNum, sequenceIndex = 1, offsetY = 0){
+            function renderCanvasToPage(canvasNum, sequenceIndex = 1, isLastPage = false){
                 const canvasData = design[`canvas${canvasNum}`] || [];
                 const tempS = canvasData.map(normalizeElement);
                 
@@ -2999,11 +2998,11 @@ document.addEventListener('DOMContentLoaded', ()=>{
                 page.style.position = 'relative';
                 page.style.background = '#fff';
                 page.style.overflow = 'hidden';
-                page.style.pageBreakAfter = (canvasNum === 1 && canvas2Enabled) ? 'always' : 'auto';
-                // Apply vertical offset for sequence mode
-                if(offsetY > 0){
-                    page.style.marginTop = `${offsetY}cm`;
+                // Set pageBreakAfter only for last page - let CSS handle the rest
+                if(isLastPage){
+                    page.style.pageBreakAfter = 'auto';
                 }
+                // No marginTop or offsetY - pages are created in sequence
                 
                 // Render elements
                 const sorted = tempS.slice().sort((a,b)=> (a.zIndex||0) - (b.zIndex||0));
@@ -3397,21 +3396,19 @@ document.addEventListener('DOMContentLoaded', ()=>{
             
             // Sequence mode is always enabled - render multiple labels stacked vertically
             // Each pair (canvas1 + canvas2) shares the same sequenceIndex
+            let pageIndex = 0;
             for(let sequenceIndex = 1; sequenceIndex <= count; sequenceIndex++){
-                // Calculate offset for this sequence index
-                // Each pair (canvas1 + canvas2) takes (height * 2 + VERTICAL_SPACING) space if canvas2 is enabled
-                // Otherwise just (height + VERTICAL_SPACING)
-                const pairHeight = canvas2Enabled ? (profile.height * 2 + VERTICAL_SPACING) : (profile.height + VERTICAL_SPACING);
-                const offsetY = (sequenceIndex - 1) * pairHeight;
-                
                 // Add canvas 1 for this sequence index
-                const page1 = renderCanvasToPage(1, sequenceIndex, offsetY);
+                pageIndex++;
+                const isLastPage1 = pageIndex === totalPages;
+                const page1 = renderCanvasToPage(1, sequenceIndex, isLastPage1);
                 printContainer.appendChild(page1);
                 
                 // Add canvas 2 with the same sequence index if enabled
                 if(canvas2Enabled){
-                    const page2OffsetY = offsetY + profile.height;
-                    const page2 = renderCanvasToPage(2, sequenceIndex, page2OffsetY);
+                    pageIndex++;
+                    const isLastPage2 = pageIndex === totalPages;
+                    const page2 = renderCanvasToPage(2, sequenceIndex, isLastPage2);
                     printContainer.appendChild(page2);
                 }
             }
@@ -3499,7 +3496,8 @@ document.addEventListener('DOMContentLoaded', ()=>{
                         @page{size:${profile.width}cm ${profile.height}cm;margin:0}
                         html,body{margin:0!important;padding:0!important;background:#fff!important;width:${profile.width}cm!important;height:auto!important}
                         #toolbar,#sidebar,#marquee,.status-message{display:none!important}
-                        .print-page{width:${profile.width}cm!important;height:${profile.height}cm!important;page-break-after:always!important;page-break-inside:avoid!important;overflow:visible!important;background:#fff!important;position:relative!important;margin:0!important;padding:0!important;display:block!important}
+                        .print-page{width:${profile.width}cm!important;height:${profile.height}cm!important;page-break-inside:avoid!important;overflow:visible!important;background:#fff!important;position:relative!important;margin:0!important;padding:0!important;display:block!important;box-sizing:border-box!important}
+                        .print-page:not(:last-child){page-break-after:always!important}
                         .print-page:last-child{page-break-after:auto!important}
                         .print-container{display:block!important;position:static!important;left:auto!important;top:auto!important}
                         #main-content,#canvas-container,#canvas-wrapper,#label-canvas{display:none!important}
@@ -3556,11 +3554,14 @@ document.addEventListener('DOMContentLoaded', ()=>{
         printContainer.style.left = '-9999px';
         printContainer.style.top = '0';
         printContainer.style.width = `${profile.width}cm`;
-        const totalHeight = canvas2Enabled ? profile.height * 2 : profile.height;
-        printContainer.style.height = `${totalHeight}cm`;
+        // Height is auto - pages will be stacked naturally
+        printContainer.style.height = 'auto';
+        
+        // Calculate total pages
+        const totalPages = canvas2Enabled ? 2 : 1;
         
         // Helper function to render canvas to print page (reuse from printBothCanvases)
-        function renderCanvasToPage(canvasNum, seqIndex, offsetY = 0){
+        function renderCanvasToPage(canvasNum, seqIndex, isLastPage = false){
             const canvasData = design[`canvas${canvasNum}`] || [];
             const tempS = canvasData.map(normalizeElement);
             
@@ -3571,10 +3572,11 @@ document.addEventListener('DOMContentLoaded', ()=>{
             page.style.position = 'relative';
             page.style.background = '#fff';
             page.style.overflow = 'hidden';
-            page.style.pageBreakAfter = (canvasNum === 1 && canvas2Enabled) ? 'always' : 'auto';
-            if(offsetY > 0){
-                page.style.marginTop = `${offsetY}cm`;
+            // Set pageBreakAfter only for last page - let CSS handle the rest
+            if(isLastPage){
+                page.style.pageBreakAfter = 'auto';
             }
+            // No marginTop or offsetY - pages are created in sequence
             
             // Render elements (same logic as in printBothCanvases)
             const sorted = tempS.slice().sort((a,b)=> (a.zIndex||0) - (b.zIndex||0));
@@ -3819,12 +3821,13 @@ document.addEventListener('DOMContentLoaded', ()=>{
         document.body.appendChild(printContainer);
         
         // Add canvas 1 with specified sequence index
-        const page1 = renderCanvasToPage(1, sequenceIndex, 0);
+        const isLastPage1 = !canvas2Enabled;
+        const page1 = renderCanvasToPage(1, sequenceIndex, isLastPage1);
         printContainer.appendChild(page1);
         
         // Add canvas 2 if enabled with same sequence index
         if(canvas2Enabled){
-            const page2 = renderCanvasToPage(2, sequenceIndex, profile.height);
+            const page2 = renderCanvasToPage(2, sequenceIndex, true);
             printContainer.appendChild(page2);
         }
         
@@ -3856,7 +3859,8 @@ document.addEventListener('DOMContentLoaded', ()=>{
                     html,body{margin:0!important;padding:0!important;background:#fff!important;width:${profile.width}cm!important;height:auto!important}
                     #toolbar,#sidebar,#marquee,.status-message{display:none!important}
                     .print-container{position:relative!important;left:0!important;top:0!important;width:${profile.width}cm!important;height:auto!important}
-                    .print-page{width:${profile.width}cm!important;height:${profile.height}cm!important;page-break-after:always!important;page-break-inside:avoid!important;overflow:visible!important;background:#fff!important;position:relative!important;margin:0!important;padding:0!important;display:block!important}
+                    .print-page{width:${profile.width}cm!important;height:${profile.height}cm!important;page-break-inside:avoid!important;overflow:visible!important;background:#fff!important;position:relative!important;margin:0!important;padding:0!important;display:block!important;box-sizing:border-box!important}
+                    .print-page:not(:last-child){page-break-after:always!important}
                     .print-page:last-child{page-break-after:auto!important}
                 }
             `;
