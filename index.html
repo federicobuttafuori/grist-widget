@@ -39,7 +39,7 @@
         .button-group{display:flex;gap:4px}
         #canvas-container{flex-grow:1;display:flex;justify-content:center;align-items:center;overflow:auto;background:#e0e0e0;padding:20px;position:relative}
         #canvas-wrapper{display:inline-block;transform-origin:center center;position:relative}
-            #label-canvas{background:#fff;box-shadow:0 4px 12px rgba(0,0,0,.15);position:relative;overflow:hidden}
+            #label-canvas{background:#fff;box-shadow:0 4px 12px rgba(0,0,0,.15);position:relative;overflow:auto}
         #marquee{position:absolute;border:1px dashed #007aff;background:rgba(0,122,255,0.08);pointer-events:none;display:none;z-index:9999}
         .label-element{position:absolute;cursor:move;border:1px solid transparent;font-size:16px;line-height:1.2;overflow:hidden;word-wrap:break-word;user-select:none;transform-origin:center center}
         .label-element.selected{border:2px dashed #007aff;box-shadow:0 0 0 1px rgba(0,122,255,.1)}
@@ -1035,7 +1035,7 @@ document.addEventListener('DOMContentLoaded', ()=>{
             d.classList.add('label-element');
             d.dataset.id = el.id;
             d.style.left = `${el.x}cm`;
-            d.style.top = `${el.y}cm`;
+            d.style.top = `${el.y + offsetY}cm`; // Apply vertical offset for sequence mode
             d.style.width = `${el.width}cm`;
             d.style.height = `${el.height}cm`;
             d.style.zIndex = el.zIndex || 0;
@@ -1463,6 +1463,15 @@ document.addEventListener('DOMContentLoaded', ()=>{
             lc.appendChild(d);
             }); // End forEach el
         } // End for seqIdx
+        
+        // Update canvas height to accommodate all labels in sequence mode
+        if(seqEnabled && sequenceCount > 1){
+            const verticalSpacing = 0.2;
+            const totalHeight = sequenceCount * H + (sequenceCount - 1) * verticalSpacing;
+            lc.style.height = `${totalHeight}cm`;
+        } else {
+            lc.style.height = `${H}cm`;
+        }
     }
 
         // Helper function to apply text overflow handling
