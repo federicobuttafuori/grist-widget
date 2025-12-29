@@ -3494,28 +3494,32 @@ document.addEventListener('DOMContentLoaded', ()=>{
     }
 
     function printSingle(){
-        const profile = profiles[currentProfile];
-        if(!profile || !profile.designs[currentDesign]) return;
-        const design = profile.designs[currentDesign];
-        const canvas2Flag = design.canvas2Enabled || false;
-        
-        // Ask user for sequence number
-        const sequenceInput = prompt('Enter sequence number:', '1');
-        if(sequenceInput === null) return; // User cancelled
-        
-        const sequenceIndex = Math.max(1, Math.floor(Number(sequenceInput)));
-        if(isNaN(sequenceIndex) || sequenceIndex < 1){
-            msg('Error: Invalid sequence number', true);
-            return;
-        }
-        
-        // Save current canvas
-        saveCurrentDesign();
-        
-        // Store original state
-        const prevSel = deepCopy(selectedIds);
-        const prevCanvas = currentCanvas;
-        const prevS = deepCopy(S);
+        try {
+            const profile = profiles[currentProfile];
+            if(!profile || !profile.designs[currentDesign]) {
+                msg('Error: No profile or design selected', true);
+                return;
+            }
+            const design = profile.designs[currentDesign];
+            const canvas2Flag = design.canvas2Enabled || false;
+            
+            // Ask user for sequence number
+            const sequenceInput = prompt('Enter sequence number:', '1');
+            if(sequenceInput === null) return; // User cancelled
+            
+            const sequenceIndex = Math.max(1, Math.floor(Number(sequenceInput)));
+            if(isNaN(sequenceIndex) || sequenceIndex < 1){
+                msg('Error: Invalid sequence number', true);
+                return;
+            }
+            
+            // Save current canvas
+            saveCurrentDesign();
+            
+            // Store original state
+            const prevSel = deepCopy(selectedIds);
+            const prevCanvas = currentCanvas;
+            const prevS = deepCopy(S);
         
         // Create print container for single label
         const printContainer = document.createElement('div');
@@ -3530,8 +3534,8 @@ document.addEventListener('DOMContentLoaded', ()=>{
         // Calculate total pages
         const totalPages = canvas2Flag ? 2 : 1;
         
-        // Helper function to render canvas to print page (reuse from printBothCanvases)
-        function renderCanvasToPage(canvasNum, seqIndex, isLastPage = false){
+        // Helper function to render canvas to print page (identical to printBothCanvases)
+        function renderCanvasToPage(canvasNum, sequenceIndex = 1, isLastPage = false){
             const canvasData = design[`canvas${canvasNum}`] || [];
             const tempS = canvasData.map(normalizeElement);
             
@@ -3548,7 +3552,7 @@ document.addEventListener('DOMContentLoaded', ()=>{
             }
             // No marginTop or offsetY - pages are created in sequence
             
-            // Render elements (same logic as in printBothCanvases)
+            // Render elements
             const sorted = tempS.slice().sort((a,b)=> (a.zIndex||0) - (b.zIndex||0));
             sorted.forEach(el=>{
                 const d = document.createElement('div');
@@ -3654,7 +3658,7 @@ document.addEventListener('DOMContentLoaded', ()=>{
                         span.style.overflow='hidden';
                         span.style.wordWrap='break-word';
                         span.style.whiteSpace='pre-wrap';
-                        span.textContent = getData(el, seqIndex);
+                        span.textContent = getData(el, sequenceIndex);
                         span.style.fontFamily = el.props.fontFamily || 'Arial, sans-serif';
                         span.style.fontSize = (el.props.fontSize || 16) + 'px';
                         span.style.color = el.props.color || '#000000';
@@ -3669,7 +3673,7 @@ document.addEventListener('DOMContentLoaded', ()=>{
                         span.style.overflow='hidden';
                         span.style.wordWrap='break-word';
                         span.style.whiteSpace='pre-wrap';
-                        span.textContent = getData(el, seqIndex);
+                        span.textContent = getData(el, sequenceIndex);
                         span.style.fontFamily = el.props.fontFamily || 'Arial, sans-serif';
                         span.style.fontSize = (el.props.fontSize || 16) + 'px';
                         span.style.color = el.props.color || '#000000';
@@ -3692,7 +3696,7 @@ document.addEventListener('DOMContentLoaded', ()=>{
                         d.style.backgroundColor = el.props.fillColor || 'transparent';
                         break;
                     case 'qr': {
-                        const c = getData(el, seqIndex);
+                        const c = getData(el, sequenceIndex);
                         const q = document.createElement('img');
                         const dpi = 37.795276;
                         const qs = Math.min(el.width, el.height) * dpi;
@@ -3705,16 +3709,28 @@ document.addEventListener('DOMContentLoaded', ()=>{
                         break;
                     }
                     case 'barcode': {
-                        const c = getData(el, seqIndex) || '';
+                        const c = getData(el, sequenceIndex) || '';
                         let prefix = el.props.prefix || '';
                         let suffix = el.props.suffix || '';
                         prefix = replaceColumnSyntax(prefix, el);
-                        prefix = applySequencePlaceholder(prefix, seqIndex);
+                        prefix = applySequencePlaceholder(prefix, sequenceIndex);
                         suffix = replaceColumnSyntax(suffix, el);
-                        suffix = applySequencePlaceholder(suffix, seqIndex);
+                        suffix = applySequencePlaceholder(suffix, sequenceIndex);
                         
                         // Combine prefix + code + suffix into the barcode value
                         const barcodeValue = prefix + String(c) + suffix;
+                        
+                        // Calculate dimensions considering padding and borders FIRST
+                        const paddingTop = (Number(el.props.paddingTop) || 0) * PIXELS_PER_CM;
+                        const paddingBottom = (Number(el.props.paddingBottom) || 0) * PIXELS_PER_CM;
+                        const paddingLeft = (Number(el.props.paddingLeft) || 0) * PIXELS_PER_CM;
+                        const paddingRight = (Number(el.props.paddingRight) || 0) * PIXELS_PER_CM;
+                        const borderWidth = (Number(el.props.thickness) || 0);
+                        
+                        const containerWidthPx = el.width * PIXELS_PER_CM;
+                        const containerHeightPx = el.height * PIXELS_PER_CM;
+                        const availableWidth = containerWidthPx - paddingLeft - paddingRight - (borderWidth * 2);
+                        const availableHeight = containerHeightPx - paddingTop - paddingBottom - (borderWidth * 2);
                         
                         // Create SVG for barcode - fill full container
                         const sv = document.createElementNS('http://www.w3.org/2000/svg','svg');
@@ -3726,12 +3742,25 @@ document.addEventListener('DOMContentLoaded', ()=>{
                         d.appendChild(sv);
                         
                         try{
+                            const barcodeWidth = Math.max(50, availableWidth);
+                            const pxHeight = availableHeight; // Use full available height, no minimum
+                            
+                            // Calculate width per bar based on available width (estimate ~50 bars for typical barcode)
+                            const estimatedBars = 50;
+                            const widthPerBar = Math.max(1, barcodeWidth / estimatedBars);
+                            
+                            // Set explicit SVG dimensions
+                            sv.setAttribute('width', barcodeWidth.toString());
+                            sv.setAttribute('height', pxHeight.toString());
+                            sv.setAttribute('viewBox', `0 0 ${barcodeWidth} ${pxHeight}`);
+                            sv.setAttribute('preserveAspectRatio', 'none'); // No aspect ratio preservation - fill completely
+                            
                             // Generate barcode with prefix + code + suffix included
                             JsBarcode(sv, barcodeValue, {
                                 format: el.props.format || "CODE128",
                                 displayValue: el.props.displayValue !== false,
-                                width: 1,
-                                height: 100,
+                                width: widthPerBar,
+                                height: pxHeight,
                                 margin: 0
                             });
                         }catch(err){
@@ -3770,7 +3799,7 @@ document.addEventListener('DOMContentLoaded', ()=>{
             return page;
         }
         
-        // Add print container to DOM
+        // Add print container to DOM first so measurements work correctly
         document.body.appendChild(printContainer);
         
         // Add canvas 1 with specified sequence index
@@ -3784,21 +3813,51 @@ document.addEventListener('DOMContentLoaded', ()=>{
             printContainer.appendChild(page2);
         }
         
-        // Wait for images to load, then print
+        // Apply text overflow handling after all elements are in DOM
+        const canvas1Data = design.canvas1 || [];
+        const canvas2Data = design.canvas2 || [];
+        const allPages = printContainer.querySelectorAll('.print-page');
+        allPages.forEach((page, pageIndex) => {
+            const canvasNum = (pageIndex === 0) ? 1 : 2;
+            const canvasData = canvasNum === 1 ? canvas1Data : canvas2Data;
+            const tempS = canvasData.map(normalizeElement);
+            const sorted = tempS.slice().sort((a,b)=> (a.zIndex||0) - (b.zIndex||0));
+            
+            page.querySelectorAll('.label-element').forEach((d, index) => {
+                if(index < sorted.length){
+                    const el = sorted[index];
+                    if((el.type === 'text' || el.type === 'data') && (el.props.textOverflow === 'auto-scale' || el.props.textOverflow === 'squeeze')){
+                        const span = d.querySelector('div[style*="pointer-events: none"]');
+                        if(span){
+                            // Use real browser dimensions
+                            const containerWidth = d.offsetWidth;
+                            const containerHeight = d.offsetHeight;
+                            applyTextOverflow(span, el, containerWidth, containerHeight, true);
+                        }
+                    }
+                }
+            });
+        });
+        
+        // Wait for all images to load before printing
         const allImages = printContainer.querySelectorAll('img');
         const imagePromises = Array.from(allImages).map(img => {
+            // If image is already loaded (complete), resolve immediately
             if(img.complete && img.naturalWidth > 0){
                 return Promise.resolve();
             }
+            // Otherwise wait for load or error
             return new Promise((resolve) => {
                 img.onload = resolve;
-                img.onerror = resolve;
+                img.onerror = resolve; // Resolve even on error so print can proceed
+                // Timeout after 5 seconds to prevent hanging
                 setTimeout(resolve, 5000);
             });
         });
         
+        // Wait for all images, then proceed with print
         Promise.all(imagePromises).then(() => {
-            // Use same print CSS logic as printBothCanvases
+            // Update print CSS for multiple pages (identical to printBothCanvases)
             const styleId = 'dynamic-print-css';
             let styleEl = document.getElementById(styleId);
             if(!styleEl){
@@ -3811,22 +3870,41 @@ document.addEventListener('DOMContentLoaded', ()=>{
                     @page{size:${profile.width}cm ${profile.height}cm;margin:0}
                     html,body{margin:0!important;padding:0!important;background:#fff!important;width:${profile.width}cm!important;height:auto!important}
                     #toolbar,#sidebar,#marquee,.status-message{display:none!important}
-                    .print-container{position:relative!important;left:0!important;top:0!important;width:${profile.width}cm!important;height:auto!important}
                     .print-page{width:${profile.width}cm!important;height:${profile.height}cm!important;page-break-inside:avoid!important;overflow:visible!important;background:#fff!important;position:relative!important;margin:0!important;padding:0!important;display:block!important;box-sizing:border-box!important}
                     .print-page:not(:last-child){page-break-after:always!important}
                     .print-page:last-child{page-break-after:auto!important}
+                    .print-container{display:block!important;position:static!important;left:auto!important;top:auto!important}
+                    #main-content,#canvas-container,#canvas-wrapper,#label-canvas{display:none!important}
+                    .label-element{print-color-adjust:exact!important;-webkit-print-color-adjust:exact!important}
                 }
             `;
             
+            // Print
             window.print();
             
-            setTimeout(() => {
+            // Restore state after a delay
+            setTimeout(()=>{
+                currentCanvas = prevCanvas;
+                S = prevS;
+                selectedIds = prevSel;
+                render();
+                updateProps();
                 if(printContainer.parentNode){
                     document.body.removeChild(printContainer);
                 }
-                styleEl.textContent = '';
+                updatePrintCSS(); // Restore normal print CSS
             }, 100);
         });
+        } catch(err) {
+            console.error('Error in printSingle:', err);
+            msg('Error: ' + (err.message || String(err)), true);
+            // Restore state on error if available
+            if(typeof prevCanvas !== 'undefined') currentCanvas = prevCanvas;
+            if(typeof prevS !== 'undefined') S = prevS;
+            if(typeof prevSel !== 'undefined') selectedIds = prevSel;
+            render();
+            updateProps();
+        }
     }
 
     // ---------- Mouse interactions: marquee, selection, drag, resize ----------
