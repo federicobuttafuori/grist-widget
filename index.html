@@ -607,6 +607,68 @@ document.addEventListener('DOMContentLoaded', ()=>{
             saveCurrentDesign();
         }
 
+        // Helper function to save globalSequenceCountColumn to localStorage
+        function saveGlobalSequenceCountColumn(){
+            try {
+                const saved = localStorage.getItem(KEY);
+                if(saved){
+                    const parsed = JSON.parse(saved);
+                    if(parsed && parsed.version === 2){
+                        parsed.globalSequenceCountColumn = globalSequenceCountColumn;
+                        localStorage.setItem(KEY, JSON.stringify(parsed));
+                    }
+                } else {
+                    // If no saved data exists, create new payload
+                    const payloadObj = { 
+                        version: 2, 
+                        profiles: profiles || {},
+                        currentProfile: currentProfile || '',
+                        currentDesign: currentDesign || '',
+                        currentCanvas: currentCanvas || 1,
+                        groups: groups || [],
+                        lastDesignByProfile: lastDesignByProfile || {},
+                        lastCanvasByProfile: lastCanvasByProfile || {},
+                        lastCanvasByDesign: lastCanvasByDesign || {},
+                        globalSequenceCountColumn: globalSequenceCountColumn
+                    };
+                    localStorage.setItem(KEY, JSON.stringify(payloadObj));
+                }
+            } catch(e) {
+                console.warn('Failed to save globalSequenceCountColumn:', e);
+            }
+        }
+
+        // Helper function to save globalSequenceCountColumn to localStorage
+        function saveGlobalSequenceCountColumn(){
+            try {
+                const saved = localStorage.getItem(KEY);
+                if(saved){
+                    const parsed = JSON.parse(saved);
+                    if(parsed && parsed.version === 2){
+                        parsed.globalSequenceCountColumn = globalSequenceCountColumn;
+                        localStorage.setItem(KEY, JSON.stringify(parsed));
+                    }
+                } else {
+                    // If no saved data exists, create new payload
+                    const payloadObj = { 
+                        version: 2, 
+                        profiles: profiles || {},
+                        currentProfile: currentProfile || '',
+                        currentDesign: currentDesign || '',
+                        currentCanvas: currentCanvas || 1,
+                        groups: groups || [],
+                        lastDesignByProfile: lastDesignByProfile || {},
+                        lastCanvasByProfile: lastCanvasByProfile || {},
+                        lastCanvasByDesign: lastCanvasByDesign || {},
+                        globalSequenceCountColumn: globalSequenceCountColumn
+                    };
+                    localStorage.setItem(KEY, JSON.stringify(payloadObj));
+                }
+            } catch(e) {
+                console.warn('Failed to save globalSequenceCountColumn:', e);
+            }
+        }
+
         function saveCurrentDesign(){
             const profile = profiles[currentProfile];
             if(!profile) return;
@@ -624,7 +686,7 @@ document.addEventListener('DOMContentLoaded', ()=>{
             const canvasKey = `canvas${currentCanvas}`;
             design[canvasKey] = deepCopy(S);
             
-            // Save to localStorage
+            // Save to localStorage (includes globalSequenceCountColumn)
             try {
                 const payloadObj = { 
                     version: 2, 
@@ -1209,6 +1271,9 @@ document.addEventListener('DOMContentLoaded', ()=>{
                     suffix = replaceColumnSyntax(suffix, el);
                     suffix = applySequencePlaceholder(suffix, sequenceIndex);
                     
+                    // Combine prefix + code + suffix into the barcode value
+                    const barcodeValue = prefix + String(c) + suffix;
+                    
                     // Calculate dimensions considering padding and borders FIRST
                     const paddingTop = (Number(el.props.paddingTop) || 0) * PIXELS_PER_CM;
                     const paddingBottom = (Number(el.props.paddingBottom) || 0) * PIXELS_PER_CM;
@@ -1221,59 +1286,17 @@ document.addEventListener('DOMContentLoaded', ()=>{
                     const availableWidth = containerWidthPx - paddingLeft - paddingRight - (borderWidth * 2);
                     const availableHeight = containerHeightPx - paddingTop - paddingBottom - (borderWidth * 2);
                     
-                    // Create container for barcode with prefix/suffix
-                    const barcodeContainer = document.createElement('div');
-                    barcodeContainer.style.display = 'flex';
-                    barcodeContainer.style.alignItems = 'stretch'; // Stretch to fill height
-                    barcodeContainer.style.justifyContent = 'center';
-                    barcodeContainer.style.width = '100%';
-                    barcodeContainer.style.height = '100%';
-                    barcodeContainer.style.pointerEvents = 'none';
-                    barcodeContainer.style.gap = '4px';
-                    
-                    // Add prefix if exists
-                    if(prefix){
-                        const prefixSpan = document.createElement('span');
-                        prefixSpan.textContent = prefix;
-                        prefixSpan.style.fontFamily = el.props.fontFamily || 'Arial, sans-serif';
-                        prefixSpan.style.fontSize = (el.props.fontSize || 16) + 'px';
-                        prefixSpan.style.color = el.props.color || '#000000';
-                        prefixSpan.style.whiteSpace = 'nowrap';
-                        prefixSpan.style.display = 'flex';
-                        prefixSpan.style.alignItems = 'center';
-                        barcodeContainer.appendChild(prefixSpan);
-                    }
-                    
-                    // Create SVG for barcode - must fill full height
+                    // Create SVG for barcode - fill full container
                     const sv = document.createElementNS('http://www.w3.org/2000/svg','svg');
                     sv.style.pointerEvents='none';
-                    sv.style.flex = '1 1 auto';
-                    sv.style.minWidth = '0';
                     sv.style.width = '100%';
                     sv.style.height = '100%';
                     sv.style.display = 'block';
                     sv.style.overflow = 'visible';
-                    barcodeContainer.appendChild(sv);
-                    
-                    // Add suffix if exists
-                    if(suffix){
-                        const suffixSpan = document.createElement('span');
-                        suffixSpan.textContent = suffix;
-                        suffixSpan.style.fontFamily = el.props.fontFamily || 'Arial, sans-serif';
-                        suffixSpan.style.fontSize = (el.props.fontSize || 16) + 'px';
-                        suffixSpan.style.color = el.props.color || '#000000';
-                        suffixSpan.style.whiteSpace = 'nowrap';
-                        suffixSpan.style.display = 'flex';
-                        suffixSpan.style.alignItems = 'center';
-                        barcodeContainer.appendChild(suffixSpan);
-                    }
-                    
-                    d.appendChild(barcodeContainer);
+                    d.appendChild(sv);
                     
                     try{
-                        // Subtract space for prefix/suffix if they exist
-                        const prefixSuffixWidth = (prefix || suffix) ? 40 : 0; // Estimate
-                        const barcodeWidth = Math.max(50, availableWidth - prefixSuffixWidth);
+                        const barcodeWidth = Math.max(50, availableWidth);
                         const pxHeight = availableHeight; // Use full available height, no minimum
                         
                         // Calculate width per bar based on available width (estimate ~50 bars for typical barcode)
@@ -1286,7 +1309,8 @@ document.addEventListener('DOMContentLoaded', ()=>{
                         sv.setAttribute('viewBox', `0 0 ${barcodeWidth} ${pxHeight}`);
                         sv.setAttribute('preserveAspectRatio', 'none'); // No aspect ratio preservation - fill completely
                         
-                        JsBarcode(sv, String(c), {
+                        // Generate barcode with prefix + code + suffix included
+                        JsBarcode(sv, barcodeValue, {
                             format: el.props.format || "CODE128",
                             displayValue: el.props.displayValue !== false,
                             width: widthPerBar,
@@ -1792,19 +1816,8 @@ document.addEventListener('DOMContentLoaded', ()=>{
             if(sequenceColumnSelect) {
                 sequenceColumnSelect.addEventListener('change', function() {
                     globalSequenceCountColumn = this.value || '';
-                    // Save to localStorage
-                    try {
-                        const saved = localStorage.getItem(KEY);
-                        if(saved){
-                            const parsed = JSON.parse(saved);
-                            if(parsed && parsed.version === 2){
-                                parsed.globalSequenceCountColumn = globalSequenceCountColumn;
-                                localStorage.setItem(KEY, JSON.stringify(parsed));
-                            }
-                        }
-                    } catch(e) {
-                        console.warn('Failed to save globalSequenceCountColumn:', e);
-                    }
+                    // Save to localStorage immediately
+                    saveGlobalSequenceCountColumn();
                     updateCountDisplay();
                     render();
                 });
@@ -3229,6 +3242,9 @@ document.addEventListener('DOMContentLoaded', ()=>{
                             suffix = replaceColumnSyntax(suffix, el);
                             suffix = applySequencePlaceholder(suffix, sequenceIndex);
                             
+                            // Combine prefix + code + suffix into the barcode value
+                            const barcodeValue = prefix + String(c) + suffix;
+                            
                             // Calculate dimensions considering padding and borders FIRST
                             const paddingTop = (Number(el.props.paddingTop) || 0) * PIXELS_PER_CM;
                             const paddingBottom = (Number(el.props.paddingBottom) || 0) * PIXELS_PER_CM;
@@ -3241,59 +3257,17 @@ document.addEventListener('DOMContentLoaded', ()=>{
                             const availableWidth = containerWidthPx - paddingLeft - paddingRight - (borderWidth * 2);
                             const availableHeight = containerHeightPx - paddingTop - paddingBottom - (borderWidth * 2);
                             
-                            // Create container for barcode with prefix/suffix
-                            const barcodeContainer = document.createElement('div');
-                            barcodeContainer.style.display = 'flex';
-                            barcodeContainer.style.alignItems = 'stretch'; // Stretch to fill height
-                            barcodeContainer.style.justifyContent = 'center';
-                            barcodeContainer.style.width = '100%';
-                            barcodeContainer.style.height = '100%';
-                            barcodeContainer.style.pointerEvents = 'none';
-                            barcodeContainer.style.gap = '4px';
-                            
-                            // Add prefix if exists
-                            if(prefix){
-                                const prefixSpan = document.createElement('span');
-                                prefixSpan.textContent = prefix;
-                                prefixSpan.style.fontFamily = el.props.fontFamily || 'Arial, sans-serif';
-                                prefixSpan.style.fontSize = (el.props.fontSize || 16) + 'px';
-                                prefixSpan.style.color = el.props.color || '#000000';
-                                prefixSpan.style.whiteSpace = 'nowrap';
-                                prefixSpan.style.display = 'flex';
-                                prefixSpan.style.alignItems = 'center';
-                                barcodeContainer.appendChild(prefixSpan);
-                            }
-                            
-                            // Create SVG for barcode - must fill full height
+                            // Create SVG for barcode - fill full container
                             const sv = document.createElementNS('http://www.w3.org/2000/svg','svg');
                             sv.style.pointerEvents='none';
-                            sv.style.flex = '1 1 auto';
-                            sv.style.minWidth = '0';
                             sv.style.width = '100%';
                             sv.style.height = '100%';
                             sv.style.display = 'block';
                             sv.style.overflow = 'visible';
-                            barcodeContainer.appendChild(sv);
-                            
-                            // Add suffix if exists
-                            if(suffix){
-                                const suffixSpan = document.createElement('span');
-                                suffixSpan.textContent = suffix;
-                                suffixSpan.style.fontFamily = el.props.fontFamily || 'Arial, sans-serif';
-                                suffixSpan.style.fontSize = (el.props.fontSize || 16) + 'px';
-                                suffixSpan.style.color = el.props.color || '#000000';
-                                suffixSpan.style.whiteSpace = 'nowrap';
-                                suffixSpan.style.display = 'flex';
-                                suffixSpan.style.alignItems = 'center';
-                                barcodeContainer.appendChild(suffixSpan);
-                            }
-                            
-                            d.appendChild(barcodeContainer);
+                            d.appendChild(sv);
                             
                             try{
-                                // Subtract space for prefix/suffix if they exist
-                                const prefixSuffixWidth = (prefix || suffix) ? 40 : 0; // Estimate
-                                const barcodeWidth = Math.max(50, availableWidth - prefixSuffixWidth);
+                                const barcodeWidth = Math.max(50, availableWidth);
                                 const pxHeight = availableHeight; // Use full available height, no minimum
                                 
                                 // Calculate width per bar based on available width (estimate ~50 bars for typical barcode)
@@ -3306,7 +3280,8 @@ document.addEventListener('DOMContentLoaded', ()=>{
                                 sv.setAttribute('viewBox', `0 0 ${barcodeWidth} ${pxHeight}`);
                                 sv.setAttribute('preserveAspectRatio', 'none'); // No aspect ratio preservation - fill completely
                                 
-                                JsBarcode(sv, String(c), {
+                                // Generate barcode with prefix + code + suffix included
+                                JsBarcode(sv, barcodeValue, {
                                     format: el.props.format || "CODE128",
                                     displayValue: el.props.displayValue !== false,
                                     width: widthPerBar,
@@ -3737,39 +3712,22 @@ document.addEventListener('DOMContentLoaded', ()=>{
                         prefix = applySequencePlaceholder(prefix, seqIndex);
                         suffix = replaceColumnSyntax(suffix, el);
                         suffix = applySequencePlaceholder(suffix, seqIndex);
-                        // Create barcode container and render (simplified version)
-                        const barcodeContainer = document.createElement('div');
-                        barcodeContainer.style.display = 'flex';
-                        barcodeContainer.style.alignItems = 'stretch';
-                        barcodeContainer.style.justifyContent = 'center';
-                        barcodeContainer.style.width = '100%';
-                        barcodeContainer.style.height = '100%';
-                        barcodeContainer.style.pointerEvents = 'none';
-                        if(prefix){
-                            const prefixSpan = document.createElement('span');
-                            prefixSpan.textContent = prefix;
-                            prefixSpan.style.fontFamily = el.props.fontFamily || 'Arial, sans-serif';
-                            prefixSpan.style.fontSize = (el.props.fontSize || 16) + 'px';
-                            prefixSpan.style.color = el.props.color || '#000000';
-                            barcodeContainer.appendChild(prefixSpan);
-                        }
+                        
+                        // Combine prefix + code + suffix into the barcode value
+                        const barcodeValue = prefix + String(c) + suffix;
+                        
+                        // Create SVG for barcode - fill full container
                         const sv = document.createElementNS('http://www.w3.org/2000/svg','svg');
                         sv.style.pointerEvents='none';
-                        sv.style.flex = '1 1 auto';
                         sv.style.width = '100%';
                         sv.style.height = '100%';
-                        barcodeContainer.appendChild(sv);
-                        if(suffix){
-                            const suffixSpan = document.createElement('span');
-                            suffixSpan.textContent = suffix;
-                            suffixSpan.style.fontFamily = el.props.fontFamily || 'Arial, sans-serif';
-                            suffixSpan.style.fontSize = (el.props.fontSize || 16) + 'px';
-                            suffixSpan.style.color = el.props.color || '#000000';
-                            barcodeContainer.appendChild(suffixSpan);
-                        }
-                        d.appendChild(barcodeContainer);
+                        sv.style.display = 'block';
+                        sv.style.overflow = 'visible';
+                        d.appendChild(sv);
+                        
                         try{
-                            JsBarcode(sv, String(c), {
+                            // Generate barcode with prefix + code + suffix included
+                            JsBarcode(sv, barcodeValue, {
                                 format: el.props.format || "CODE128",
                                 displayValue: el.props.displayValue !== false,
                                 width: 1,
@@ -5159,6 +5117,10 @@ document.addEventListener('DOMContentLoaded', ()=>{
                     // Load lastCanvasByDesign if saved
                     if(parsed.lastCanvasByDesign && typeof parsed.lastCanvasByDesign === 'object'){
                         lastCanvasByDesign = parsed.lastCanvasByDesign;
+                    }
+                    // Load globalSequenceCountColumn if saved
+                    if(parsed.globalSequenceCountColumn !== undefined){
+                        globalSequenceCountColumn = parsed.globalSequenceCountColumn || '';
                     }
                     // Restore current profile, design and canvas if saved
                     if(parsed.currentProfile && profiles[parsed.currentProfile]){
