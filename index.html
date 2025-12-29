@@ -39,7 +39,7 @@
         .button-group{display:flex;gap:4px}
         #canvas-container{flex-grow:1;display:flex;justify-content:center;align-items:center;overflow:auto;background:#e0e0e0;padding:20px;position:relative}
         #canvas-wrapper{display:inline-block;transform-origin:center center;position:relative}
-            #label-canvas{background:#fff;box-shadow:0 4px 12px rgba(0,0,0,.15);position:relative;overflow:auto;min-height:100%}
+            #label-canvas{background:#fff;box-shadow:0 4px 12px rgba(0,0,0,.15);position:relative;overflow:hidden}
         #marquee{position:absolute;border:1px dashed #007aff;background:rgba(0,122,255,0.08);pointer-events:none;display:none;z-index:9999}
         .label-element{position:absolute;cursor:move;border:1px solid transparent;font-size:16px;line-height:1.2;overflow:hidden;word-wrap:break-word;user-select:none;transform-origin:center center}
         .label-element.selected{border:2px dashed #007aff;box-shadow:0 0 0 1px rgba(0,122,255,.1)}
@@ -129,21 +129,6 @@
             <div class="sidebar-section">
                 <h3>Properties</h3>
                 <div id="properties-panel">Select an element to edit its properties.</div>
-                </div>
-            <hr>
-            <div class="sidebar-section">
-                <h3>Sequence Mode</h3>
-                <div style="display:flex;align-items:center;gap:8px;margin-bottom:8px">
-                    <input type="checkbox" id="sequence-enabled" style="width:auto;flex:none">
-                    <label for="sequence-enabled" style="font-size:14px;margin:0;font-weight:normal;cursor:pointer">Enable Sequence Mode</label>
-                </div>
-                <div id="sequence-settings" style="display:none">
-                    <label>Count Column:</label>
-                    <select id="sequence-count-column">
-                        <option value="">-- Select Column --</option>
-                    </select>
-                    <small style="display:block;margin-top:4px;color:#666;font-size:12px">Use <strong>**sequence**</strong> in text/prefix/suffix to show label number (1, 2, 3...)</small>
-                </div>
             </div>
             <hr>
             <div class="sidebar-section">
@@ -319,9 +304,6 @@ document.addEventListener('DOMContentLoaded', ()=>{
         const btnRemoveDesign = document.getElementById('btn-remove-design');
         const canvasSelector = document.getElementById('canvas-selector');
         const canvas2Enabled = document.getElementById('canvas2-enabled');
-        const sequenceEnabled = document.getElementById('sequence-enabled');
-        const sequenceCountColumn = document.getElementById('sequence-count-column');
-        const sequenceSettings = document.getElementById('sequence-settings');
 
     // Marquee state
     let marqueeActive = false;
@@ -461,25 +443,6 @@ document.addEventListener('DOMContentLoaded', ()=>{
             const design = profile.designs[currentDesign];
             const enabled = design.canvas2Enabled || false;
             canvas2Enabled.checked = enabled;
-            
-            // Update sequence mode settings
-            const seqEnabled = design.sequenceEnabled || false;
-            sequenceEnabled.checked = seqEnabled;
-            sequenceSettings.style.display = seqEnabled ? 'block' : 'none';
-            if(design.sequenceCountColumn){
-                sequenceCountColumn.value = design.sequenceCountColumn;
-            } else {
-                sequenceCountColumn.value = '';
-            }
-            
-            // Update sequence count column options
-            if(C && C.length > 0){
-                const currentValue = sequenceCountColumn.value;
-                sequenceCountColumn.innerHTML = '<option value="">-- Select Column --</option>' + 
-                    C.map(col => `<option value="${col}" ${col===currentValue?'selected':''}>${col}</option>`).join('');
-            } else {
-                sequenceCountColumn.innerHTML = '<option value="">-- No columns --</option>';
-            }
             
             // Update canvas selector options
             const canvas2Option = canvasSelector.querySelector('option[value="2"]');
@@ -633,17 +596,12 @@ document.addEventListener('DOMContentLoaded', ()=>{
                 profile.designs[currentDesign] = {
                     canvas1: [],
                     canvas2: [],
-                    canvas2Enabled: false,
-                    sequenceEnabled: false,
-                    sequenceCountColumn: ''
+                    canvas2Enabled: false
                 };
             }
             const design = profile.designs[currentDesign];
             const canvasKey = `canvas${currentCanvas}`;
             design[canvasKey] = deepCopy(S);
-            // Save sequence mode settings
-            design.sequenceEnabled = sequenceEnabled.checked;
-            design.sequenceCountColumn = sequenceCountColumn.value || '';
             
             // Save to localStorage
             try {
@@ -671,9 +629,7 @@ document.addEventListener('DOMContentLoaded', ()=>{
                 profile.designs[currentDesign] = {
                     canvas1: [],
                     canvas2: [],
-                    canvas2Enabled: false,
-                    sequenceEnabled: false,
-                    sequenceCountColumn: ''
+                    canvas2Enabled: false
                 };
             }
             const design = profile.designs[currentDesign];
@@ -683,9 +639,6 @@ document.addEventListener('DOMContentLoaded', ()=>{
             selectedIds = [];
             // Reset history when switching design/profile/canvas
             resetHistory();
-            
-            // Load sequence mode settings
-            updateCanvasControls();
         }
 
         function addProfile(){
@@ -708,9 +661,7 @@ document.addEventListener('DOMContentLoaded', ()=>{
                     'default': {
                         canvas1: [],
                         canvas2: [],
-                        canvas2Enabled: false,
-                        sequenceEnabled: false,
-                        sequenceCountColumn: ''
+                        canvas2Enabled: false
                     }
                 }
             };
@@ -745,9 +696,7 @@ document.addEventListener('DOMContentLoaded', ()=>{
             profile.designs[designKey] = {
                 canvas1: [],
                 canvas2: [],
-                canvas2Enabled: false,
-                sequenceEnabled: false,
-                sequenceCountColumn: ''
+                canvas2Enabled: false
             };
             switchDesign(designKey);
             msg(`Design "${designKey}" added`);
@@ -797,9 +746,7 @@ document.addEventListener('DOMContentLoaded', ()=>{
             profile.designs[newKey] = {
                 canvas1: deepCopy(currentDes.canvas1 || []),
                 canvas2: deepCopy(currentDes.canvas2 || []),
-                canvas2Enabled: currentDes.canvas2Enabled || false,
-                sequenceEnabled: currentDes.sequenceEnabled || false,
-                sequenceCountColumn: currentDes.sequenceCountColumn || ''
+                canvas2Enabled: currentDes.canvas2Enabled || false
             };
             // Switch to cloned design
             switchDesign(newKey);
@@ -992,67 +939,13 @@ document.addEventListener('DOMContentLoaded', ()=>{
     // ---------- Rendering ----------
     function render(){
         lc.innerHTML = '';
-        
-        // Check if sequence mode is enabled
-        const profile = profiles[currentProfile];
-        const design = profile && profile.designs[currentDesign] ? profile.designs[currentDesign] : null;
-        const seqEnabled = design && design.sequenceEnabled || false;
-        let sequenceCount = 1;
-        const maxPreviewCount = 50; // Limit preview for performance
-        
-        if(seqEnabled){
-            const countColumn = design.sequenceCountColumn;
-            if(countColumn && R && Object.prototype.hasOwnProperty.call(R, countColumn)){
-                const countRaw = R[countColumn];
-                // Handle different value types: number, string, array, etc.
-                let countValue = countRaw;
-                if(Array.isArray(countRaw) && countRaw.length > 0){
-                    countValue = countRaw[0]; // Take first element if array
-                }
-                // Convert to number, handling strings and null/undefined
-                // Trim string values to remove whitespace
-                if(typeof countValue === 'string'){
-                    countValue = countValue.trim();
-                }
-                const parsedCount = countValue === null || countValue === undefined || countValue === '' ? 0 : Number(countValue);
-                if(!isNaN(parsedCount)){
-                    sequenceCount = Math.max(0, Math.floor(parsedCount));
-                    // Limit preview count for performance
-                    sequenceCount = Math.min(sequenceCount, maxPreviewCount);
-                }
-            }
-        }
-        
         const sorted = S.slice().sort((a,b)=> (a.zIndex||0) - (b.zIndex||0));
-        const verticalSpacing = 0.5; // 0.5cm spacing between labels in preview
-        const topPadding = seqEnabled ? 0.5 : 0; // Padding at top to prevent clipping (always in sequence mode)
-        const bottomPadding = seqEnabled ? 0.5 : 0; // Padding at bottom
-        
-        // Render labels for each sequence index
-        for(let seqIdx = 1; seqIdx <= sequenceCount; seqIdx++){
-            // Calculate offset: first label starts at topPadding, subsequent labels add spacing
-            const offsetY = seqEnabled ? (topPadding + (seqIdx - 1) * (H + verticalSpacing)) : 0;
-            
-            // Add visual separator line between labels (except before first label)
-            if(seqEnabled && seqIdx > 1){
-                const separator = document.createElement('div');
-                separator.style.position = 'absolute';
-                separator.style.left = '0';
-                separator.style.top = `${offsetY - verticalSpacing/2}cm`;
-                separator.style.width = `${W}cm`;
-                separator.style.height = '2px';
-                separator.style.backgroundColor = 'rgba(200,200,200,0.6)';
-                separator.style.pointerEvents = 'none';
-                separator.style.zIndex = 10000;
-                lc.appendChild(separator);
-            }
-            
-            sorted.forEach(el=>{
+        sorted.forEach(el=>{
             const d = document.createElement('div');
             d.classList.add('label-element');
             d.dataset.id = el.id;
             d.style.left = `${el.x}cm`;
-            d.style.top = `${el.y + offsetY}cm`; // Apply vertical offset for sequence mode
+            d.style.top = `${el.y}cm`;
             d.style.width = `${el.width}cm`;
             d.style.height = `${el.height}cm`;
             d.style.zIndex = el.zIndex || 0;
@@ -1159,7 +1052,7 @@ document.addEventListener('DOMContentLoaded', ()=>{
                     }
                     span.style.wordWrap='break-word';
                     
-                    span.textContent = getData(el, seqIdx);
+                    span.textContent = getData(el);
                     // Copy font styles to span for overflow calculation
                     span.style.fontFamily = el.props.fontFamily || 'Arial, sans-serif';
                     span.style.fontSize = (el.props.fontSize || 16) + 'px';
@@ -1200,7 +1093,7 @@ document.addEventListener('DOMContentLoaded', ()=>{
                     }
                     span.style.wordWrap='break-word';
                     
-                    span.textContent = getData(el, seqIdx);
+                    span.textContent = getData(el);
                     // Copy font styles to span for overflow calculation
                     span.style.fontFamily = el.props.fontFamily || 'Arial, sans-serif';
                     span.style.fontSize = (el.props.fontSize || 16) + 'px';
@@ -1243,7 +1136,7 @@ document.addEventListener('DOMContentLoaded', ()=>{
                     d.style.backgroundColor = el.props.fillColor || 'transparent';
                     break;
                 case 'qr': {
-                    const c = getData(el, seqIdx);
+                    const c = getData(el);
                     const q = document.createElement('img');
                     const dpi = 37.795276;
                     const qs = Math.min(el.width, el.height) * dpi;
@@ -1285,9 +1178,7 @@ document.addEventListener('DOMContentLoaded', ()=>{
                     // Add prefix if exists
                     if(prefix){
                         const prefixSpan = document.createElement('span');
-                        let processedPrefix = replaceColumnSyntax(prefix, el);
-                        processedPrefix = applySequencePlaceholder(processedPrefix, seqIdx);
-                        prefixSpan.textContent = processedPrefix;
+                        prefixSpan.textContent = replaceColumnSyntax(prefix, el);
                         prefixSpan.style.fontFamily = el.props.fontFamily || 'Arial, sans-serif';
                         prefixSpan.style.fontSize = (el.props.fontSize || 16) + 'px';
                         prefixSpan.style.color = el.props.color || '#000000';
@@ -1311,9 +1202,7 @@ document.addEventListener('DOMContentLoaded', ()=>{
                     // Add suffix if exists
                     if(suffix){
                         const suffixSpan = document.createElement('span');
-                        let processedSuffix = replaceColumnSyntax(suffix, el);
-                        processedSuffix = applySequencePlaceholder(processedSuffix, seqIdx);
-                        suffixSpan.textContent = processedSuffix;
+                        suffixSpan.textContent = replaceColumnSyntax(suffix, el);
                         suffixSpan.style.fontFamily = el.props.fontFamily || 'Arial, sans-serif';
                         suffixSpan.style.fontSize = (el.props.fontSize || 16) + 'px';
                         suffixSpan.style.color = el.props.color || '#000000';
@@ -1478,30 +1367,7 @@ document.addEventListener('DOMContentLoaded', ()=>{
             }
 
             lc.appendChild(d);
-            }); // End forEach el
-        } // End for seqIdx
-        
-        // Update canvas height to accommodate all labels in sequence mode
-        if(seqEnabled && sequenceCount > 1){
-            const verticalSpacing = 0.5;
-            const topPadding = 0.5;
-            const bottomPadding = 0.5;
-            // Total height = top padding + all labels + spacing between labels + bottom padding
-            const totalHeight = topPadding + (sequenceCount * H) + ((sequenceCount - 1) * verticalSpacing) + bottomPadding;
-            lc.style.height = `${totalHeight}cm`;
-            lc.style.paddingTop = '0'; // Don't use padding, use absolute positioning instead
-            lc.style.paddingBottom = '0';
-            lc.style.boxSizing = 'border-box';
-            lc.style.background = '#fff';
-            lc.style.position = 'relative'; // Ensure relative positioning for absolute children
-        } else {
-            lc.style.height = `${H}cm`;
-            lc.style.paddingTop = '0';
-            lc.style.paddingBottom = '0';
-            lc.style.boxSizing = 'border-box';
-            lc.style.background = '#fff';
-            lc.style.position = 'relative';
-        }
+        });
     }
 
         // Helper function to apply text overflow handling
@@ -1695,48 +1561,38 @@ document.addEventListener('DOMContentLoaded', ()=>{
         }
         
         // Helper function to replace **column** syntax with actual data
-    function replaceColumnSyntax(str, el){
-        if(!str || typeof str !== 'string' || !R || typeof R !== 'object') return str;
-        return str.replace(/\*\*([^*]+)\*\*/g, (match, columnId) => {
-            const trimmedColumnId = columnId.trim();
-            if(Object.prototype.hasOwnProperty.call(R, trimmedColumnId)){
-                let v = R[trimmedColumnId];
-                if(v === null || v === undefined) return '';
-                // Format numbers if it's a data field
-                if(el && el.type === 'data' && typeof v === 'number'){
-                    const dec = (el.props.decimals !== undefined) ? Number(el.props.decimals) : 2;
-                    const pct = !!el.props.asPercent;
-                    return fmt(v, dec, pct);
+        function replaceColumnSyntax(str, el){
+            if(!str || typeof str !== 'string' || !R || typeof R !== 'object') return str;
+            return str.replace(/\*\*([^*]+)\*\*/g, (match, columnId) => {
+                const trimmedColumnId = columnId.trim();
+                if(Object.prototype.hasOwnProperty.call(R, trimmedColumnId)){
+                    let v = R[trimmedColumnId];
+                    if(v === null || v === undefined) return '';
+                    // Format numbers if it's a data field
+                    if(el && el.type === 'data' && typeof v === 'number'){
+                        const dec = (el.props.decimals !== undefined) ? Number(el.props.decimals) : 2;
+                        const pct = !!el.props.asPercent;
+                        return fmt(v, dec, pct);
+                    }
+                    return String(v);
                 }
-                return String(v);
-            }
-            // Return the original match if column not found (so user can see what's missing)
-            return match;
+                // Return the original match if column not found (so user can see what's missing)
+                return match;
         });
     }
-    
-    function applySequencePlaceholder(str, sequenceIndex){
-        if(!str || typeof str !== 'string') return str;
-        return str.replace(/\*\*sequence\*\*/g, String(sequenceIndex));
-    }
 
-    function getData(el, sequenceIndex = 1){
+    function getData(el){
             let text = el.props.text || '';
             let prefix = el.props.prefix || '';
             let suffix = el.props.suffix || '';
             
             // Handle **column** syntax for text, data, and barcode fields
-            if(el.type === 'text' || el.type === 'data' || el.type === 'barcode' || el.type === 'qr'){
+            if(el.type === 'text' || el.type === 'data' || el.type === 'barcode'){
                 // Process text, prefix, and suffix for **column** syntax
                 text = replaceColumnSyntax(text, el);
                 prefix = replaceColumnSyntax(prefix, el);
                 suffix = replaceColumnSyntax(suffix, el);
             }
-            
-            // Apply **sequence** placeholder to text, prefix, and suffix
-            text = applySequencePlaceholder(text, sequenceIndex);
-            prefix = applySequencePlaceholder(prefix, sequenceIndex);
-            suffix = applySequencePlaceholder(suffix, sequenceIndex);
             
             // Handle boundColumn (legacy support) - only if **column** syntax wasn't used
             if(el.props.boundColumn && R && Object.prototype.hasOwnProperty.call(R, el.props.boundColumn) && !text.includes('**') && !prefix.includes('**') && !suffix.includes('**')){
@@ -2786,9 +2642,7 @@ document.addEventListener('DOMContentLoaded', ()=>{
                                 'default': {
                                     canvas1: oldData, // Keep original, normalize when adding
                                     canvas2: [],
-                                    canvas2Enabled: false,
-                                    sequenceEnabled: false,
-                                    sequenceCountColumn: ''
+                                    canvas2Enabled: false
                                 }
                             }
                         }
@@ -2840,14 +2694,8 @@ document.addEventListener('DOMContentLoaded', ()=>{
                     designData = {
                         canvas1: (importedDes.canvas1 || []), // Keep original
                         canvas2: (importedDes.canvas2 || []), // Keep original
-                        canvas2Enabled: importedDes.canvas2Enabled || false,
-                        sequenceEnabled: importedDes.sequenceEnabled || false,
-                        sequenceCountColumn: importedDes.sequenceCountColumn || ''
+                        canvas2Enabled: importedDes.canvas2Enabled || false
                     };
-                } else {
-                    // Ensure sequence fields exist even if design is complete
-                    if(importedDes.sequenceEnabled === undefined) importedDes.sequenceEnabled = false;
-                    if(importedDes.sequenceCountColumn === undefined) importedDes.sequenceCountColumn = '';
                 }
                 
                 // Get the canvas data to import
@@ -2873,19 +2721,8 @@ document.addEventListener('DOMContentLoaded', ()=>{
                     S.push(newEl);
                 });
                 
-                // Import sequence mode settings if available
-                if(importedDes.sequenceEnabled !== undefined){
-                    currentDes.sequenceEnabled = importedDes.sequenceEnabled;
-                }
-                if(importedDes.sequenceCountColumn !== undefined){
-                    currentDes.sequenceCountColumn = importedDes.sequenceCountColumn;
-                }
-                
                 // Save the updated design
                 saveCurrentDesign();
-                
-                // Update UI to reflect imported sequence settings
-                updateCanvasControls();
                 
                 render();
                 updateProps();
@@ -2945,105 +2782,6 @@ document.addEventListener('DOMContentLoaded', ()=>{
             if(!profile || !profile.designs[currentDesign]) return;
             const design = profile.designs[currentDesign];
             const canvas2Enabled = design.canvas2Enabled || false;
-            const seqEnabled = design.sequenceEnabled || false;
-            
-            // Check sequence mode requirements
-            let sequenceCount = 1;
-            if(seqEnabled){
-                const countColumn = design.sequenceCountColumn;
-                if(!countColumn || !R){
-                    msg('Sequence mode enabled but count column not set or no record data available.', true);
-                    return;
-                }
-                
-                // Debug: log all available columns and their values
-                console.log('Sequence count debug - All R keys:', Object.keys(R));
-                console.log('Sequence count debug - Looking for column:', countColumn);
-                console.log('Sequence count debug - Full R object:', JSON.stringify(R, null, 2));
-                console.log('Sequence count debug - Specific column value:', R[countColumn]);
-                console.log('Sequence count debug - Column value type:', typeof R[countColumn]);
-                console.log('Sequence count debug - Column value stringified:', JSON.stringify(R[countColumn]));
-                
-                // Try to get the value - check both exact match and case-insensitive
-                let countRaw = null;
-                if(Object.prototype.hasOwnProperty.call(R, countColumn)){
-                    countRaw = R[countColumn];
-                    console.log('Sequence count debug - Found exact match, value:', countRaw, 'type:', typeof countRaw);
-                } else {
-                    // Try case-insensitive match
-                    const lowerColumn = countColumn.toLowerCase();
-                    for(const key in R){
-                        if(key.toLowerCase() === lowerColumn){
-                            countRaw = R[key];
-                            console.log('Sequence count debug - Found case-insensitive match:', key, '=', countRaw, 'type:', typeof countRaw);
-                            break;
-                        }
-                    }
-                }
-                
-                if(countRaw === null || countRaw === undefined){
-                    msg(`Sequence count column "${countColumn}" not found in current record. Available columns: ${Object.keys(R).join(', ')}`, true);
-                    return;
-                }
-                
-                console.log('Sequence count debug - Final countRaw:', {
-                    countColumn, 
-                    countRaw, 
-                    type: typeof countRaw, 
-                    rawValue: countRaw,
-                    stringified: JSON.stringify(countRaw),
-                    isArray: Array.isArray(countRaw), 
-                    isObject: typeof countRaw === 'object' && countRaw !== null,
-                    constructor: countRaw?.constructor?.name
-                });
-                
-                // Handle different value types: number, string, array, object, etc.
-                let countValue = countRaw;
-                
-                // If it's an object (but not array), try to extract value property
-                if(countRaw !== null && typeof countRaw === 'object' && !Array.isArray(countRaw)){
-                    // Try common Grist object properties
-                    if('value' in countRaw){
-                        countValue = countRaw.value;
-                        console.log('Sequence count debug - Extracted from object.value:', countValue);
-                    } else if('displayValue' in countRaw){
-                        countValue = countRaw.displayValue;
-                        console.log('Sequence count debug - Extracted from object.displayValue:', countValue);
-                    } else {
-                        // Try to get first numeric property
-                        for(const key in countRaw){
-                            if(typeof countRaw[key] === 'number'){
-                                countValue = countRaw[key];
-                                console.log('Sequence count debug - Extracted from object property:', key, '=', countValue);
-                                break;
-                            }
-                        }
-                    }
-                }
-                
-                if(Array.isArray(countRaw) && countRaw.length > 0){
-                    countValue = countRaw[0]; // Take first element if array
-                }
-                
-                // Convert to number, handling strings and null/undefined
-                // Trim string values to remove whitespace
-                if(typeof countValue === 'string'){
-                    countValue = countValue.trim();
-                }
-                
-                const parsedCount = countValue === null || countValue === undefined || countValue === '' ? 0 : Number(countValue);
-                console.log('Sequence count parsed:', { countValue, parsedCount, sequenceCount: Math.max(0, Math.floor(parsedCount)) });
-                
-                if(isNaN(parsedCount)){
-                    msg(`Sequence count column "${countColumn}" contains invalid value: ${JSON.stringify(countRaw)}. Expected a number.`, true);
-                    return;
-                }
-                sequenceCount = Math.max(0, Math.floor(parsedCount));
-                if(sequenceCount <= 0){
-                    msg(`Sequence count must be greater than 0. Current value from column "${countColumn}": ${JSON.stringify(countRaw)} (parsed as ${parsedCount}). Available columns: ${Object.keys(R).join(', ')}`, true);
-                    return;
-                }
-            }
             
             // Save current canvas
             saveCurrentDesign();
@@ -3059,25 +2797,11 @@ document.addEventListener('DOMContentLoaded', ()=>{
             printContainer.style.position = 'absolute';
             printContainer.style.left = '-9999px';
             printContainer.style.top = '0';
-            
-            // Calculate container height based on sequence mode
-            let containerHeight;
-            if(seqEnabled){
-                // Height = number of labels * label height + spacing
-                const verticalSpacing = 0.2; // 0.2cm spacing between labels
-                containerHeight = sequenceCount * profile.height + (sequenceCount - 1) * verticalSpacing;
-                if(canvas2Enabled){
-                    containerHeight = containerHeight * 2; // Double for canvas 2
-                }
-            } else {
-                containerHeight = canvas2Enabled ? profile.height * 2 : profile.height;
-            }
-            
             printContainer.style.width = `${profile.width}cm`;
-            printContainer.style.height = `${containerHeight}cm`;
+            printContainer.style.height = canvas2Enabled ? `${profile.height * 2}cm` : `${profile.height}cm`;
             
             // Helper function to render canvas to print page
-            function renderCanvasToPage(canvasNum, sequenceIndex = 1, verticalOffset = 0){
+            function renderCanvasToPage(canvasNum){
                 const canvasData = design[`canvas${canvasNum}`] || [];
                 const tempS = canvasData.map(normalizeElement);
                 
@@ -3088,8 +2812,7 @@ document.addEventListener('DOMContentLoaded', ()=>{
                 page.style.position = 'relative';
                 page.style.background = '#fff';
                 page.style.overflow = 'hidden';
-                page.style.top = `${verticalOffset}cm`; // Offset for sequence mode
-                page.style.pageBreakAfter = (canvasNum === 1 && canvas2Enabled && !seqEnabled) ? 'always' : 'auto';
+                page.style.pageBreakAfter = (canvasNum === 1 && canvas2Enabled) ? 'always' : 'auto';
                 
                 // Render elements
                 const sorted = tempS.slice().sort((a,b)=> (a.zIndex||0) - (b.zIndex||0));
@@ -3220,7 +2943,7 @@ document.addEventListener('DOMContentLoaded', ()=>{
                             }
                             span.style.wordWrap='break-word';
                             
-                            span.textContent = getData(el, sequenceIndex);
+                            span.textContent = getData(el);
                             // Copy font styles to span for overflow calculation
                             span.style.fontFamily = el.props.fontFamily || 'Arial, sans-serif';
                             span.style.fontSize = (el.props.fontSize || 16) + 'px';
@@ -3245,7 +2968,7 @@ document.addEventListener('DOMContentLoaded', ()=>{
                             span.style.wordWrap='break-word';
                             span.style.whiteSpace='pre-wrap'; // Always allow wrapping first
                             
-                            span.textContent = getData(el, sequenceIndex);
+                            span.textContent = getData(el);
                             // Copy font styles to span for overflow calculation
                             span.style.fontFamily = el.props.fontFamily || 'Arial, sans-serif';
                             span.style.fontSize = (el.props.fontSize || 16) + 'px';
@@ -3298,7 +3021,7 @@ document.addEventListener('DOMContentLoaded', ()=>{
                             d.style.backgroundColor = el.props.fillColor || 'transparent';
                             break;
                         case 'qr': {
-                            const c = getData(el, sequenceIndex);
+                            const c = getData(el);
                             const q = document.createElement('img');
                             const dpi = 37.795276;
                             const qs = Math.min(el.width, el.height) * dpi;
@@ -3311,7 +3034,7 @@ document.addEventListener('DOMContentLoaded', ()=>{
                             break;
                         }
                         case 'barcode': {
-                            const c = getData(el, sequenceIndex) || '';
+                            const c = getData(el) || '';
                             const prefix = el.props.prefix || '';
                             const suffix = el.props.suffix || '';
                             
@@ -3340,9 +3063,7 @@ document.addEventListener('DOMContentLoaded', ()=>{
                             // Add prefix if exists
                             if(prefix){
                                 const prefixSpan = document.createElement('span');
-                                let processedPrefix = replaceColumnSyntax(prefix, el);
-                        processedPrefix = applySequencePlaceholder(processedPrefix, seqIdx);
-                        prefixSpan.textContent = processedPrefix;
+                                prefixSpan.textContent = replaceColumnSyntax(prefix, el);
                                 prefixSpan.style.fontFamily = el.props.fontFamily || 'Arial, sans-serif';
                                 prefixSpan.style.fontSize = (el.props.fontSize || 16) + 'px';
                                 prefixSpan.style.color = el.props.color || '#000000';
@@ -3366,9 +3087,7 @@ document.addEventListener('DOMContentLoaded', ()=>{
                             // Add suffix if exists
                             if(suffix){
                                 const suffixSpan = document.createElement('span');
-                                let processedSuffix = replaceColumnSyntax(suffix, el);
-                                processedSuffix = applySequencePlaceholder(processedSuffix, sequenceIndex);
-                                suffixSpan.textContent = processedSuffix;
+                                suffixSpan.textContent = replaceColumnSyntax(suffix, el);
                                 suffixSpan.style.fontFamily = el.props.fontFamily || 'Arial, sans-serif';
                                 suffixSpan.style.fontSize = (el.props.fontSize || 16) + 'px';
                                 suffixSpan.style.color = el.props.color || '#000000';
@@ -3479,40 +3198,15 @@ document.addEventListener('DOMContentLoaded', ()=>{
             // Add print container to DOM first so measurements work correctly
             document.body.appendChild(printContainer);
             
-            const allPages = [];
+            // Add canvas 1
+            const page1 = renderCanvasToPage(1);
+            printContainer.appendChild(page1);
             
-            if(seqEnabled){
-                // Sequence mode: generate multiple labels
-                const verticalSpacing = 0.2; // 0.2cm spacing between labels
-                
-                for(let seqIdx = 1; seqIdx <= sequenceCount; seqIdx++){
-                    // Calculate vertical offset for this label
-                    const offsetY = (seqIdx - 1) * (profile.height + verticalSpacing);
-                    
-                    // Generate canvas 1 label
-                    const page1 = renderCanvasToPage(1, seqIdx, offsetY);
-                    printContainer.appendChild(page1);
-                    allPages.push({page: page1, canvasNum: 1, sequenceIndex: seqIdx});
-                    
-                    // Generate canvas 2 label if enabled
-                    if(canvas2Enabled){
-                        const canvas2OffsetY = offsetY + profile.height + verticalSpacing;
-                        const page2 = renderCanvasToPage(2, seqIdx, canvas2OffsetY);
-                        printContainer.appendChild(page2);
-                        allPages.push({page: page2, canvasNum: 2, sequenceIndex: seqIdx});
-                    }
-                }
-            } else {
-                // Normal mode: single label per canvas
-                const page1 = renderCanvasToPage(1, 1, 0);
-                printContainer.appendChild(page1);
-                allPages.push({page: page1, canvasNum: 1, sequenceIndex: 1});
-                
-                if(canvas2Enabled){
-                    const page2 = renderCanvasToPage(2, 1, 0);
-                    printContainer.appendChild(page2);
-                    allPages.push({page: page2, canvasNum: 2, sequenceIndex: 1});
-                }
+            // Add canvas 2 if enabled
+            let page2 = null;
+            if(canvas2Enabled){
+                page2 = renderCanvasToPage(2);
+                printContainer.appendChild(page2);
             }
             
             // Now apply text overflow handling after all elements are in DOM
@@ -3520,8 +3214,8 @@ document.addEventListener('DOMContentLoaded', ()=>{
             const canvas1Data = design.canvas1 || [];
             const canvas2Data = design.canvas2 || [];
             
-            allPages.forEach(({page, canvasNum, sequenceIndex}) => {
-                const canvasData = canvasNum === 1 ? canvas1Data : canvas2Data;
+            [page1, page2].filter(Boolean).forEach((page, pageIndex) => {
+                const canvasData = pageIndex === 0 ? canvas1Data : canvas2Data;
                 const tempS = canvasData.map(normalizeElement);
                 const sorted = tempS.slice().sort((a,b)=> (a.zIndex||0) - (b.zIndex||0));
                 
@@ -3567,27 +3261,14 @@ document.addEventListener('DOMContentLoaded', ()=>{
                     styleEl.id = styleId;
                     document.head.appendChild(styleEl);
                 }
-                // Calculate page height for print CSS
-                let pageHeight = profile.height;
-                if(seqEnabled){
-                    // In sequence mode, page should accommodate all labels
-                    const verticalSpacing = 0.2;
-                    pageHeight = sequenceCount * profile.height + (sequenceCount - 1) * verticalSpacing;
-                    if(canvas2Enabled){
-                        pageHeight = pageHeight * 2; // Double for canvas 2
-                    }
-                } else if(canvas2Enabled){
-                    pageHeight = profile.height * 2;
-                }
-                
                 styleEl.textContent = `
                     @media print{
-                        @page{size:${profile.width}cm ${pageHeight}cm;margin:0}
+                        @page{size:${profile.width}cm ${profile.height}cm;margin:0}
                         html,body{margin:0!important;padding:0!important;background:#fff!important;width:${profile.width}cm!important;height:auto!important}
                         #toolbar,#sidebar,#marquee,.status-message{display:none!important}
-                        .print-page{width:${profile.width}cm!important;height:${profile.height}cm!important;page-break-after:${seqEnabled ? 'auto' : 'always'}!important;page-break-inside:avoid!important;overflow:visible!important;background:#fff!important;position:relative!important;margin:0!important;padding:0!important;display:block!important}
+                        .print-page{width:${profile.width}cm!important;height:${profile.height}cm!important;page-break-after:always!important;page-break-inside:avoid!important;overflow:visible!important;background:#fff!important;position:relative!important;margin:0!important;padding:0!important;display:block!important}
                         .print-page:last-child{page-break-after:auto!important}
-                        .print-container{display:block!important;position:static!important;left:auto!important;top:auto!important;height:${pageHeight}cm!important}
+                        .print-container{display:block!important;position:static!important;left:auto!important;top:auto!important}
                         #main-content,#canvas-container,#canvas-wrapper,#label-canvas{display:none!important}
                         .label-element{print-color-adjust:exact!important;-webkit-print-color-adjust:exact!important}
                     }
@@ -3695,8 +3376,6 @@ document.addEventListener('DOMContentLoaded', ()=>{
         const te = t.closest('.label-element');
         if(!te) return;
         const id = te.dataset.id;
-        // In sequence mode, clicking any replica should select the base element
-        // The dataset.id is the same for all replicas, so this works correctly
         const clickedElement = S.find(x=>x.id===id);
         if(!clickedElement) return;
 
@@ -4624,27 +4303,6 @@ document.addEventListener('DOMContentLoaded', ()=>{
         canvas2Enabled.addEventListener('change', (e)=>{
             toggleCanvas2(e.target.checked);
         });
-        
-        // Sequence mode event listeners
-        sequenceEnabled.addEventListener('change', (e)=>{
-            const profile = profiles[currentProfile];
-            if(!profile || !profile.designs[currentDesign]) return;
-            const design = profile.designs[currentDesign];
-            design.sequenceEnabled = e.target.checked;
-            sequenceSettings.style.display = e.target.checked ? 'block' : 'none';
-            saveCurrentDesign();
-            render();
-        });
-        
-        sequenceCountColumn.addEventListener('change', (e)=>{
-            const profile = profiles[currentProfile];
-            if(!profile || !profile.designs[currentDesign]) return;
-            const design = profile.designs[currentDesign];
-            design.sequenceCountColumn = e.target.value || '';
-            saveCurrentDesign();
-            render();
-        });
-        
     fileInput.addEventListener('change', (ev)=>{
         const f = ev.target.files && ev.target.files[0];
         if(!f) return;
@@ -4866,13 +4524,7 @@ document.addEventListener('DOMContentLoaded', ()=>{
         try{ window.grist.ready({ requiredAccess:'full' }); }catch(e){}
         try{
             if(typeof window.grist.onRecord === 'function'){
-                window.grist.onRecord(function(record,mappings){ 
-                    R = record||{}; 
-                    C = Object.keys(R); 
-                    if(selectedIds.length) updateProps(); 
-                    updateCanvasControls(); // Update sequence column selector when columns change
-                    render(); 
-                });
+                window.grist.onRecord(function(record,mappings){ R = record||{}; C = Object.keys(R); if(selectedIds.length) updateProps(); render(); });
             }
         }catch(e){ console.warn('grist.onRecord error',e); }
         try{
