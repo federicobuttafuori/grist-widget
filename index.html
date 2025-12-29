@@ -164,6 +164,7 @@ document.addEventListener('DOMContentLoaded', ()=>{
     let drag = false, resizeMode = false, ctx = {};
         let canvasRotation = 0;           // temporary canvas rotation (0, 90, 180, 270 degrees)
         let W = 8, H = 5;                 // Current dimensions (dynamic)
+        let globalSequenceCountColumn = ''; // Global count column (shared across all designs)
         const KEY = 'grist_label_layout_v2'; // Updated version for profiles
         const FONT_FAVORITES_KEY = 'grist_label_font_favorites'; // Key for font favorites
     const MAX_HISTORY = 100;
@@ -264,8 +265,7 @@ document.addEventListener('DOMContentLoaded', ()=>{
                         canvas1: [],
                         canvas2: [],
                         canvas2Enabled: false,
-                        sequenceEnabled: false,
-                        sequenceCountColumn: ''
+                        sequenceEnabled: false
                     }
                 }
             }
@@ -306,7 +306,7 @@ document.addEventListener('DOMContentLoaded', ()=>{
         const btnRemoveProfile = document.getElementById('btn-remove-profile');
         const btnRemoveDesign = document.getElementById('btn-remove-design');
         const canvasSelector = document.getElementById('canvas-selector');
-        const canvas2Enabled = document.getElementById('canvas2-enabled');
+        const canvas2Checkbox = document.getElementById('canvas2-enabled');
 
     // Marquee state
     let marqueeActive = false;
@@ -444,14 +444,14 @@ document.addEventListener('DOMContentLoaded', ()=>{
             const profile = profiles[currentProfile];
             if(!profile || !profile.designs[currentDesign]) return;
             const design = profile.designs[currentDesign];
-            const enabled = design.canvas2Enabled || false;
-            canvas2Enabled.checked = enabled;
+            const canvas2Flag = design.canvas2Enabled || false;
+            canvas2Checkbox.checked = canvas2Flag;
             
             // Update canvas selector options
             const canvas2Option = canvasSelector.querySelector('option[value="2"]');
             if(canvas2Option){
-                canvas2Option.disabled = !enabled;
-                if(!enabled && currentCanvas === 2){
+                canvas2Option.disabled = !canvas2Flag;
+                if(!canvas2Flag && currentCanvas === 2){
                     // If disabling canvas 2 and we're on it, switch to canvas 1
                     currentCanvas = 1;
                     loadCurrentDesign();
@@ -554,12 +554,27 @@ document.addEventListener('DOMContentLoaded', ()=>{
             const profile = profiles[currentProfile];
             if(!profile || !profile.designs[currentDesign]) return;
             const design = profile.designs[currentDesign];
-            // If trying to switch to canvas 2 but it's disabled, don't allow
-            if(canvasNum === 2 && !(design.canvas2Enabled || false)){
-                msg('Canvas 2 is disabled. Enable it first.', true);
+            const canvas2Flag = design.canvas2Enabled || false;
+            
+            // If trying to switch to canvas 2 but it's disabled, disable selector instead of forcing reset
+            if(canvasNum === 2 && !canvas2Flag){
+                // Disable the canvas selector option instead of showing message
+                const canvas2Option = canvasSelector.querySelector('option[value="2"]');
+                if(canvas2Option){
+                    canvas2Option.disabled = true;
+                }
                 canvasSelector.value = '1';
                 return;
             }
+            
+            // Enable canvas 2 option if it was disabled
+            if(canvas2Flag){
+                const canvas2Option = canvasSelector.querySelector('option[value="2"]');
+                if(canvas2Option){
+                    canvas2Option.disabled = false;
+                }
+            }
+            
             // Save current canvas before switching
             saveCurrentDesign();
             // Switch canvas
@@ -600,14 +615,12 @@ document.addEventListener('DOMContentLoaded', ()=>{
                     canvas1: [],
                     canvas2: [],
                     canvas2Enabled: false,
-                    sequenceEnabled: true,
-                    sequenceCountColumn: ''
+                    sequenceEnabled: true
                 };
             }
             const design = profile.designs[currentDesign];
-            // Ensure sequence fields exist
+            // Ensure sequence fields exist (backward compatibility)
             if(design.sequenceEnabled === undefined) design.sequenceEnabled = false;
-            if(design.sequenceCountColumn === undefined) design.sequenceCountColumn = '';
             const canvasKey = `canvas${currentCanvas}`;
             design[canvasKey] = deepCopy(S);
             
@@ -622,7 +635,8 @@ document.addEventListener('DOMContentLoaded', ()=>{
                         groups: groups,
                         lastDesignByProfile: lastDesignByProfile,
                         lastCanvasByProfile: lastCanvasByProfile,
-                        lastCanvasByDesign: lastCanvasByDesign
+                        lastCanvasByDesign: lastCanvasByDesign,
+                        globalSequenceCountColumn: globalSequenceCountColumn
                 };
                 localStorage.setItem(KEY, JSON.stringify(payloadObj));
             } catch(e) {
@@ -638,14 +652,12 @@ document.addEventListener('DOMContentLoaded', ()=>{
                     canvas1: [],
                     canvas2: [],
                     canvas2Enabled: false,
-                    sequenceEnabled: true,
-                    sequenceCountColumn: ''
+                    sequenceEnabled: true
                 };
             }
             const design = profile.designs[currentDesign];
             // Ensure sequence fields exist (backward compatibility)
             if(design.sequenceEnabled === undefined) design.sequenceEnabled = false;
-            if(design.sequenceCountColumn === undefined) design.sequenceCountColumn = '';
             const canvasKey = `canvas${currentCanvas}`;
             const canvasData = design[canvasKey] || [];
             S = canvasData.map(normalizeElement);
@@ -675,8 +687,7 @@ document.addEventListener('DOMContentLoaded', ()=>{
                         canvas1: [],
                         canvas2: [],
                         canvas2Enabled: false,
-                        sequenceEnabled: false,
-                        sequenceCountColumn: ''
+                        sequenceEnabled: false
                     }
                 }
             };
@@ -712,9 +723,8 @@ document.addEventListener('DOMContentLoaded', ()=>{
                 canvas1: [],
                 canvas2: [],
                 canvas2Enabled: false,
-                sequenceEnabled: false,
-                sequenceCountColumn: ''
-            };
+                        sequenceEnabled: false
+                    };
             switchDesign(designKey);
             msg(`Design "${designKey}" added`);
             saveCurrentDesign();
@@ -764,8 +774,7 @@ document.addEventListener('DOMContentLoaded', ()=>{
                 canvas1: deepCopy(currentDes.canvas1 || []),
                 canvas2: deepCopy(currentDes.canvas2 || []),
                 canvas2Enabled: currentDes.canvas2Enabled || false,
-                sequenceEnabled: currentDes.sequenceEnabled || false,
-                sequenceCountColumn: currentDes.sequenceCountColumn || ''
+                sequenceEnabled: currentDes.sequenceEnabled || false
             };
             // Switch to cloned design
             switchDesign(newKey);
@@ -962,8 +971,8 @@ document.addEventListener('DOMContentLoaded', ()=>{
         // Sequence mode is always enabled
         const profile = profiles[currentProfile];
         const design = profile && profile.designs[currentDesign] ? profile.designs[currentDesign] : null;
-        const sequenceCountColumn = design && design.sequenceCountColumn ? design.sequenceCountColumn : '';
-        const canvas2Enabled = design && design.canvas2Enabled ? true : false;
+        const sequenceCountColumn = globalSequenceCountColumn || '';
+        const canvas2Flag = design && design.canvas2Enabled ? true : false;
         
         let countToRender = 1;
         const MAX_PREVIEW_LABELS = 50;
@@ -1427,14 +1436,14 @@ document.addEventListener('DOMContentLoaded', ()=>{
                 // Calculate offset for this sequence index
                 // Each pair (canvas1 + canvas2) takes (H * 2 + VERTICAL_SPACING) space if canvas2 is enabled
                 // Otherwise just (H + VERTICAL_SPACING)
-                const pairHeight = canvas2Enabled ? (H * 2 + VERTICAL_SPACING) : (H + VERTICAL_SPACING);
+                const pairHeight = canvas2Flag ? (H * 2 + VERTICAL_SPACING) : (H + VERTICAL_SPACING);
                 const offsetY = (sequenceIndex - 1) * pairHeight;
                 
                 // Render canvas1 with this sequence index
                 renderElementsForCanvas(canvas1Data, sequenceIndex, offsetY);
                 
                 // Render canvas2 with the same sequence index if enabled
-                if(canvas2Enabled){
+                if(canvas2Flag){
                     const canvas2OffsetY = offsetY + H;
                     renderElementsForCanvas(canvas2Data, sequenceIndex, canvas2OffsetY);
                 }
@@ -1757,14 +1766,13 @@ document.addEventListener('DOMContentLoaded', ()=>{
                 return;
             }
             const design = profile.designs[currentDesign];
-            // Sequence mode is always enabled - no toggle needed
-            const sequenceCountColumn = design.sequenceCountColumn || '';
+            // Sequence mode is always enabled - use global count column
             
             // Get current count value
             let countValue = '';
             let countDisplay = '—';
-            if(sequenceCountColumn && R && Object.prototype.hasOwnProperty.call(R, sequenceCountColumn)){
-                const countRaw = R[sequenceCountColumn];
+            if(globalSequenceCountColumn && R && Object.prototype.hasOwnProperty.call(R, globalSequenceCountColumn)){
+                const countRaw = R[globalSequenceCountColumn];
                 const count = Math.max(0, Math.floor(Number(countRaw)));
                 countValue = count;
                 countDisplay = count > 0 ? String(count) : '0 (invalid)';
@@ -1773,7 +1781,7 @@ document.addEventListener('DOMContentLoaded', ()=>{
             // Build column options
             let columnOptions = '<option value="">-- Select Column --</option>';
             C.forEach(col => {
-                const selected = col === sequenceCountColumn ? 'selected' : '';
+                const selected = col === globalSequenceCountColumn ? 'selected' : '';
                 columnOptions += `<option value="${col}" ${selected}>${col}</option>`;
             });
             
@@ -1804,8 +1812,20 @@ document.addEventListener('DOMContentLoaded', ()=>{
             
             if(sequenceColumnSelect) {
                 sequenceColumnSelect.addEventListener('change', function() {
-                    design.sequenceCountColumn = this.value || '';
-                    saveCurrentDesign();
+                    globalSequenceCountColumn = this.value || '';
+                    // Save to localStorage
+                    try {
+                        const saved = localStorage.getItem(KEY);
+                        if(saved){
+                            const parsed = JSON.parse(saved);
+                            if(parsed && parsed.version === 2){
+                                parsed.globalSequenceCountColumn = globalSequenceCountColumn;
+                                localStorage.setItem(KEY, JSON.stringify(parsed));
+                            }
+                        }
+                    } catch(e) {
+                        console.warn('Failed to save globalSequenceCountColumn:', e);
+                    }
                     updateCountDisplay();
                     render();
                 });
@@ -2846,8 +2866,7 @@ document.addEventListener('DOMContentLoaded', ()=>{
                         canvas1: importedDes, // Keep original, normalize when adding
                         canvas2: [],
                         canvas2Enabled: false,
-                        sequenceEnabled: false,
-                        sequenceCountColumn: ''
+                        sequenceEnabled: false
                     };
                 } else if(!importedDes.canvas1 || !importedDes.canvas2){
                     designData = {
@@ -2855,7 +2874,6 @@ document.addEventListener('DOMContentLoaded', ()=>{
                         canvas2: (importedDes.canvas2 || []), // Keep original
                         canvas2Enabled: importedDes.canvas2Enabled || false,
                         sequenceEnabled: importedDes.sequenceEnabled || false,
-                        sequenceCountColumn: importedDes.sequenceCountColumn || ''
                     };
                 }
                 
@@ -2942,17 +2960,15 @@ document.addEventListener('DOMContentLoaded', ()=>{
             const profile = profiles[currentProfile];
             if(!profile || !profile.designs[currentDesign]) return;
             const design = profile.designs[currentDesign];
-            const canvas2Enabled = design.canvas2Enabled || false;
+            const canvas2Flag = design.canvas2Enabled || false;
             // Sequence mode is always enabled
             const sequenceEnabled = true;
-            const sequenceCountColumn = design.sequenceCountColumn || '';
-            
             // Validate sequence mode
-            if(!sequenceCountColumn){
+            if(!globalSequenceCountColumn){
                 msg('Error: No count column selected. Please select a column in Design Settings.', true);
                 return;
             }
-            if(!R || !Object.prototype.hasOwnProperty.call(R, sequenceCountColumn)){
+            if(!R || !Object.prototype.hasOwnProperty.call(R, globalSequenceCountColumn)){
                 msg('Error: Count column not found in current record', true);
                 return;
             }
@@ -2966,7 +2982,7 @@ document.addEventListener('DOMContentLoaded', ()=>{
             const prevS = deepCopy(S);
             
             // Calculate count for sequence mode (always enabled)
-            const countRaw = R[sequenceCountColumn];
+            const countRaw = R[globalSequenceCountColumn];
             const count = Math.max(0, Math.floor(Number(countRaw)));
             if(count <= 0){
                 msg('Warning: Count value is 0 or invalid, no labels will be printed', true);
@@ -2984,7 +3000,7 @@ document.addEventListener('DOMContentLoaded', ()=>{
             printContainer.style.height = 'auto';
             
             // Calculate total pages
-            const totalPages = canvas2Enabled ? count * 2 : count;
+            const totalPages = canvas2Flag ? count * 2 : count;
             
             // Helper function to render canvas to print page
             function renderCanvasToPage(canvasNum, sequenceIndex = 1, isLastPage = false){
@@ -3405,7 +3421,7 @@ document.addEventListener('DOMContentLoaded', ()=>{
                 printContainer.appendChild(page1);
                 
                 // Add canvas 2 with the same sequence index if enabled
-                if(canvas2Enabled){
+                if(canvas2Flag){
                     pageIndex++;
                     const isLastPage2 = pageIndex === totalPages;
                     const page2 = renderCanvasToPage(2, sequenceIndex, isLastPage2);
@@ -3417,7 +3433,7 @@ document.addEventListener('DOMContentLoaded', ()=>{
             const pages = printContainer.querySelectorAll('.print-page');
             let page1 = null, page2 = null;
             if(pages.length > 0) page1 = pages[0];
-            if(canvas2Enabled && pages.length > 1) page2 = pages[1];
+            if(canvas2Flag && pages.length > 1) page2 = pages[1];
             
             // Now apply text overflow handling after all elements are in DOM
             // Need to get the canvas data for each page
@@ -3433,7 +3449,7 @@ document.addEventListener('DOMContentLoaded', ()=>{
                 const pageIndex = Array.from(allPages).indexOf(page);
                 let canvasData, canvasNum;
                 if(sequenceEnabled){
-                    if(canvas2Enabled){
+                    if(canvas2Flag){
                         // Even index (0, 2, 4...) = canvas1, odd (1, 3, 5...) = canvas2
                         canvasNum = (pageIndex % 2 === 0) ? 1 : 2;
                     } else {
@@ -3527,7 +3543,7 @@ document.addEventListener('DOMContentLoaded', ()=>{
         const profile = profiles[currentProfile];
         if(!profile || !profile.designs[currentDesign]) return;
         const design = profile.designs[currentDesign];
-        const canvas2Enabled = design.canvas2Enabled || false;
+        const canvas2Flag = design.canvas2Enabled || false;
         
         // Ask user for sequence number
         const sequenceInput = prompt('Enter sequence number:', '1');
@@ -3558,7 +3574,7 @@ document.addEventListener('DOMContentLoaded', ()=>{
         printContainer.style.height = 'auto';
         
         // Calculate total pages
-        const totalPages = canvas2Enabled ? 2 : 1;
+        const totalPages = canvas2Flag ? 2 : 1;
         
         // Helper function to render canvas to print page (reuse from printBothCanvases)
         function renderCanvasToPage(canvasNum, seqIndex, isLastPage = false){
@@ -3821,12 +3837,12 @@ document.addEventListener('DOMContentLoaded', ()=>{
         document.body.appendChild(printContainer);
         
         // Add canvas 1 with specified sequence index
-        const isLastPage1 = !canvas2Enabled;
+        const isLastPage1 = !canvas2Flag;
         const page1 = renderCanvasToPage(1, sequenceIndex, isLastPage1);
         printContainer.appendChild(page1);
         
         // Add canvas 2 if enabled with same sequence index
-        if(canvas2Enabled){
+        if(canvas2Flag){
             const page2 = renderCanvasToPage(2, sequenceIndex, true);
             printContainer.appendChild(page2);
         }
@@ -4887,7 +4903,7 @@ document.addEventListener('DOMContentLoaded', ()=>{
             switchCanvas(parseInt(e.target.value));
             saveCurrentDesign();
         });
-        canvas2Enabled.addEventListener('change', (e)=>{
+        canvas2Checkbox.addEventListener('change', (e)=>{
             toggleCanvas2(e.target.checked);
         });
     fileInput.addEventListener('change', (ev)=>{
@@ -5083,9 +5099,9 @@ document.addEventListener('DOMContentLoaded', ()=>{
                     const profile = profiles[currentProfile];
                     if (profile && profile.designs[currentDesign]) {
                         const design = profile.designs[currentDesign];
-                        const canvas2Enabled = design.canvas2Enabled || false;
+                        const canvas2Flag = design.canvas2Enabled || false;
                         // Mostra solo se canvas2 è abilitato
-                        miniCanvasSelect.style.display = canvas2Enabled ? 'block' : 'none';
+                        miniCanvasSelect.style.display = canvas2Flag ? 'block' : 'none';
                         miniCanvasSelect.value = currentCanvas.toString();
                     }
                 }
@@ -5149,7 +5165,6 @@ document.addEventListener('DOMContentLoaded', ()=>{
                                 const design = profile.designs[designKey];
                                 if(design){
                                     if(design.sequenceEnabled === undefined) design.sequenceEnabled = false;
-                                    if(design.sequenceCountColumn === undefined) design.sequenceCountColumn = '';
                                 }
                             });
                         }
