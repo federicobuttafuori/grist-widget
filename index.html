@@ -39,7 +39,7 @@
         .button-group{display:flex;gap:4px}
         #canvas-container{flex-grow:1;display:flex;justify-content:center;align-items:center;overflow:auto;background:#e0e0e0;padding:20px;position:relative}
         #canvas-wrapper{display:inline-block;transform-origin:center center;position:relative}
-            #label-canvas{background:#fff;box-shadow:0 4px 12px rgba(0,0,0,.15);position:relative;overflow:auto}
+            #label-canvas{background:#fff;box-shadow:0 4px 12px rgba(0,0,0,.15);position:relative;overflow:auto;min-height:100%}
         #marquee{position:absolute;border:1px dashed #007aff;background:rgba(0,122,255,0.08);pointer-events:none;display:none;z-index:9999}
         .label-element{position:absolute;cursor:move;border:1px solid transparent;font-size:16px;line-height:1.2;overflow:hidden;word-wrap:break-word;user-select:none;transform-origin:center center}
         .label-element.selected{border:2px dashed #007aff;box-shadow:0 0 0 1px rgba(0,122,255,.1)}
@@ -1024,12 +1024,28 @@ document.addEventListener('DOMContentLoaded', ()=>{
         }
         
         const sorted = S.slice().sort((a,b)=> (a.zIndex||0) - (b.zIndex||0));
-        const verticalSpacing = 0.5; // 0.5cm spacing between labels in preview (increased from 0.2)
-        const topPadding = seqEnabled ? 0.3 : 0; // Padding at top to prevent clipping (only in sequence mode)
+        const verticalSpacing = 0.5; // 0.5cm spacing between labels in preview
+        const topPadding = seqEnabled ? 0.5 : 0; // Padding at top to prevent clipping (always in sequence mode)
+        const bottomPadding = seqEnabled ? 0.5 : 0; // Padding at bottom
         
         // Render labels for each sequence index
         for(let seqIdx = 1; seqIdx <= sequenceCount; seqIdx++){
-            const offsetY = seqEnabled && seqIdx > 1 ? topPadding + (seqIdx - 1) * (H + verticalSpacing) : (seqEnabled ? topPadding : 0);
+            // Calculate offset: first label starts at topPadding, subsequent labels add spacing
+            const offsetY = seqEnabled ? (topPadding + (seqIdx - 1) * (H + verticalSpacing)) : 0;
+            
+            // Add visual separator line between labels (except before first label)
+            if(seqEnabled && seqIdx > 1){
+                const separator = document.createElement('div');
+                separator.style.position = 'absolute';
+                separator.style.left = '0';
+                separator.style.top = `${offsetY - verticalSpacing/2}cm`;
+                separator.style.width = `${W}cm`;
+                separator.style.height = '2px';
+                separator.style.backgroundColor = 'rgba(200,200,200,0.6)';
+                separator.style.pointerEvents = 'none';
+                separator.style.zIndex = 10000;
+                lc.appendChild(separator);
+            }
             
             sorted.forEach(el=>{
             const d = document.createElement('div');
@@ -1467,14 +1483,24 @@ document.addEventListener('DOMContentLoaded', ()=>{
         
         // Update canvas height to accommodate all labels in sequence mode
         if(seqEnabled && sequenceCount > 1){
-            const verticalSpacing = 0.5; // Match the spacing used in rendering
-            const topPadding = 0.3;
-            const bottomPadding = 0.3;
-            const totalHeight = topPadding + sequenceCount * H + (sequenceCount - 1) * verticalSpacing + bottomPadding;
+            const verticalSpacing = 0.5;
+            const topPadding = 0.5;
+            const bottomPadding = 0.5;
+            // Total height = top padding + all labels + spacing between labels + bottom padding
+            const totalHeight = topPadding + (sequenceCount * H) + ((sequenceCount - 1) * verticalSpacing) + bottomPadding;
             lc.style.height = `${totalHeight}cm`;
+            lc.style.paddingTop = '0'; // Don't use padding, use absolute positioning instead
+            lc.style.paddingBottom = '0';
+            lc.style.boxSizing = 'border-box';
+            lc.style.background = '#fff';
+            lc.style.position = 'relative'; // Ensure relative positioning for absolute children
         } else {
-            // Normal mode: use standard height without extra padding
             lc.style.height = `${H}cm`;
+            lc.style.paddingTop = '0';
+            lc.style.paddingBottom = '0';
+            lc.style.boxSizing = 'border-box';
+            lc.style.background = '#fff';
+            lc.style.position = 'relative';
         }
     }
 
