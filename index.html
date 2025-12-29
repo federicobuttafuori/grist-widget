@@ -1426,24 +1426,12 @@ document.addEventListener('DOMContentLoaded', ()=>{
             });
         }
         
-        // Always show only sequence 1 in canvas preview (single label view)
+        // Always show only the current canvas being edited (sequence 1 only)
         // Sequence mode is used only for printing, not for canvas preview
-        // Show only the current selected canvas with sequence index 1
-        const canvas1Data = currentCanvas === 1 ? S : (design.canvas1 || []);
-        const canvas2Data = currentCanvas === 2 ? S : (design.canvas2 || []);
-        
-        if(canvas2Flag){
-            // Show both canvases stacked vertically (sequence 1 only)
-            renderElementsForCanvas(canvas1Data, 1, 0);
-            renderElementsForCanvas(canvas2Data, 1, H);
-            // Container height for both canvases
-            lc.style.height = `${H * 2}cm`;
-        } else {
-            // Show only current canvas (sequence 1)
-            renderElementsForCanvas(S, 1, 0);
-            // Reset container height to single label height
-            lc.style.height = `${H}cm`;
-        }
+        // Show only the canvas that the user is currently working on
+        renderElementsForCanvas(S, 1, 0);
+        // Reset container height to single label height
+        lc.style.height = `${H}cm`;
     }
 
         // Helper function to apply text overflow handling
