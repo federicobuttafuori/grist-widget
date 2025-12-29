@@ -64,6 +64,7 @@
         <button id="btn-clear" title="Clear Layout">🗑️ Clear</button>
         <div class="divider"></div>
         <button id="btn-print" title="Print Label">🖨️ Print</button>
+        <button id="btn-print-single" title="Print Single Label">🖨️ Print Single</button>
             <div class="divider"></div>
             <button id="btn-rotate-canvas" title="Rotate Canvas 90° (temporary, not for print)">🔄 Rotate</button>
         <div class="divider"></div>
@@ -599,7 +600,7 @@ document.addEventListener('DOMContentLoaded', ()=>{
                     canvas1: [],
                     canvas2: [],
                     canvas2Enabled: false,
-                    sequenceEnabled: false,
+                    sequenceEnabled: true,
                     sequenceCountColumn: ''
                 };
             }
@@ -637,7 +638,7 @@ document.addEventListener('DOMContentLoaded', ()=>{
                     canvas1: [],
                     canvas2: [],
                     canvas2Enabled: false,
-                    sequenceEnabled: false,
+                    sequenceEnabled: true,
                     sequenceCountColumn: ''
                 };
             }
@@ -958,10 +959,9 @@ document.addEventListener('DOMContentLoaded', ()=>{
     function render(){
         lc.innerHTML = '';
         
-        // Check for sequence mode
+        // Sequence mode is always enabled
         const profile = profiles[currentProfile];
         const design = profile && profile.designs[currentDesign] ? profile.designs[currentDesign] : null;
-        const sequenceEnabled = design && design.sequenceEnabled ? true : false;
         const sequenceCountColumn = design && design.sequenceCountColumn ? design.sequenceCountColumn : '';
         const canvas2Enabled = design && design.canvas2Enabled ? true : false;
         
@@ -969,7 +969,7 @@ document.addEventListener('DOMContentLoaded', ()=>{
         const MAX_PREVIEW_LABELS = 50;
         const VERTICAL_SPACING = 0.2; // cm spacing between labels
         
-        if(sequenceEnabled && sequenceCountColumn && R && Object.prototype.hasOwnProperty.call(R, sequenceCountColumn)){
+        if(sequenceCountColumn && R && Object.prototype.hasOwnProperty.call(R, sequenceCountColumn)){
             const countRaw = R[sequenceCountColumn];
             const count = Math.max(0, Math.floor(Number(countRaw)));
             countToRender = Math.min(count, MAX_PREVIEW_LABELS);
@@ -1414,9 +1414,10 @@ document.addEventListener('DOMContentLoaded', ()=>{
             });
         }
         
-        // Render labels for each sequence index
-        if(sequenceEnabled){
-            // Get canvas data
+        // Render labels - if sequence column is set and count > 1, show sequence mode
+        // Otherwise show only the current selected canvas
+        if(sequenceCountColumn && countToRender > 1){
+            // Sequence mode: show multiple labels with both canvases
             const canvas1Data = design.canvas1 || [];
             const canvas2Data = design.canvas2 || [];
             
@@ -1437,8 +1438,9 @@ document.addEventListener('DOMContentLoaded', ()=>{
                 }
             }
         } else {
-            // Normal mode: render only current canvas
-            const canvasData = currentCanvas === 1 ? (design.canvas1 || []) : (design.canvas2 || []);
+            // Normal mode: show only the current selected canvas
+            const canvasKey = `canvas${currentCanvas}`;
+            const canvasData = design[canvasKey] || [];
             renderElementsForCanvas(canvasData, 1, 0);
         }
     }
@@ -1754,8 +1756,18 @@ document.addEventListener('DOMContentLoaded', ()=>{
                 return;
             }
             const design = profile.designs[currentDesign];
-            const sequenceEnabled = design.sequenceEnabled || false;
+            // Sequence mode is always enabled - no toggle needed
             const sequenceCountColumn = design.sequenceCountColumn || '';
+            
+            // Get current count value
+            let countValue = '';
+            let countDisplay = '—';
+            if(sequenceCountColumn && R && Object.prototype.hasOwnProperty.call(R, sequenceCountColumn)){
+                const countRaw = R[sequenceCountColumn];
+                const count = Math.max(0, Math.floor(Number(countRaw)));
+                countValue = count;
+                countDisplay = count > 0 ? String(count) : '0 (invalid)';
+            }
             
             // Build column options
             let columnOptions = '<option value="">-- Select Column --</option>';
@@ -1766,36 +1778,46 @@ document.addEventListener('DOMContentLoaded', ()=>{
             
             let h = '<div style="padding:12px;">';
             h += '<h4 style="margin:0 0 12px 0;font-size:16px;font-weight:600;">Design Settings</h4>';
-            h += `<div class="prop-grid"><label>Sequence Mode</label><input type="checkbox" id="sequence-enabled" ${sequenceEnabled ? 'checked' : ''}></div>`;
-            h += `<div class="prop-grid" id="sequence-column-row" style="display:${sequenceEnabled ? 'grid' : 'none'}"><label>Count Column</label><select id="sequence-count-column">${columnOptions}</select></div>`;
-            h += '<hr style="margin:12px 0;">';
-            h += '<div style="font-size:12px;color:#666;margin-top:8px;">Select an element to edit its properties.</div>';
+            h += `<div class="prop-grid"><label>Count Column</label><select id="sequence-count-column">${columnOptions}</select></div>`;
+            h += `<div class="prop-grid" style="margin-top:8px;"><label>Sequence Count</label><span id="sequence-count-display" style="font-weight:600;color:#007aff;font-size:14px;">${countDisplay}</span></div>`;
             h += '</div>';
             pp.innerHTML = h;
             
-            // Add event listeners
-            const sequenceEnabledCheckbox = pp.querySelector('#sequence-enabled');
+            // Add event listener for column selector
             const sequenceColumnSelect = pp.querySelector('#sequence-count-column');
-            const sequenceColumnRow = pp.querySelector('#sequence-column-row');
+            const countDisplayEl = pp.querySelector('#sequence-count-display');
             
-            if(sequenceEnabledCheckbox) {
-                sequenceEnabledCheckbox.addEventListener('change', function() {
-                    design.sequenceEnabled = this.checked;
-                    if(sequenceColumnRow) {
-                        sequenceColumnRow.style.display = this.checked ? 'grid' : 'none';
+            // Function to update count display
+            function updateCountDisplay(){
+                if(countDisplayEl && sequenceColumnSelect){
+                    let display = '—';
+                    const selectedColumn = sequenceColumnSelect.value || '';
+                    if(selectedColumn && R && Object.prototype.hasOwnProperty.call(R, selectedColumn)){
+                        const countRaw = R[selectedColumn];
+                        const count = Math.max(0, Math.floor(Number(countRaw)));
+                        display = count > 0 ? String(count) : '0 (invalid)';
                     }
-                    saveCurrentDesign();
-                    render();
-                });
+                    countDisplayEl.textContent = display;
+                }
             }
             
             if(sequenceColumnSelect) {
                 sequenceColumnSelect.addEventListener('change', function() {
                     design.sequenceCountColumn = this.value || '';
                     saveCurrentDesign();
+                    updateCountDisplay();
                     render();
                 });
             }
+            
+            // Update count display initially and store function for external updates
+            updateCountDisplay();
+            
+            // Store update function globally so it can be called when R changes
+            window.updateSequenceCountDisplay = updateCountDisplay;
+            
+            // Store update function globally so it can be called when R changes
+            window.updateSequenceCountDisplay = updateCountDisplay;
             
             return;
         }
@@ -2920,19 +2942,18 @@ document.addEventListener('DOMContentLoaded', ()=>{
             if(!profile || !profile.designs[currentDesign]) return;
             const design = profile.designs[currentDesign];
             const canvas2Enabled = design.canvas2Enabled || false;
-            const sequenceEnabled = design.sequenceEnabled || false;
+            // Sequence mode is always enabled
+            const sequenceEnabled = true;
             const sequenceCountColumn = design.sequenceCountColumn || '';
             
             // Validate sequence mode
-            if(sequenceEnabled){
-                if(!sequenceCountColumn){
-                    msg('Error: Sequence mode enabled but no count column selected', true);
-                    return;
-                }
-                if(!R || !Object.prototype.hasOwnProperty.call(R, sequenceCountColumn)){
-                    msg('Error: Count column not found in current record', true);
-                    return;
-                }
+            if(!sequenceCountColumn){
+                msg('Error: No count column selected. Please select a column in Design Settings.', true);
+                return;
+            }
+            if(!R || !Object.prototype.hasOwnProperty.call(R, sequenceCountColumn)){
+                msg('Error: Count column not found in current record', true);
+                return;
             }
             
             // Save current canvas
@@ -2943,16 +2964,13 @@ document.addEventListener('DOMContentLoaded', ()=>{
             const prevCanvas = currentCanvas;
             const prevS = deepCopy(S);
             
-            // Calculate count for sequence mode
-            let count = 1;
+            // Calculate count for sequence mode (always enabled)
             const VERTICAL_SPACING = 0.2; // cm spacing between labels
-            if(sequenceEnabled && sequenceCountColumn){
-                const countRaw = R[sequenceCountColumn];
-                count = Math.max(0, Math.floor(Number(countRaw)));
-                if(count <= 0){
-                    msg('Warning: Count value is 0 or invalid, no labels will be printed', true);
-                    return;
-                }
+            const countRaw = R[sequenceCountColumn];
+            const count = Math.max(0, Math.floor(Number(countRaw)));
+            if(count <= 0){
+                msg('Warning: Count value is 0 or invalid, no labels will be printed', true);
+                return;
             }
             
             // Create print container
@@ -2962,16 +2980,11 @@ document.addEventListener('DOMContentLoaded', ()=>{
             printContainer.style.left = '-9999px';
             printContainer.style.top = '0';
             printContainer.style.width = `${profile.width}cm`;
-            // Height will be adjusted based on sequence mode
-            let totalHeight;
-            if(sequenceEnabled){
-                // Each pair (canvas1 + canvas2) takes (height * 2 + VERTICAL_SPACING) space if canvas2 is enabled
-                // Otherwise just (height + VERTICAL_SPACING)
-                const pairHeight = canvas2Enabled ? (profile.height * 2 + VERTICAL_SPACING) : (profile.height + VERTICAL_SPACING);
-                totalHeight = count * pairHeight - VERTICAL_SPACING;
-            } else {
-                totalHeight = canvas2Enabled ? profile.height * 2 : profile.height;
-            }
+            // Height calculation - sequence mode is always enabled
+            // Each pair (canvas1 + canvas2) takes (height * 2 + VERTICAL_SPACING) space if canvas2 is enabled
+            // Otherwise just (height + VERTICAL_SPACING)
+            const pairHeight = canvas2Enabled ? (profile.height * 2 + VERTICAL_SPACING) : (profile.height + VERTICAL_SPACING);
+            const totalHeight = count * pairHeight - VERTICAL_SPACING;
             printContainer.style.height = `${totalHeight}cm`;
             
             // Helper function to render canvas to print page
@@ -3382,53 +3395,32 @@ document.addEventListener('DOMContentLoaded', ()=>{
             // Add print container to DOM first so measurements work correctly
             document.body.appendChild(printContainer);
             
-            if(sequenceEnabled){
-                // Sequence mode: render multiple labels stacked vertically
-                // Each pair (canvas1 + canvas2) shares the same sequenceIndex
-                for(let sequenceIndex = 1; sequenceIndex <= count; sequenceIndex++){
-                    // Calculate offset for this sequence index
-                    // Each pair (canvas1 + canvas2) takes (height * 2 + VERTICAL_SPACING) space if canvas2 is enabled
-                    // Otherwise just (height + VERTICAL_SPACING)
-                    const pairHeight = canvas2Enabled ? (profile.height * 2 + VERTICAL_SPACING) : (profile.height + VERTICAL_SPACING);
-                    const offsetY = (sequenceIndex - 1) * pairHeight;
-                    
-                    // Add canvas 1 for this sequence index
-                    const page1 = renderCanvasToPage(1, sequenceIndex, offsetY);
-                    printContainer.appendChild(page1);
-                    
-                    // Add canvas 2 with the same sequence index if enabled
-                    if(canvas2Enabled){
-                        const page2OffsetY = offsetY + profile.height;
-                        const page2 = renderCanvasToPage(2, sequenceIndex, page2OffsetY);
-                        printContainer.appendChild(page2);
-                    }
-                }
-            } else {
-                // Normal mode: single label
-                // Add canvas 1
-                const page1 = renderCanvasToPage(1);
+            // Sequence mode is always enabled - render multiple labels stacked vertically
+            // Each pair (canvas1 + canvas2) shares the same sequenceIndex
+            for(let sequenceIndex = 1; sequenceIndex <= count; sequenceIndex++){
+                // Calculate offset for this sequence index
+                // Each pair (canvas1 + canvas2) takes (height * 2 + VERTICAL_SPACING) space if canvas2 is enabled
+                // Otherwise just (height + VERTICAL_SPACING)
+                const pairHeight = canvas2Enabled ? (profile.height * 2 + VERTICAL_SPACING) : (profile.height + VERTICAL_SPACING);
+                const offsetY = (sequenceIndex - 1) * pairHeight;
+                
+                // Add canvas 1 for this sequence index
+                const page1 = renderCanvasToPage(1, sequenceIndex, offsetY);
                 printContainer.appendChild(page1);
                 
-                // Add canvas 2 if enabled
+                // Add canvas 2 with the same sequence index if enabled
                 if(canvas2Enabled){
-                    const page2 = renderCanvasToPage(2);
+                    const page2OffsetY = offsetY + profile.height;
+                    const page2 = renderCanvasToPage(2, sequenceIndex, page2OffsetY);
                     printContainer.appendChild(page2);
                 }
             }
             
             // Store pages for text overflow handling
+            const pages = printContainer.querySelectorAll('.print-page');
             let page1 = null, page2 = null;
-            if(sequenceEnabled){
-                const pages = printContainer.querySelectorAll('.print-page');
-                if(pages.length > 0) page1 = pages[0];
-                if(canvas2Enabled && pages.length > 1) page2 = pages[1];
-            } else {
-                page1 = printContainer.querySelector('.print-page');
-                if(canvas2Enabled){
-                    const pages = printContainer.querySelectorAll('.print-page');
-                    if(pages.length > 1) page2 = pages[1];
-                }
-            }
+            if(pages.length > 0) page1 = pages[0];
+            if(canvas2Enabled && pages.length > 1) page2 = pages[1];
             
             // Now apply text overflow handling after all elements are in DOM
             // Need to get the canvas data for each page
@@ -3531,6 +3523,353 @@ document.addEventListener('DOMContentLoaded', ()=>{
                     updatePrintCSS(); // Restore normal print CSS
                 }, 100);
             });
+    }
+
+    function printSingle(){
+        const profile = profiles[currentProfile];
+        if(!profile || !profile.designs[currentDesign]) return;
+        const design = profile.designs[currentDesign];
+        const canvas2Enabled = design.canvas2Enabled || false;
+        
+        // Ask user for sequence number
+        const sequenceInput = prompt('Enter sequence number:', '1');
+        if(sequenceInput === null) return; // User cancelled
+        
+        const sequenceIndex = Math.max(1, Math.floor(Number(sequenceInput)));
+        if(isNaN(sequenceIndex) || sequenceIndex < 1){
+            msg('Error: Invalid sequence number', true);
+            return;
+        }
+        
+        // Save current canvas
+        saveCurrentDesign();
+        
+        // Store original state
+        const prevSel = deepCopy(selectedIds);
+        const prevCanvas = currentCanvas;
+        const prevS = deepCopy(S);
+        
+        // Create print container for single label
+        const printContainer = document.createElement('div');
+        printContainer.className = 'print-container';
+        printContainer.style.position = 'absolute';
+        printContainer.style.left = '-9999px';
+        printContainer.style.top = '0';
+        printContainer.style.width = `${profile.width}cm`;
+        const totalHeight = canvas2Enabled ? profile.height * 2 : profile.height;
+        printContainer.style.height = `${totalHeight}cm`;
+        
+        // Helper function to render canvas to print page (reuse from printBothCanvases)
+        function renderCanvasToPage(canvasNum, seqIndex, offsetY = 0){
+            const canvasData = design[`canvas${canvasNum}`] || [];
+            const tempS = canvasData.map(normalizeElement);
+            
+            const page = document.createElement('div');
+            page.className = 'print-page';
+            page.style.width = `${profile.width}cm`;
+            page.style.height = `${profile.height}cm`;
+            page.style.position = 'relative';
+            page.style.background = '#fff';
+            page.style.overflow = 'hidden';
+            page.style.pageBreakAfter = (canvasNum === 1 && canvas2Enabled) ? 'always' : 'auto';
+            if(offsetY > 0){
+                page.style.marginTop = `${offsetY}cm`;
+            }
+            
+            // Render elements (same logic as in printBothCanvases)
+            const sorted = tempS.slice().sort((a,b)=> (a.zIndex||0) - (b.zIndex||0));
+            sorted.forEach(el=>{
+                const d = document.createElement('div');
+                d.classList.add('label-element');
+                d.style.position = 'absolute';
+                d.style.left = `${el.x}cm`;
+                d.style.top = `${el.y}cm`;
+                if(el.type !== 'line'){
+                    d.style.width = `${el.width}cm`;
+                    d.style.height = `${el.height}cm`;
+                } else {
+                    d.style.width = `${el.width}cm`;
+                }
+                d.style.zIndex = el.zIndex || 0;
+                d.style.fontSize = `${el.props.fontSize || 16}px`;
+                const fontWeight = el.props.fontWeight;
+                if(typeof fontWeight === 'number'){
+                    d.style.fontWeight = fontWeight;
+                } else {
+                    d.style.fontWeight = fontWeight || 'normal';
+                }
+                d.style.fontFamily = el.props.fontFamily || 'Arial, sans-serif';
+                d.style.lineHeight = el.props.lineHeight !== undefined ? String(el.props.lineHeight) : '1.2';
+                const justifyMap = { left: 'flex-start', center: 'center', right: 'flex-end' };
+                const alignMap = { top: 'flex-start', middle: 'center', bottom: 'flex-end' };
+                if(el.type !== 'line'){
+                    d.style.display = 'flex';
+                    d.style.alignItems = alignMap[el.props.valign] || 'flex-start';
+                    d.style.justifyContent = justifyMap[el.props.textAlign] || 'flex-start';
+                    if(el.type === 'text' || el.type === 'data'){
+                        d.style.whiteSpace = 'pre-wrap';
+                    } else {
+                        d.style.whiteSpace = 'normal';
+                    }
+                } else {
+                    d.style.display = 'block';
+                    d.style.whiteSpace = '';
+                }
+                d.style.textAlign = el.props.textAlign || 'left';
+                if(el.type !== 'line'){
+                    d.style.color = el.props.color || '#000000';
+                }
+                d.style.boxSizing = 'border-box';
+                const rotation = Number(el.props.rotation) || 0;
+                d.style.transform = `rotate(${rotation}deg)`;
+                d.style.transformOrigin = 'center center';
+                
+                if((el.type === 'text' || el.type === 'data')){
+                    const pt = Number.isFinite(Number(el.props.paddingTop)) ? Number(el.props.paddingTop) : 0;
+                    const pr = Number.isFinite(Number(el.props.paddingRight)) ? Number(el.props.paddingRight) : 0;
+                    const pb = Number.isFinite(Number(el.props.paddingBottom)) ? Number(el.props.paddingBottom) : 0;
+                    const pl = Number.isFinite(Number(el.props.paddingLeft)) ? Number(el.props.paddingLeft) : 0;
+                    d.style.padding = `${pt}cm ${pr}cm ${pb}cm ${pl}cm`;
+                } else {
+                    d.style.padding = '';
+                }
+                
+                // Apply borders and styling (simplified - same as printBothCanvases)
+                if(el.props.showBorder && el.type !== 'box'){
+                    const borderWidth = `${Number(el.props.borderWidth)||1}px`;
+                    const borderColor = el.props.borderColor || '#000';
+                    const borderStyle = 'solid';
+                    d.style.borderTop = (el.props.borderTop !== false) ? `${borderWidth} ${borderStyle} ${borderColor}` : 'none';
+                    d.style.borderRight = (el.props.borderRight !== false) ? `${borderWidth} ${borderStyle} ${borderColor}` : 'none';
+                    d.style.borderBottom = (el.props.borderBottom !== false) ? `${borderWidth} ${borderStyle} ${borderColor}` : 'none';
+                    d.style.borderLeft = (el.props.borderLeft !== false) ? `${borderWidth} ${borderStyle} ${borderColor}` : 'none';
+                    d.style.printColorAdjust = 'exact';
+                    d.style.webkitPrintColorAdjust = 'exact';
+                    const brTL = Number(el.props.borderRadiusTopLeft) || 0;
+                    const brTR = Number(el.props.borderRadiusTopRight) || 0;
+                    const brBR = Number(el.props.borderRadiusBottomRight) || 0;
+                    const brBL = Number(el.props.borderRadiusBottomLeft) || 0;
+                    if(brTL > 0 || brTR > 0 || brBR > 0 || brBL > 0){
+                        d.style.borderRadius = `${brTL}px ${brTR}px ${brBR}px ${brBL}px`;
+                    } else {
+                        d.style.borderRadius = '';
+                    }
+                } else if(el.type !== 'box' && el.type !== 'line'){
+                    if(!el.props.showBorder){
+                        d.style.border = '1px solid transparent';
+                    }
+                }
+                
+                if(el.type === 'box'){
+                    const brTL = Number(el.props.borderRadiusTopLeft) || 0;
+                    const brTR = Number(el.props.borderRadiusTopRight) || 0;
+                    const brBR = Number(el.props.borderRadiusBottomRight) || 0;
+                    const brBL = Number(el.props.borderRadiusBottomLeft) || 0;
+                    if(brTL > 0 || brTR > 0 || brBR > 0 || brBL > 0){
+                        d.style.borderRadius = `${brTL}px ${brTR}px ${brBR}px ${brBL}px`;
+                    } else {
+                        d.style.borderRadius = '';
+                    }
+                }
+                
+                // Content - use getData with the specified sequenceIndex
+                switch(el.type){
+                    case 'text': {
+                        const span = document.createElement('div');
+                        span.style.display='block';
+                        span.style.pointerEvents='none';
+                        span.style.width='100%';
+                        span.style.overflow='hidden';
+                        span.style.wordWrap='break-word';
+                        span.style.whiteSpace='pre-wrap';
+                        span.textContent = getData(el, seqIndex);
+                        span.style.fontFamily = el.props.fontFamily || 'Arial, sans-serif';
+                        span.style.fontSize = (el.props.fontSize || 16) + 'px';
+                        span.style.color = el.props.color || '#000000';
+                        d.appendChild(span);
+                        break;
+                    }
+                    case 'data': {
+                        const span = document.createElement('div');
+                        span.style.display='block';
+                        span.style.width='100%';
+                        span.style.pointerEvents='none';
+                        span.style.overflow='hidden';
+                        span.style.wordWrap='break-word';
+                        span.style.whiteSpace='pre-wrap';
+                        span.textContent = getData(el, seqIndex);
+                        span.style.fontFamily = el.props.fontFamily || 'Arial, sans-serif';
+                        span.style.fontSize = (el.props.fontSize || 16) + 'px';
+                        span.style.color = el.props.color || '#000000';
+                        d.appendChild(span);
+                        break;
+                    }
+                    case 'line':
+                        d.style.background = el.props.color || '#000000';
+                        d.style.height = `${el.props.thickness || 2}px`;
+                        d.style.width = `${el.width}cm`;
+                        d.style.border = 'none';
+                        break;
+                    case 'box':
+                        const boxThickness = el.props.thickness !== undefined ? Number(el.props.thickness) : 2;
+                        if(boxThickness > 0){
+                            d.style.border = `${boxThickness}px solid ${el.props.color || '#000000'}`;
+                        } else {
+                            d.style.border = 'none';
+                        }
+                        d.style.backgroundColor = el.props.fillColor || 'transparent';
+                        break;
+                    case 'qr': {
+                        const c = getData(el, seqIndex);
+                        const q = document.createElement('img');
+                        const dpi = 37.795276;
+                        const qs = Math.min(el.width, el.height) * dpi;
+                        q.src = `https://api.qrserver.com/v1/create-qr-code/?size=${Math.round(qs)}x${Math.round(qs)}&data=${encodeURIComponent(c)}`;
+                        q.style.pointerEvents='none';
+                        q.style.width='100%';
+                        q.style.height='100%';
+                        q.style.objectFit='contain';
+                        d.appendChild(q);
+                        break;
+                    }
+                    case 'barcode': {
+                        const c = getData(el, seqIndex) || '';
+                        let prefix = el.props.prefix || '';
+                        let suffix = el.props.suffix || '';
+                        prefix = replaceColumnSyntax(prefix, el);
+                        prefix = applySequencePlaceholder(prefix, seqIndex);
+                        suffix = replaceColumnSyntax(suffix, el);
+                        suffix = applySequencePlaceholder(suffix, seqIndex);
+                        // Create barcode container and render (simplified version)
+                        const barcodeContainer = document.createElement('div');
+                        barcodeContainer.style.display = 'flex';
+                        barcodeContainer.style.alignItems = 'stretch';
+                        barcodeContainer.style.justifyContent = 'center';
+                        barcodeContainer.style.width = '100%';
+                        barcodeContainer.style.height = '100%';
+                        barcodeContainer.style.pointerEvents = 'none';
+                        if(prefix){
+                            const prefixSpan = document.createElement('span');
+                            prefixSpan.textContent = prefix;
+                            prefixSpan.style.fontFamily = el.props.fontFamily || 'Arial, sans-serif';
+                            prefixSpan.style.fontSize = (el.props.fontSize || 16) + 'px';
+                            prefixSpan.style.color = el.props.color || '#000000';
+                            barcodeContainer.appendChild(prefixSpan);
+                        }
+                        const sv = document.createElementNS('http://www.w3.org/2000/svg','svg');
+                        sv.style.pointerEvents='none';
+                        sv.style.flex = '1 1 auto';
+                        sv.style.width = '100%';
+                        sv.style.height = '100%';
+                        barcodeContainer.appendChild(sv);
+                        if(suffix){
+                            const suffixSpan = document.createElement('span');
+                            suffixSpan.textContent = suffix;
+                            suffixSpan.style.fontFamily = el.props.fontFamily || 'Arial, sans-serif';
+                            suffixSpan.style.fontSize = (el.props.fontSize || 16) + 'px';
+                            suffixSpan.style.color = el.props.color || '#000000';
+                            barcodeContainer.appendChild(suffixSpan);
+                        }
+                        d.appendChild(barcodeContainer);
+                        try{
+                            JsBarcode(sv, String(c), {
+                                format: el.props.format || "CODE128",
+                                displayValue: el.props.displayValue !== false,
+                                width: 1,
+                                height: 100,
+                                margin: 0
+                            });
+                        }catch(err){
+                            sv.innerHTML = `<text x="10" y="20" fill="red" font-size="12">Invalid barcode</text>`;
+                        }
+                        break;
+                    }
+                    case 'image': {
+                        const img = document.createElement('img');
+                        img.style.pointerEvents='none';
+                        img.style.width='100%';
+                        img.style.height='100%';
+                        img.style.objectFit = el.props.objectFit || 'contain';
+                        if(el.props.boundColumn && R && Object.prototype.hasOwnProperty.call(R, el.props.boundColumn)){
+                            const imgurId = R[el.props.boundColumn];
+                            if(imgurId){
+                                const id = String(imgurId).trim();
+                                if(id){
+                                    if(id.startsWith('http://') || id.startsWith('https://')){
+                                        img.src = id;
+                                    } else {
+                                        const cleanId = id.replace(/\.(jpg|jpeg|png|gif|webp)$/i, '');
+                                        img.src = `https://i.imgur.com/${cleanId}.jpg`;
+                                    }
+                                }
+                            }
+                        }
+                        d.appendChild(img);
+                        break;
+                    }
+                }
+                
+                page.appendChild(d);
+            });
+            
+            return page;
+        }
+        
+        // Add print container to DOM
+        document.body.appendChild(printContainer);
+        
+        // Add canvas 1 with specified sequence index
+        const page1 = renderCanvasToPage(1, sequenceIndex, 0);
+        printContainer.appendChild(page1);
+        
+        // Add canvas 2 if enabled with same sequence index
+        if(canvas2Enabled){
+            const page2 = renderCanvasToPage(2, sequenceIndex, profile.height);
+            printContainer.appendChild(page2);
+        }
+        
+        // Wait for images to load, then print
+        const allImages = printContainer.querySelectorAll('img');
+        const imagePromises = Array.from(allImages).map(img => {
+            if(img.complete && img.naturalWidth > 0){
+                return Promise.resolve();
+            }
+            return new Promise((resolve) => {
+                img.onload = resolve;
+                img.onerror = resolve;
+                setTimeout(resolve, 5000);
+            });
+        });
+        
+        Promise.all(imagePromises).then(() => {
+            // Use same print CSS logic as printBothCanvases
+            const styleId = 'dynamic-print-css';
+            let styleEl = document.getElementById(styleId);
+            if(!styleEl){
+                styleEl = document.createElement('style');
+                styleEl.id = styleId;
+                document.head.appendChild(styleEl);
+            }
+            styleEl.textContent = `
+                @media print{
+                    @page{size:${profile.width}cm ${profile.height}cm;margin:0}
+                    html,body{margin:0!important;padding:0!important;background:#fff!important;width:${profile.width}cm!important;height:auto!important}
+                    #toolbar,#sidebar,#marquee,.status-message{display:none!important}
+                    .print-container{position:relative!important;left:0!important;top:0!important;width:${profile.width}cm!important;height:auto!important}
+                    .print-page{width:${profile.width}cm!important;height:${profile.height}cm!important;page-break-after:always!important;page-break-inside:avoid!important;overflow:visible!important;background:#fff!important;position:relative!important;margin:0!important;padding:0!important;display:block!important}
+                    .print-page:last-child{page-break-after:auto!important}
+                }
+            `;
+            
+            window.print();
+            
+            setTimeout(() => {
+                if(printContainer.parentNode){
+                    document.body.removeChild(printContainer);
+                }
+                styleEl.textContent = '';
+            }, 100);
+        });
     }
 
     // ---------- Mouse interactions: marquee, selection, drag, resize ----------
@@ -4483,8 +4822,11 @@ document.addEventListener('DOMContentLoaded', ()=>{
 
         // ---------- Buttons ----------
     document.getElementById('btn-print').addEventListener('click', ()=>{
-            printBothCanvases();
-        });
+        printBothCanvases();
+    });
+    document.getElementById('btn-print-single').addEventListener('click', ()=>{
+        printSingle();
+    });
         document.getElementById('btn-rotate-canvas').addEventListener('click', ()=>{
             canvasRotation = (canvasRotation + 90) % 360;
             applyCanvasRotation();
@@ -4765,7 +5107,19 @@ document.addEventListener('DOMContentLoaded', ()=>{
         try{ window.grist.ready({ requiredAccess:'full' }); }catch(e){}
         try{
             if(typeof window.grist.onRecord === 'function'){
-                window.grist.onRecord(function(record,mappings){ R = record||{}; C = Object.keys(R); if(selectedIds.length) updateProps(); render(); });
+                window.grist.onRecord(function(record,mappings){ 
+                    R = record||{}; 
+                    C = Object.keys(R); 
+                    if(selectedIds.length) {
+                        updateProps(); 
+                    } else {
+                        // Update count display even when no elements are selected
+                        if(typeof window.updateSequenceCountDisplay === 'function'){
+                            window.updateSequenceCountDisplay();
+                        }
+                    }
+                    render(); 
+                });
             }
         }catch(e){ console.warn('grist.onRecord error',e); }
         try{
