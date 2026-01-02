@@ -367,6 +367,8 @@ document.addEventListener('DOMContentLoaded', ()=>{
             if(!profile) return;
             W = profile.width;
             H = profile.height;
+            // Clear canvas before updating size to prevent showing old content
+            lc.innerHTML = '';
             lc.style.width = `${W}cm`;
             lc.style.height = `${H}cm`;
             updatePrintCSS();
@@ -509,8 +511,12 @@ document.addEventListener('DOMContentLoaded', ()=>{
             updateProfileSelector();
             updateDesignSelector();
             updateCanvasControls();
-            render();
-            updateProps();
+            // Force a re-render after canvas size is updated
+            // Use requestAnimationFrame to ensure DOM is updated before rendering
+            requestAnimationFrame(() => {
+                render();
+                updateProps();
+            });
         }
 
         function switchDesign(designKey){
