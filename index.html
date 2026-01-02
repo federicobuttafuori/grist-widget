@@ -1694,8 +1694,11 @@ document.addEventListener('DOMContentLoaded', ()=>{
             let prefix = el.props.prefix || '';
             let suffix = el.props.suffix || '';
             
-            // Handle **column** syntax for text, data, and barcode fields
-            if(el.type === 'text' || el.type === 'data' || el.type === 'barcode'){
+            // Check if **column** syntax is used in original text/prefix/suffix (before processing)
+            const hasColumnSyntax = text.includes('**') || prefix.includes('**') || suffix.includes('**');
+            
+            // Handle **column** syntax for text, data, barcode, and qr fields
+            if(el.type === 'text' || el.type === 'data' || el.type === 'barcode' || el.type === 'qr'){
                 // Process text, prefix, and suffix for **column** syntax
                 text = replaceColumnSyntax(text, el);
                 prefix = replaceColumnSyntax(prefix, el);
@@ -1707,28 +1710,32 @@ document.addEventListener('DOMContentLoaded', ()=>{
                 suffix = applySequencePlaceholder(suffix, sequenceIndex);
             }
             
-            // Handle boundColumn (legacy support) - only if **column** syntax wasn't used
-            if(el.props.boundColumn && R && Object.prototype.hasOwnProperty.call(R, el.props.boundColumn) && !text.includes('**') && !prefix.includes('**') && !suffix.includes('**')){
-            let v = R[el.props.boundColumn];
-            if(el.type === 'data' && typeof v === 'number'){
-                const dec = (el.props.decimals !== undefined) ? Number(el.props.decimals) : 2;
-                const pct = !!el.props.asPercent;
-                return prefix + fmt(v,dec,pct) + suffix;
+            // Handle boundColumn (legacy support) - only if **column** syntax wasn't used AND text is empty
+            if(!hasColumnSyntax && el.props.boundColumn && R && Object.prototype.hasOwnProperty.call(R, el.props.boundColumn)){
+                let v = R[el.props.boundColumn];
+                if(el.type === 'data' && typeof v === 'number'){
+                    const dec = (el.props.decimals !== undefined) ? Number(el.props.decimals) : 2;
+                    const pct = !!el.props.asPercent;
+                    return prefix + fmt(v,dec,pct) + suffix;
+                }
+                // For barcode and qr, return only the value (prefix/suffix are handled separately in rendering)
+                if(el.type === 'barcode' || el.type === 'qr'){
+                    return String(v);
+                }
+                return prefix + String(v) + suffix;
             }
-            // For barcode, return only the value (prefix/suffix are handled separately in rendering)
-            if(el.type === 'barcode'){
-                return String(v);
-            }
-            return prefix + String(v) + suffix;
-        }
             
             // For text/data fields, return the processed text with prefix/suffix
             if(el.type === 'text' || el.type === 'data'){
                 return prefix + text + suffix;
             }
             
-            // For barcode, return only the text value (prefix/suffix will be shown separately if needed)
-            if(el.type === 'barcode'){
+            // For barcode and qr, return only the text value (prefix/suffix will be shown separately in rendering)
+            if(el.type === 'barcode' || el.type === 'qr'){
+                // If text is empty but we have boundColumn, use boundColumn as fallback
+                if(!text && el.props.boundColumn && R && Object.prototype.hasOwnProperty.call(R, el.props.boundColumn)){
+                    return String(R[el.props.boundColumn]);
+                }
                 return text;
             }
             
