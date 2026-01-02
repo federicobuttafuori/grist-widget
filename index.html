@@ -1694,24 +1694,28 @@ document.addEventListener('DOMContentLoaded', ()=>{
             let prefix = el.props.prefix || '';
             let suffix = el.props.suffix || '';
             
-            // Check if **column** syntax is used in original text/prefix/suffix (before processing)
-            const hasColumnSyntax = text.includes('**') || prefix.includes('**') || suffix.includes('**');
+            // For text fields, check if **column** syntax is used ONLY in the text itself (not prefix/suffix)
+            // Prefix and suffix can have **column** syntax independently
+            const hasColumnSyntaxInText = text.includes('**');
+            
+            // Always process prefix and suffix for **column** syntax (they work independently)
+            prefix = replaceColumnSyntax(prefix, el);
+            suffix = replaceColumnSyntax(suffix, el);
+            prefix = applySequencePlaceholder(prefix, sequenceIndex);
+            suffix = applySequencePlaceholder(suffix, sequenceIndex);
             
             // Handle **column** syntax for text, data, barcode, and qr fields
             if(el.type === 'text' || el.type === 'data' || el.type === 'barcode' || el.type === 'qr'){
-                // Process text, prefix, and suffix for **column** syntax
+                // Process text for **column** syntax
                 text = replaceColumnSyntax(text, el);
-                prefix = replaceColumnSyntax(prefix, el);
-                suffix = replaceColumnSyntax(suffix, el);
                 
                 // Apply **sequence** placeholder after column syntax
                 text = applySequencePlaceholder(text, sequenceIndex);
-                prefix = applySequencePlaceholder(prefix, sequenceIndex);
-                suffix = applySequencePlaceholder(suffix, sequenceIndex);
             }
             
-            // Handle boundColumn (legacy support) - only if **column** syntax wasn't used AND text is empty
-            if(!hasColumnSyntax && el.props.boundColumn && R && Object.prototype.hasOwnProperty.call(R, el.props.boundColumn)){
+            // Handle boundColumn (legacy support) - only if **column** syntax wasn't used in text itself
+            // For text fields, we can use boundColumn even if prefix/suffix have **column** syntax
+            if(!hasColumnSyntaxInText && el.props.boundColumn && R && Object.prototype.hasOwnProperty.call(R, el.props.boundColumn)){
                 let v = R[el.props.boundColumn];
                 if(el.type === 'data' && typeof v === 'number'){
                     const dec = (el.props.decimals !== undefined) ? Number(el.props.decimals) : 2;
@@ -1721,6 +1725,10 @@ document.addEventListener('DOMContentLoaded', ()=>{
                 // For barcode and qr, return only the value (prefix/suffix are handled separately in rendering)
                 if(el.type === 'barcode' || el.type === 'qr'){
                     return String(v);
+                }
+                // For text fields, use boundColumn value with processed prefix/suffix
+                if(el.type === 'text'){
+                    return prefix + String(v) + suffix;
                 }
                 return prefix + String(v) + suffix;
             }
