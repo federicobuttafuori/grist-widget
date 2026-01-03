@@ -3135,7 +3135,7 @@ document.addEventListener('DOMContentLoaded', ()=>{
         }
 
         // Function to show wave selection popup
-        function showWaveSelectionPopup(callback){
+        function showWaveSelectionPopup(callback, canvas2Flag = false){
             if(!packWaves || packWaves.length === 0){
                 callback([]); // No waves, return empty array to use default behavior
                 return;
@@ -3157,12 +3157,19 @@ document.addEventListener('DOMContentLoaded', ()=>{
             // Content area
             html += '<div style="padding:20px 24px;overflow-y:auto;flex:1;">';
             
+            // Calculate total labels for "All Waves" option
+            let totalLabelsAllWaves = 0;
+            
             // Build wave list with weight and count info
             packWaves.forEach((wave, index) => {
                 const count = (wave.countColumn && R && Object.prototype.hasOwnProperty.call(R, wave.countColumn)) ? 
                     Math.max(0, Math.floor(Number(R[wave.countColumn]))) : 0;
                 const weight = (wave.weightColumn && R && Object.prototype.hasOwnProperty.call(R, wave.weightColumn)) ? 
                     R[wave.weightColumn] : null;
+                
+                // Calculate total labels for this wave (considering canvas2Flag)
+                const totalLabels = canvas2Flag ? count * 2 : count;
+                totalLabelsAllWaves += totalLabels;
                 
                 // Display weight in grams (direct value, not converted)
                 let weightDisplay = '—';
@@ -3181,7 +3188,7 @@ document.addEventListener('DOMContentLoaded', ()=>{
                 html += `<div style="flex:1;">`;
                 html += `<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px;">`;
                 html += `<strong style="font-size:16px;color:#333;font-weight:600;">Wave ${index + 1}</strong>`;
-                html += `<span style="font-size:12px;color:#666;background:#e9ecef;padding:4px 8px;border-radius:4px;">${count} labels</span>`;
+                html += `<span style="font-size:12px;color:#666;background:#e9ecef;padding:4px 8px;border-radius:4px;">${totalLabels} labels</span>`;
                 html += `</div>`;
                 html += `<div style="font-size:14px;color:#666;display:flex;gap:16px;">`;
                 html += `<span><strong>Weight:</strong> ${weightDisplay}</span>`;
@@ -3197,7 +3204,10 @@ document.addEventListener('DOMContentLoaded', ()=>{
             html += `<label style="display:flex;align-items:center;cursor:pointer;margin:0;">`;
             html += `<input type="radio" name="wave-selection" value="all" checked style="margin-right:14px;width:18px;height:18px;cursor:pointer;accent-color:#ff9800;">`;
             html += `<div style="flex:1;">`;
+            html += `<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px;">`;
             html += `<strong style="font-size:16px;color:#e65100;font-weight:600;">All Waves</strong>`;
+            html += `<span style="font-size:12px;color:#bf360c;background:#ffe0b2;padding:4px 8px;border-radius:4px;font-weight:600;">${totalLabelsAllWaves} labels</span>`;
+            html += `</div>`;
             html += `<div style="font-size:14px;color:#bf360c;margin-top:4px;">Print all waves in sequence</div>`;
             html += `</div>`;
             html += `</label>`;
@@ -3331,7 +3341,7 @@ document.addEventListener('DOMContentLoaded', ()=>{
                 return;
             }
             
-            // Helper function to render canvas to print page (reuse from printBothCanvases)
+            // Helper function to render canvas to print page (identical to printBothCanvases)
             function renderCanvasToPage(canvasNum, sequenceIndex = 1, isLastPage = false, waveContext = null){
                 const canvasData = design[`canvas${canvasNum}`] || [];
                 const tempS = canvasData.map(normalizeElement);
@@ -3343,11 +3353,13 @@ document.addEventListener('DOMContentLoaded', ()=>{
                 page.style.position = 'relative';
                 page.style.background = '#fff';
                 page.style.overflow = 'hidden';
+                // Set pageBreakAfter only for last page - let CSS handle the rest
                 if(isLastPage){
                     page.style.pageBreakAfter = 'auto';
                 }
+                // No marginTop or offsetY - pages are created in sequence
                 
-                // Render elements using renderElementsForCanvas logic but adapted for print
+                // Render elements
                 const sorted = tempS.slice().sort((a,b)=> (a.zIndex||0) - (b.zIndex||0));
                 sorted.forEach(el=>{
                     const d = document.createElement('div');
@@ -3355,11 +3367,13 @@ document.addEventListener('DOMContentLoaded', ()=>{
                     d.style.position = 'absolute';
                     d.style.left = `${el.x}cm`;
                     d.style.top = `${el.y}cm`;
+                    // For lines, don't set height in cm initially - it will be set in px later
                     if(el.type !== 'line'){
                         d.style.width = `${el.width}cm`;
                         d.style.height = `${el.height}cm`;
                     } else {
                         d.style.width = `${el.width}cm`;
+                        // Height will be set in px in the line case below
                     }
                     d.style.zIndex = el.zIndex || 0;
                     d.style.fontSize = `${el.props.fontSize || 16}px`;
@@ -3377,14 +3391,21 @@ document.addEventListener('DOMContentLoaded', ()=>{
                         d.style.display = 'flex';
                         d.style.alignItems = alignMap[el.props.valign] || 'flex-start';
                         d.style.justifyContent = justifyMap[el.props.textAlign] || 'flex-start';
+                        // Use pre-wrap to preserve line breaks from textarea
                         if(el.type === 'text' || el.type === 'data'){
                             d.style.whiteSpace = 'pre-wrap';
                         } else {
                             d.style.whiteSpace = 'normal';
                         }
+                    } else {
+                        d.style.display = 'block';
+                        d.style.whiteSpace = '';
                     }
                     d.style.textAlign = el.props.textAlign || 'left';
-                    d.style.color = el.props.color || '#000000';
+                    // For lines, color is handled separately via background
+                    if(el.type !== 'line'){
+                        d.style.color = el.props.color || '#000000';
+                    }
                     d.style.boxSizing = 'border-box';
                     const rotation = Number(el.props.rotation) || 0;
                     d.style.transform = `rotate(${rotation}deg)`;
@@ -3396,24 +3417,90 @@ document.addEventListener('DOMContentLoaded', ()=>{
                         const pb = Number.isFinite(Number(el.props.paddingBottom)) ? Number(el.props.paddingBottom) : 0;
                         const pl = Number.isFinite(Number(el.props.paddingLeft)) ? Number(el.props.paddingLeft) : 0;
                         d.style.padding = `${pt}cm ${pr}cm ${pb}cm ${pl}cm`;
+                    } else {
+                        d.style.padding = '';
                     }
                     
-                    // Handle different element types
+                        // Apply borders for elements with showBorder enabled
+                    if(el.props.showBorder && el.type !== 'box'){
+                        const borderWidth = `${Number(el.props.borderWidth)||1}px`;
+                        const borderColor = el.props.borderColor || '#000';
+                        const borderStyle = 'solid';
+                        
+                        // Apply borders only to enabled sides
+                        d.style.borderTop = (el.props.borderTop !== false) ? `${borderWidth} ${borderStyle} ${borderColor}` : 'none';
+                        d.style.borderRight = (el.props.borderRight !== false) ? `${borderWidth} ${borderStyle} ${borderColor}` : 'none';
+                        d.style.borderBottom = (el.props.borderBottom !== false) ? `${borderWidth} ${borderStyle} ${borderColor}` : 'none';
+                        d.style.borderLeft = (el.props.borderLeft !== false) ? `${borderWidth} ${borderStyle} ${borderColor}` : 'none';
+                            
+                            // Force borders to print
+                            d.style.printColorAdjust = 'exact';
+                            d.style.webkitPrintColorAdjust = 'exact';
+                        
+                        // Apply border radius (individual corners)
+                        const brTL = Number(el.props.borderRadiusTopLeft) || 0;
+                        const brTR = Number(el.props.borderRadiusTopRight) || 0;
+                        const brBR = Number(el.props.borderRadiusBottomRight) || 0;
+                        const brBL = Number(el.props.borderRadiusBottomLeft) || 0;
+                        if(brTL > 0 || brTR > 0 || brBR > 0 || brBL > 0){
+                            d.style.borderRadius = `${brTL}px ${brTR}px ${brBR}px ${brBL}px`;
+                        } else {
+                            d.style.borderRadius = '';
+                        }
+                        } else if(el.type !== 'box' && el.type !== 'line'){
+                            // Only apply transparent border if showBorder is not enabled
+                            // This ensures borders are visible when showBorder is true
+                            if(!el.props.showBorder){
+                                d.style.border = '1px solid transparent';
+                            }
+                        }
+                        
+                        // Apply border radius for box elements (independent of showBorder)
+                        if(el.type === 'box'){
+                            const brTL = Number(el.props.borderRadiusTopLeft) || 0;
+                            const brTR = Number(el.props.borderRadiusTopRight) || 0;
+                            const brBR = Number(el.props.borderRadiusBottomRight) || 0;
+                            const brBL = Number(el.props.borderRadiusBottomLeft) || 0;
+                            if(brTL > 0 || brTR > 0 || brBR > 0 || brBL > 0){
+                                d.style.borderRadius = `${brTL}px ${brTR}px ${brBR}px ${brBL}px`;
+                    } else {
+                                d.style.borderRadius = '';
+                            }
+                    }
+                    
+                    // Content
                     switch(el.type){
                         case 'text': {
                             const span = document.createElement('div');
                             span.style.display='block';
-                            span.style.width='100%';
                             span.style.pointerEvents='none';
-                            span.style.overflow='hidden';
+                            
+                            // Set whiteSpace and width based on textOverflow mode
+                            const overflowMode = el.props.textOverflow || 'clip';
+                            if(overflowMode === 'squeeze'){
+                                span.style.whiteSpace = 'nowrap'; // No wrapping for squeeze
+                                span.style.width = 'auto'; // Allow natural text width for squeeze
+                                span.style.overflow = 'visible'; // Don't clip compressed text
+                            } else {
+                                span.style.width = '100%';
+                                span.style.overflow = 'hidden';
+                                span.style.whiteSpace = 'pre-wrap'; // Allow wrapping for clip and auto-scale
+                            }
                             span.style.wordWrap='break-word';
-                            span.style.whiteSpace='pre-wrap';
+                            
                             span.textContent = getData(el, sequenceIndex, waveContext);
+                            // Copy font styles to span for overflow calculation
                             span.style.fontFamily = el.props.fontFamily || 'Arial, sans-serif';
                             span.style.fontSize = (el.props.fontSize || 16) + 'px';
-                            span.style.fontWeight = (typeof el.props.fontWeight === 'number') ? el.props.fontWeight : (el.props.fontWeight || 'normal');
+                            const fontWeight = el.props.fontWeight;
+                            if(typeof fontWeight === 'number'){
+                                span.style.fontWeight = fontWeight;
+                            } else {
+                                span.style.fontWeight = fontWeight || 'normal';
+                            }
                             span.style.lineHeight = el.props.lineHeight !== undefined ? String(el.props.lineHeight) : '1.2';
                             span.style.color = el.props.color || '#000000';
+                            
                             d.appendChild(span);
                             break;
                         }
@@ -3424,33 +3511,58 @@ document.addEventListener('DOMContentLoaded', ()=>{
                             span.style.pointerEvents='none';
                             span.style.overflow='hidden';
                             span.style.wordWrap='break-word';
-                            span.style.whiteSpace='pre-wrap';
+                            span.style.whiteSpace='pre-wrap'; // Always allow wrapping first
+                            
                             span.textContent = getData(el, sequenceIndex, waveContext);
+                            // Copy font styles to span for overflow calculation
                             span.style.fontFamily = el.props.fontFamily || 'Arial, sans-serif';
                             span.style.fontSize = (el.props.fontSize || 16) + 'px';
-                            span.style.fontWeight = (typeof el.props.fontWeight === 'number') ? el.props.fontWeight : (el.props.fontWeight || 'normal');
+                            const fontWeight = el.props.fontWeight;
+                            if(typeof fontWeight === 'number'){
+                                span.style.fontWeight = fontWeight;
+                            } else {
+                                span.style.fontWeight = fontWeight || 'normal';
+                            }
                             span.style.lineHeight = el.props.lineHeight !== undefined ? String(el.props.lineHeight) : '1.2';
                             span.style.color = el.props.color || '#000000';
+                            
                             d.appendChild(span);
                             break;
                         }
                         case 'line':
-                            d.style.background = el.props.color || '#000000';
+                            // For lines, use explicit background color and ensure visibility
+                            const lineColor = el.props.color || '#000000';
+                            d.style.background = lineColor;
+                            d.style.backgroundColor = lineColor;
                             d.style.height = `${el.props.thickness || 2}px`;
                             d.style.width = `${el.width}cm`;
                             d.style.border = 'none';
+                            d.style.display = 'block';
+                            d.style.margin = '0';
+                            d.style.padding = '0';
+                            d.style.overflow = 'visible';
+                            d.style.minHeight = `${el.props.thickness || 2}px`;
+                            d.style.maxHeight = `${el.props.thickness || 2}px`;
+                            d.style.boxSizing = 'border-box';
+                            // Force browsers to print background colors
+                            d.style.printColorAdjust = 'exact';
+                            d.style.webkitPrintColorAdjust = 'exact';
+                            // Add a non-breaking space to ensure the div has content (invisible but ensures rendering)
+                            d.innerHTML = '&nbsp;';
+                            d.style.color = 'transparent';
+                            d.style.fontSize = '0';
                             break;
                         case 'box':
-                            const printBoxThickness = el.props.thickness !== undefined ? Number(el.props.thickness) : 2;
-                            if(printBoxThickness > 0){
-                                d.style.border = `${printBoxThickness}px solid ${el.props.color || '#000000'}`;
-                                d.style.borderWidth = `${printBoxThickness}px`;
-                            } else {
-                                d.style.border = 'none';
-                                d.style.borderWidth = '0';
-                                d.style.borderStyle = 'none';
-                                d.style.borderColor = 'transparent';
-                            }
+                                const printBoxThickness = el.props.thickness !== undefined ? Number(el.props.thickness) : 2;
+                                if(printBoxThickness > 0){
+                                    d.style.border = `${printBoxThickness}px solid ${el.props.color || '#000000'}`;
+                                    d.style.borderWidth = `${printBoxThickness}px`;
+                                } else {
+                                    d.style.border = 'none';
+                                    d.style.borderWidth = '0';
+                                    d.style.borderStyle = 'none';
+                                    d.style.borderColor = 'transparent';
+                                }
                             d.style.backgroundColor = el.props.fillColor || '#ffffff';
                             break;
                         case 'qr': {
@@ -3458,11 +3570,16 @@ document.addEventListener('DOMContentLoaded', ()=>{
                             const c = getData(el, sequenceIndex, waveContext) || '';
                             let prefix = el.props.prefix || '';
                             let suffix = el.props.suffix || '';
+                            
+                            // Apply sequence placeholder to prefix and suffix
                             prefix = replaceColumnSyntax(prefix, el);
                             prefix = applySequencePlaceholder(prefix, effectiveSequenceIndex);
                             suffix = replaceColumnSyntax(suffix, el);
                             suffix = applySequencePlaceholder(suffix, effectiveSequenceIndex);
+                            
+                            // Combine prefix + code + suffix into the QR code value
                             const qrValue = prefix + String(c) + suffix;
+                            
                             const q = document.createElement('img');
                             const dpi = 37.795276;
                             const qs = Math.min(el.width, el.height) * dpi;
@@ -3479,21 +3596,30 @@ document.addEventListener('DOMContentLoaded', ()=>{
                             const c = getData(el, sequenceIndex, waveContext) || '';
                             let prefix = el.props.prefix || '';
                             let suffix = el.props.suffix || '';
+                            
+                            // Apply sequence placeholder to prefix and suffix
                             prefix = replaceColumnSyntax(prefix, el);
                             prefix = applySequencePlaceholder(prefix, effectiveSequenceIndex);
                             suffix = replaceColumnSyntax(suffix, el);
                             suffix = applySequencePlaceholder(suffix, effectiveSequenceIndex);
+                            
+                            // Combine prefix + code + suffix into the barcode value
                             const barcodeValue = prefix + String(c) + suffix;
+                            
+                            // Calculate dimensions considering padding and borders FIRST
                             const PIXELS_PER_CM = 37.795276;
                             const paddingTop = (Number(el.props.paddingTop) || 0) * PIXELS_PER_CM;
                             const paddingBottom = (Number(el.props.paddingBottom) || 0) * PIXELS_PER_CM;
                             const paddingLeft = (Number(el.props.paddingLeft) || 0) * PIXELS_PER_CM;
                             const paddingRight = (Number(el.props.paddingRight) || 0) * PIXELS_PER_CM;
                             const borderWidth = (Number(el.props.thickness) || 0);
+                            
                             const containerWidthPx = el.width * PIXELS_PER_CM;
                             const containerHeightPx = el.height * PIXELS_PER_CM;
                             const availableWidth = containerWidthPx - paddingLeft - paddingRight - (borderWidth * 2);
                             const availableHeight = containerHeightPx - paddingTop - paddingBottom - (borderWidth * 2);
+                            
+                            // Create SVG for barcode - fill full container
                             const sv = document.createElementNS('http://www.w3.org/2000/svg','svg');
                             sv.style.pointerEvents='none';
                             sv.style.width = '100%';
@@ -3501,44 +3627,61 @@ document.addEventListener('DOMContentLoaded', ()=>{
                             sv.style.display = 'block';
                             sv.style.overflow = 'visible';
                             d.appendChild(sv);
+                            
                             try{
                                 const barcodeWidth = Math.max(50, availableWidth);
-                                const pxHeight = availableHeight;
+                                const pxHeight = availableHeight; // Use full available height, no minimum
+                                
+                                // Calculate width per bar based on available width (estimate ~50 bars for typical barcode)
                                 const estimatedBars = 50;
                                 const widthPerBar = Math.max(1, barcodeWidth / estimatedBars);
+                                
+                                // Set explicit SVG dimensions
                                 sv.setAttribute('width', barcodeWidth.toString());
                                 sv.setAttribute('height', pxHeight.toString());
                                 sv.setAttribute('viewBox', `0 0 ${barcodeWidth} ${pxHeight}`);
-                                sv.setAttribute('preserveAspectRatio', 'none');
+                                sv.setAttribute('preserveAspectRatio', 'none'); // No aspect ratio preservation - fill completely
+                                
+                                // Generate barcode with prefix + code + suffix included
                                 JsBarcode(sv, barcodeValue, {
                                     format: el.props.format || "CODE128",
+                                    displayValue: el.props.displayValue !== false,
                                     width: widthPerBar,
                                     height: pxHeight,
-                                    displayValue: el.props.displayValue !== false
+                                    margin: 0
                                 });
-                            } catch(e){
-                                console.warn('Barcode generation error:', e);
+                            }catch(err){
+                                sv.innerHTML = `<text x="10" y="20" fill="red" font-size="12">Invalid barcode</text>`;
                             }
                             break;
                         }
                         case 'image': {
                             const img = document.createElement('img');
-                            img.style.width = '100%';
-                            img.style.height = '100%';
+                            img.style.pointerEvents='none';
+                            img.style.width='100%';
+                            img.style.height='100%';
                             img.style.objectFit = el.props.objectFit || 'contain';
-                            img.style.pointerEvents = 'none';
-                            let imageUrl = el.props.text || '';
-                            if(imageUrl && R){
-                                imageUrl = replaceColumnSyntax(imageUrl, el);
-                                imageUrl = applySequencePlaceholder(imageUrl, waveContext && waveContext.waveSequenceIndex !== undefined ? waveContext.waveSequenceIndex : sequenceIndex);
-                            }
-                            if(imageUrl && imageUrl.includes('imgur.com')){
-                                const id = imageUrl.match(/imgur\.com\/([a-zA-Z0-9]+)/);
-                                if(id && id[1]){
-                                    const cleanId = id[1].replace(/\.(jpg|jpeg|png|gif|webp)$/i, '');
-                                    imageUrl = `https://i.imgur.com/${cleanId}.jpg`;
+                            
+                            // Build Imgur URL from Grist column value
+                            let imageUrl = '';
+                            if(el.props.boundColumn && R && Object.prototype.hasOwnProperty.call(R, el.props.boundColumn)){
+                                const imgurId = R[el.props.boundColumn];
+                                if(imgurId){
+                                    const id = String(imgurId).trim();
+                                    if(id){
+                                        // Construct Imgur URL: https://i.imgur.com/{id}.jpg
+                                        // If the value already contains http/https, use it as-is
+                                        if(id.startsWith('http://') || id.startsWith('https://')){
+                                            imageUrl = id;
+                                        } else {
+                                            // Remove any existing extension and add .jpg
+                                            const cleanId = id.replace(/\.(jpg|jpeg|png|gif|webp)$/i, '');
+                                            imageUrl = `https://i.imgur.com/${cleanId}.jpg`;
+                                        }
+                                    }
                                 }
                             }
+                            
                             if(imageUrl){
                                 img.src = imageUrl;
                                 img.onerror = function(){
@@ -3555,6 +3698,7 @@ document.addEventListener('DOMContentLoaded', ()=>{
                                     d.appendChild(errorDiv);
                                 };
                             } else {
+                                // Show placeholder when no image
                                 img.style.display = 'none';
                                 const placeholder = document.createElement('div');
                                 placeholder.style.width = '100%';
@@ -3572,12 +3716,28 @@ document.addEventListener('DOMContentLoaded', ()=>{
                             break;
                         }
                     }
+                    
                     page.appendChild(d);
                 });
+                
+                // Ensure page has content - if no elements, add a placeholder to prevent blank pages
+                if(page.children.length === 0){
+                    const placeholder = document.createElement('div');
+                    placeholder.style.width = '100%';
+                    placeholder.style.height = '100%';
+                    placeholder.style.display = 'flex';
+                    placeholder.style.alignItems = 'center';
+                    placeholder.style.justifyContent = 'center';
+                    placeholder.style.color = '#999';
+                    placeholder.style.fontSize = '12px';
+                    placeholder.textContent = 'Empty page';
+                    page.appendChild(placeholder);
+                }
+                
                 return page;
             }
             
-            // Add print container to DOM
+            // Add print container to DOM first so measurements work correctly
             document.body.appendChild(printContainer);
             
             // Iterate over selected waves
@@ -3667,17 +3827,14 @@ document.addEventListener('DOMContentLoaded', ()=>{
                 styleEl.textContent = `
                     @media print{
                         @page{size:${profile.width}cm ${profile.height}cm;margin:0}
-                        html,body{margin:0!important;padding:0!important;width:${profile.width}cm!important;height:${profile.height}cm!important;overflow:visible!important;background:#fff!important}
+                        html,body{margin:0!important;padding:0!important;background:#fff!important;width:${profile.width}cm!important;height:auto!important}
                         #toolbar,#sidebar,#marquee,.status-message{display:none!important}
-                        #main-content{width:${profile.width}cm!important;height:${profile.height}cm!important;overflow:visible!important;display:block!important;padding:0!important;margin:0!important}
-                        #canvas-container{width:${profile.width}cm!important;height:${profile.height}cm!important;padding:0!important;margin:0!important;overflow:visible!important;background:#fff!important;display:block!important;position:static!important}
-                        #canvas-wrapper{position:static!important;width:${profile.width}cm!important;height:${profile.height}cm!important;margin:0!important;padding:0!important;transform:none!important;display:block!important}
-                        #label-canvas{position:static!important;width:${profile.width}cm!important;height:${profile.height}cm!important;transform:none!important;box-shadow:none!important;display:block!important;overflow:visible!important;background:#fff!important}
-                        .label-element{page-break-inside:avoid!important;-webkit-print-color-adjust:exact!important;print-color-adjust:exact!important}
-                        .label-element.selected{border:1px solid transparent!important;box-shadow:none!important}
-                        .resize-handle{display:none!important}
-                        .label-element[style*="border"]{-webkit-print-color-adjust:exact!important;print-color-adjust:exact!important}
+                        .print-page{width:${profile.width}cm!important;height:${profile.height}cm!important;page-break-inside:avoid!important;overflow:visible!important;background:#fff!important;position:relative!important;margin:0!important;padding:0!important;display:block!important;box-sizing:border-box!important}
                         .print-page:not(:last-child){page-break-after:always!important}
+                        .print-page:last-child{page-break-after:auto!important}
+                        .print-container{display:block!important;position:static!important;left:auto!important;top:auto!important}
+                        #main-content,#canvas-container,#canvas-wrapper,#label-canvas{display:none!important}
+                        .label-element{print-color-adjust:exact!important;-webkit-print-color-adjust:exact!important}
                     }
                 `;
                 window.print();
@@ -3720,7 +3877,7 @@ document.addEventListener('DOMContentLoaded', ()=>{
                     
                     // Proceed with printing selected waves
                     printSelectedWaves(selectedWaveIndices, profile, design, canvas2Flag, prevSel, prevCanvas, prevS);
-                });
+                }, canvas2Flag);
                 return;
             }
             
