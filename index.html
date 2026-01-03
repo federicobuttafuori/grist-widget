@@ -1257,7 +1257,7 @@ document.addEventListener('DOMContentLoaded', ()=>{
                             d.style.borderStyle = 'none';
                             d.style.borderColor = 'transparent';
                         }
-                    d.style.backgroundColor = el.props.fillColor || 'transparent';
+                    d.style.backgroundColor = el.props.fillColor || '#ffffff';
                     break;
                 case 'qr': {
                     const c = getData(el, sequenceIndex) || '';
@@ -3260,7 +3260,7 @@ document.addEventListener('DOMContentLoaded', ()=>{
                                     d.style.borderStyle = 'none';
                                     d.style.borderColor = 'transparent';
                                 }
-                            d.style.backgroundColor = el.props.fillColor || 'transparent';
+                            d.style.backgroundColor = el.props.fillColor || '#ffffff';
                             break;
                         case 'qr': {
                             const c = getData(el, sequenceIndex) || '';
@@ -3749,7 +3749,7 @@ document.addEventListener('DOMContentLoaded', ()=>{
                         } else {
                             d.style.border = 'none';
                         }
-                        d.style.backgroundColor = el.props.fillColor || 'transparent';
+                        d.style.backgroundColor = el.props.fillColor || '#ffffff';
                         break;
                     case 'qr': {
                         const c = getData(el, sequenceIndex) || '';
