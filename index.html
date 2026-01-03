@@ -1824,12 +1824,16 @@ document.addEventListener('DOMContentLoaded', ()=>{
             });
             
             let h = '<div style="padding:12px;">';
-            h += '<h4 style="margin:0 0 12px 0;font-size:16px;font-weight:600;">Design Settings</h4>';
-            h += `<div class="prop-grid"><label>Count Column</label><select id="sequence-count-column">${columnOptions}</select></div>`;
-            h += `<div class="prop-grid" style="margin-top:8px;"><label>Sequence Count</label><span id="sequence-count-display" style="font-weight:600;color:#007aff;font-size:14px;">${countDisplay}</span></div>`;
+            
+            // Only show Design Settings if no waves are configured (for backward compatibility)
+            if(packWaves.length === 0){
+                h += '<h4 style="margin:0 0 12px 0;font-size:16px;font-weight:600;">Design Settings</h4>';
+                h += `<div class="prop-grid"><label>Count Column</label><select id="sequence-count-column">${columnOptions}</select></div>`;
+                h += `<div class="prop-grid" style="margin-top:8px;"><label>Sequence Count</label><span id="sequence-count-display" style="font-weight:600;color:#007aff;font-size:14px;">${countDisplay}</span></div>`;
+                h += '<hr style="margin:16px 0;border:none;border-top:1px solid #e0e0e0;">';
+            }
             
             // Pack Waves Configuration
-            h += '<hr style="margin:16px 0;border:none;border-top:1px solid #e0e0e0;">';
             h += '<h4 style="margin:0 0 12px 0;font-size:16px;font-weight:600;">Pack Waves Configuration</h4>';
             if(packWaves.length === 0){
                 h += '<p style="font-size:13px;color:#666;margin:8px 0;">No waves configured. Add a wave to enable multi-wave printing.</p>';
