@@ -1253,9 +1253,9 @@ document.addEventListener('DOMContentLoaded', ()=>{
                     let suffix = el.props.suffix || '';
                     
                     // Apply sequence placeholder to prefix and suffix
-                    prefix = replaceColumnSyntax(prefix, el);
+                    prefix = replaceColumnSyntax(prefix, el, waveContext);
                     prefix = applySequencePlaceholder(prefix, effectiveSequenceIndex);
-                    suffix = replaceColumnSyntax(suffix, el);
+                    suffix = replaceColumnSyntax(suffix, el, waveContext);
                     suffix = applySequencePlaceholder(suffix, effectiveSequenceIndex);
                     
                     // Combine prefix + code + suffix into the QR code value
@@ -1279,9 +1279,9 @@ document.addEventListener('DOMContentLoaded', ()=>{
                     let suffix = el.props.suffix || '';
                     
                     // Apply sequence placeholder to prefix and suffix
-                    prefix = replaceColumnSyntax(prefix, el);
+                    prefix = replaceColumnSyntax(prefix, el, waveContext);
                     prefix = applySequencePlaceholder(prefix, effectiveSequenceIndex);
-                    suffix = replaceColumnSyntax(suffix, el);
+                    suffix = replaceColumnSyntax(suffix, el, waveContext);
                     suffix = applySequencePlaceholder(suffix, effectiveSequenceIndex);
                     
                     // Combine prefix + code + suffix into the barcode value
@@ -1662,12 +1662,23 @@ document.addEventListener('DOMContentLoaded', ()=>{
         }
         
         // Helper function to replace **column** syntax with actual data
-        function replaceColumnSyntax(str, el){
+        function replaceColumnSyntax(str, el, waveContext = null){
             if(!str || typeof str !== 'string' || !R || typeof R !== 'object') return str;
             return str.replace(/\*\*([^*]+)\*\*/g, (match, columnId) => {
                 const trimmedColumnId = columnId.trim();
-                if(Object.prototype.hasOwnProperty.call(R, trimmedColumnId)){
-                    let v = R[trimmedColumnId];
+                // If waveContext is provided, check if this column matches any wave's weightColumn
+                // If it does, use the current wave's weightColumn value
+                let columnToUse = trimmedColumnId;
+                if(waveContext && waveContext.weightColumn){
+                    // Check if the column matches any wave's weightColumn
+                    const matchesAnyWaveWeight = packWaves.some(wave => wave.weightColumn === trimmedColumnId);
+                    if(matchesAnyWaveWeight){
+                        // Use the current wave's weightColumn value
+                        columnToUse = waveContext.weightColumn;
+                    }
+                }
+                if(Object.prototype.hasOwnProperty.call(R, columnToUse)){
+                    let v = R[columnToUse];
                     if(v === null || v === undefined) return '';
                     // Format numbers if it's a data field
                     if(el && el.type === 'data' && typeof v === 'number'){
@@ -1697,8 +1708,8 @@ document.addEventListener('DOMContentLoaded', ()=>{
             const hasColumnSyntaxInText = text.includes('**');
             
             // Always process prefix and suffix for **column** syntax (they work independently)
-            prefix = replaceColumnSyntax(prefix, el);
-            suffix = replaceColumnSyntax(suffix, el);
+            prefix = replaceColumnSyntax(prefix, el, waveContext);
+            suffix = replaceColumnSyntax(suffix, el, waveContext);
             // Use waveSequenceIndex if waveContext is provided, otherwise use sequenceIndex
             const effectiveSequenceIndex = waveContext && waveContext.waveSequenceIndex !== undefined ? waveContext.waveSequenceIndex : sequenceIndex;
             prefix = applySequencePlaceholder(prefix, effectiveSequenceIndex);
@@ -1707,7 +1718,7 @@ document.addEventListener('DOMContentLoaded', ()=>{
             // Handle **column** syntax for text, data, barcode, and qr fields
             if(el.type === 'text' || el.type === 'data' || el.type === 'barcode' || el.type === 'qr'){
                 // Process text for **column** syntax
-                text = replaceColumnSyntax(text, el);
+                text = replaceColumnSyntax(text, el, waveContext);
                 
                 // Apply **sequence** placeholder after column syntax
                 text = applySequencePlaceholder(text, effectiveSequenceIndex);
@@ -3585,9 +3596,9 @@ document.addEventListener('DOMContentLoaded', ()=>{
                             let suffix = el.props.suffix || '';
                             
                             // Apply sequence placeholder to prefix and suffix
-                            prefix = replaceColumnSyntax(prefix, el);
+                            prefix = replaceColumnSyntax(prefix, el, waveContext);
                             prefix = applySequencePlaceholder(prefix, effectiveSequenceIndex);
-                            suffix = replaceColumnSyntax(suffix, el);
+                            suffix = replaceColumnSyntax(suffix, el, waveContext);
                             suffix = applySequencePlaceholder(suffix, effectiveSequenceIndex);
                             
                             // Combine prefix + code + suffix into the QR code value
@@ -3611,9 +3622,9 @@ document.addEventListener('DOMContentLoaded', ()=>{
                             let suffix = el.props.suffix || '';
                             
                             // Apply sequence placeholder to prefix and suffix
-                            prefix = replaceColumnSyntax(prefix, el);
+                            prefix = replaceColumnSyntax(prefix, el, waveContext);
                             prefix = applySequencePlaceholder(prefix, effectiveSequenceIndex);
-                            suffix = replaceColumnSyntax(suffix, el);
+                            suffix = replaceColumnSyntax(suffix, el, waveContext);
                             suffix = applySequencePlaceholder(suffix, effectiveSequenceIndex);
                             
                             // Combine prefix + code + suffix into the barcode value
@@ -4165,9 +4176,9 @@ document.addEventListener('DOMContentLoaded', ()=>{
                             let suffix = el.props.suffix || '';
                             
                             // Apply sequence placeholder to prefix and suffix
-                            prefix = replaceColumnSyntax(prefix, el);
+                            prefix = replaceColumnSyntax(prefix, el, waveContext);
                             prefix = applySequencePlaceholder(prefix, effectiveSequenceIndex);
-                            suffix = replaceColumnSyntax(suffix, el);
+                            suffix = replaceColumnSyntax(suffix, el, waveContext);
                             suffix = applySequencePlaceholder(suffix, effectiveSequenceIndex);
                             
                             // Combine prefix + code + suffix into the QR code value
@@ -4191,9 +4202,9 @@ document.addEventListener('DOMContentLoaded', ()=>{
                             let suffix = el.props.suffix || '';
                             
                             // Apply sequence placeholder to prefix and suffix
-                            prefix = replaceColumnSyntax(prefix, el);
+                            prefix = replaceColumnSyntax(prefix, el, waveContext);
                             prefix = applySequencePlaceholder(prefix, effectiveSequenceIndex);
-                            suffix = replaceColumnSyntax(suffix, el);
+                            suffix = replaceColumnSyntax(suffix, el, waveContext);
                             suffix = applySequencePlaceholder(suffix, effectiveSequenceIndex);
                             
                             // Combine prefix + code + suffix into the barcode value
@@ -4662,9 +4673,9 @@ document.addEventListener('DOMContentLoaded', ()=>{
                         let suffix = el.props.suffix || '';
                         
                         // Apply sequence placeholder to prefix and suffix
-                        prefix = replaceColumnSyntax(prefix, el);
+                        prefix = replaceColumnSyntax(prefix, el, waveContext);
                         prefix = applySequencePlaceholder(prefix, effectiveSequenceIndex);
-                        suffix = replaceColumnSyntax(suffix, el);
+                        suffix = replaceColumnSyntax(suffix, el, waveContext);
                         suffix = applySequencePlaceholder(suffix, effectiveSequenceIndex);
                         
                         // Combine prefix + code + suffix into the QR code value
@@ -4686,9 +4697,9 @@ document.addEventListener('DOMContentLoaded', ()=>{
                         const c = getData(el, sequenceIndex, waveContext) || '';
                         let prefix = el.props.prefix || '';
                         let suffix = el.props.suffix || '';
-                        prefix = replaceColumnSyntax(prefix, el);
+                        prefix = replaceColumnSyntax(prefix, el, waveContext);
                         prefix = applySequencePlaceholder(prefix, effectiveSequenceIndex);
-                        suffix = replaceColumnSyntax(suffix, el);
+                        suffix = replaceColumnSyntax(suffix, el, waveContext);
                         suffix = applySequencePlaceholder(suffix, effectiveSequenceIndex);
                         
                         // Combine prefix + code + suffix into the barcode value
