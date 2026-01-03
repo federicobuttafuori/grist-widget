@@ -166,6 +166,7 @@ document.addEventListener('DOMContentLoaded', ()=>{
         let canvasRotation = 0;           // temporary canvas rotation (0, 90, 180, 270 degrees)
         let W = 8, H = 5;                 // Current dimensions (dynamic)
         let globalSequenceCountColumn = ''; // Global count column (shared across all designs)
+        let packWaves = []; // Array of pack waves: [{ countColumn: string, weightColumn: string }]
         const KEY = 'grist_label_layout_v2'; // Updated version for profiles
         const FONT_FAVORITES_KEY = 'grist_label_font_favorites'; // Key for font favorites
     const MAX_HISTORY = 100;
@@ -620,7 +621,7 @@ document.addEventListener('DOMContentLoaded', ()=>{
             saveCurrentDesign();
         }
 
-        // Helper function to save globalSequenceCountColumn to localStorage
+        // Helper function to save globalSequenceCountColumn and packWaves to localStorage
         function saveGlobalSequenceCountColumn(){
             try {
                 const saved = localStorage.getItem(KEY);
@@ -628,6 +629,7 @@ document.addEventListener('DOMContentLoaded', ()=>{
                     const parsed = JSON.parse(saved);
                     if(parsed && parsed.version === 2){
                         parsed.globalSequenceCountColumn = globalSequenceCountColumn;
+                        parsed.packWaves = packWaves || [];
                         localStorage.setItem(KEY, JSON.stringify(parsed));
                     }
                 } else {
@@ -642,38 +644,8 @@ document.addEventListener('DOMContentLoaded', ()=>{
                         lastDesignByProfile: lastDesignByProfile || {},
                         lastCanvasByProfile: lastCanvasByProfile || {},
                         lastCanvasByDesign: lastCanvasByDesign || {},
-                        globalSequenceCountColumn: globalSequenceCountColumn
-                    };
-                    localStorage.setItem(KEY, JSON.stringify(payloadObj));
-                }
-            } catch(e) {
-                console.warn('Failed to save globalSequenceCountColumn:', e);
-            }
-        }
-
-        // Helper function to save globalSequenceCountColumn to localStorage
-        function saveGlobalSequenceCountColumn(){
-            try {
-                const saved = localStorage.getItem(KEY);
-                if(saved){
-                    const parsed = JSON.parse(saved);
-                    if(parsed && parsed.version === 2){
-                        parsed.globalSequenceCountColumn = globalSequenceCountColumn;
-                        localStorage.setItem(KEY, JSON.stringify(parsed));
-                    }
-                } else {
-                    // If no saved data exists, create new payload
-                    const payloadObj = { 
-                        version: 2, 
-                        profiles: profiles || {},
-                        currentProfile: currentProfile || '',
-                        currentDesign: currentDesign || '',
-                        currentCanvas: currentCanvas || 1,
-                        groups: groups || [],
-                        lastDesignByProfile: lastDesignByProfile || {},
-                        lastCanvasByProfile: lastCanvasByProfile || {},
-                        lastCanvasByDesign: lastCanvasByDesign || {},
-                        globalSequenceCountColumn: globalSequenceCountColumn
+                        globalSequenceCountColumn: globalSequenceCountColumn,
+                        packWaves: packWaves || []
                     };
                     localStorage.setItem(KEY, JSON.stringify(payloadObj));
                 }
@@ -699,7 +671,7 @@ document.addEventListener('DOMContentLoaded', ()=>{
             const canvasKey = `canvas${currentCanvas}`;
             design[canvasKey] = deepCopy(S);
             
-            // Save to localStorage (includes globalSequenceCountColumn)
+            // Save to localStorage (includes globalSequenceCountColumn and packWaves)
             try {
                 const payloadObj = { 
                     version: 2, 
@@ -711,7 +683,8 @@ document.addEventListener('DOMContentLoaded', ()=>{
                         lastDesignByProfile: lastDesignByProfile,
                         lastCanvasByProfile: lastCanvasByProfile,
                         lastCanvasByDesign: lastCanvasByDesign,
-                        globalSequenceCountColumn: globalSequenceCountColumn
+                        globalSequenceCountColumn: globalSequenceCountColumn,
+                        packWaves: packWaves || []
                 };
                 localStorage.setItem(KEY, JSON.stringify(payloadObj));
             } catch(e) {
@@ -1060,7 +1033,7 @@ document.addEventListener('DOMContentLoaded', ()=>{
         }
         
         // Helper function to render elements for a specific canvas and sequence index
-        function renderElementsForCanvas(canvasData, sequenceIndex, baseOffsetY){
+        function renderElementsForCanvas(canvasData, sequenceIndex, baseOffsetY, waveContext = null){
             const sorted = canvasData.map(normalizeElement).slice().sort((a,b)=> (a.zIndex||0) - (b.zIndex||0));
             sorted.forEach(el=>{
             const d = document.createElement('div');
@@ -1177,7 +1150,7 @@ document.addEventListener('DOMContentLoaded', ()=>{
                     }
                     span.style.wordWrap='break-word';
                     
-                    span.textContent = getData(el, sequenceIndex);
+                    span.textContent = getData(el, sequenceIndex, waveContext);
                     // Copy font styles to span for overflow calculation
                     span.style.fontFamily = el.props.fontFamily || 'Arial, sans-serif';
                     span.style.fontSize = (el.props.fontSize || 16) + 'px';
@@ -1218,7 +1191,7 @@ document.addEventListener('DOMContentLoaded', ()=>{
                     }
                     span.style.wordWrap='break-word';
                     
-                    span.textContent = getData(el, sequenceIndex);
+                    span.textContent = getData(el, sequenceIndex, waveContext);
                     // Copy font styles to span for overflow calculation
                     span.style.fontFamily = el.props.fontFamily || 'Arial, sans-serif';
                     span.style.fontSize = (el.props.fontSize || 16) + 'px';
@@ -1261,15 +1234,16 @@ document.addEventListener('DOMContentLoaded', ()=>{
                     d.style.backgroundColor = el.props.fillColor || '#ffffff';
                     break;
                 case 'qr': {
-                    const c = getData(el, sequenceIndex) || '';
+                    const effectiveSequenceIndex = waveContext && waveContext.waveSequenceIndex !== undefined ? waveContext.waveSequenceIndex : sequenceIndex;
+                    const c = getData(el, sequenceIndex, waveContext) || '';
                     let prefix = el.props.prefix || '';
                     let suffix = el.props.suffix || '';
                     
                     // Apply sequence placeholder to prefix and suffix
                     prefix = replaceColumnSyntax(prefix, el);
-                    prefix = applySequencePlaceholder(prefix, sequenceIndex);
+                    prefix = applySequencePlaceholder(prefix, effectiveSequenceIndex);
                     suffix = replaceColumnSyntax(suffix, el);
-                    suffix = applySequencePlaceholder(suffix, sequenceIndex);
+                    suffix = applySequencePlaceholder(suffix, effectiveSequenceIndex);
                     
                     // Combine prefix + code + suffix into the QR code value
                     const qrValue = prefix + String(c) + suffix;
@@ -1286,15 +1260,16 @@ document.addEventListener('DOMContentLoaded', ()=>{
                     break;
                 }
                 case 'barcode': {
-                    const c = getData(el, sequenceIndex) || '';
+                    const effectiveSequenceIndex = waveContext && waveContext.waveSequenceIndex !== undefined ? waveContext.waveSequenceIndex : sequenceIndex;
+                    const c = getData(el, sequenceIndex, waveContext) || '';
                     let prefix = el.props.prefix || '';
                     let suffix = el.props.suffix || '';
                     
                     // Apply sequence placeholder to prefix and suffix
                     prefix = replaceColumnSyntax(prefix, el);
-                    prefix = applySequencePlaceholder(prefix, sequenceIndex);
+                    prefix = applySequencePlaceholder(prefix, effectiveSequenceIndex);
                     suffix = replaceColumnSyntax(suffix, el);
-                    suffix = applySequencePlaceholder(suffix, sequenceIndex);
+                    suffix = applySequencePlaceholder(suffix, effectiveSequenceIndex);
                     
                     // Combine prefix + code + suffix into the barcode value
                     const barcodeValue = prefix + String(c) + suffix;
@@ -1699,7 +1674,7 @@ document.addEventListener('DOMContentLoaded', ()=>{
         return str.replace(/\*\*sequence\*\*/g, String(sequenceIndex));
     }
 
-    function getData(el, sequenceIndex = 1){
+    function getData(el, sequenceIndex = 1, waveContext = null){
             let text = el.props.text || '';
             let prefix = el.props.prefix || '';
             let suffix = el.props.suffix || '';
@@ -1711,8 +1686,10 @@ document.addEventListener('DOMContentLoaded', ()=>{
             // Always process prefix and suffix for **column** syntax (they work independently)
             prefix = replaceColumnSyntax(prefix, el);
             suffix = replaceColumnSyntax(suffix, el);
-            prefix = applySequencePlaceholder(prefix, sequenceIndex);
-            suffix = applySequencePlaceholder(suffix, sequenceIndex);
+            // Use waveSequenceIndex if waveContext is provided, otherwise use sequenceIndex
+            const effectiveSequenceIndex = waveContext && waveContext.waveSequenceIndex !== undefined ? waveContext.waveSequenceIndex : sequenceIndex;
+            prefix = applySequencePlaceholder(prefix, effectiveSequenceIndex);
+            suffix = applySequencePlaceholder(suffix, effectiveSequenceIndex);
             
             // Handle **column** syntax for text, data, barcode, and qr fields
             if(el.type === 'text' || el.type === 'data' || el.type === 'barcode' || el.type === 'qr'){
@@ -1720,13 +1697,24 @@ document.addEventListener('DOMContentLoaded', ()=>{
                 text = replaceColumnSyntax(text, el);
                 
                 // Apply **sequence** placeholder after column syntax
-                text = applySequencePlaceholder(text, sequenceIndex);
+                text = applySequencePlaceholder(text, effectiveSequenceIndex);
+            }
+            
+            // Handle boundColumn with waveContext support
+            // If waveContext is provided and element has boundColumn that matches a wave weight column, use waveContext.weightColumn
+            let boundColumnToUse = el.props.boundColumn;
+            if(waveContext && waveContext.weightColumn && el.props.boundColumn){
+                // Check if boundColumn matches any wave weight column
+                const matchesWaveWeight = packWaves.some(wave => wave.weightColumn === el.props.boundColumn);
+                if(matchesWaveWeight){
+                    boundColumnToUse = waveContext.weightColumn;
+                }
             }
             
             // Handle boundColumn (legacy support) - only if **column** syntax wasn't used in text itself
             // For text fields, we can use boundColumn even if prefix/suffix have **column** syntax
-            if(!hasColumnSyntaxInText && el.props.boundColumn && R && Object.prototype.hasOwnProperty.call(R, el.props.boundColumn)){
-                let v = R[el.props.boundColumn];
+            if(!hasColumnSyntaxInText && boundColumnToUse && R && Object.prototype.hasOwnProperty.call(R, boundColumnToUse)){
+                let v = R[boundColumnToUse];
                 if(el.type === 'data' && typeof v === 'number'){
                     const dec = (el.props.decimals !== undefined) ? Number(el.props.decimals) : 2;
                     const pct = !!el.props.asPercent;
@@ -1751,8 +1739,15 @@ document.addEventListener('DOMContentLoaded', ()=>{
             // For barcode and qr, return only the text value (prefix/suffix will be shown separately in rendering)
             if(el.type === 'barcode' || el.type === 'qr'){
                 // If text is empty but we have boundColumn, use boundColumn as fallback
-                if(!text && el.props.boundColumn && R && Object.prototype.hasOwnProperty.call(R, el.props.boundColumn)){
-                    return String(R[el.props.boundColumn]);
+                let boundColumnToUse = el.props.boundColumn;
+                if(waveContext && waveContext.weightColumn && el.props.boundColumn){
+                    const matchesWaveWeight = packWaves.some(wave => wave.weightColumn === el.props.boundColumn);
+                    if(matchesWaveWeight){
+                        boundColumnToUse = waveContext.weightColumn;
+                    }
+                }
+                if(!text && boundColumnToUse && R && Object.prototype.hasOwnProperty.call(R, boundColumnToUse)){
+                    return String(R[boundColumnToUse]);
                 }
                 return text;
             }
@@ -1832,6 +1827,39 @@ document.addEventListener('DOMContentLoaded', ()=>{
             h += '<h4 style="margin:0 0 12px 0;font-size:16px;font-weight:600;">Design Settings</h4>';
             h += `<div class="prop-grid"><label>Count Column</label><select id="sequence-count-column">${columnOptions}</select></div>`;
             h += `<div class="prop-grid" style="margin-top:8px;"><label>Sequence Count</label><span id="sequence-count-display" style="font-weight:600;color:#007aff;font-size:14px;">${countDisplay}</span></div>`;
+            
+            // Pack Waves Configuration
+            h += '<hr style="margin:16px 0;border:none;border-top:1px solid #e0e0e0;">';
+            h += '<h4 style="margin:0 0 12px 0;font-size:16px;font-weight:600;">Pack Waves Configuration</h4>';
+            if(packWaves.length === 0){
+                h += '<p style="font-size:13px;color:#666;margin:8px 0;">No waves configured. Add a wave to enable multi-wave printing.</p>';
+            } else {
+                packWaves.forEach((wave, index) => {
+                    // Build count column options
+                    let countColumnOptions = '<option value="">-- Select Column --</option>';
+                    C.forEach(col => {
+                        const selected = col === wave.countColumn ? 'selected' : '';
+                        countColumnOptions += `<option value="${col}" ${selected}>${col}</option>`;
+                    });
+                    
+                    // Build weight column options
+                    let weightColumnOptions = '<option value="">-- Select Column --</option>';
+                    C.forEach(col => {
+                        const selected = col === wave.weightColumn ? 'selected' : '';
+                        weightColumnOptions += `<option value="${col}" ${selected}>${col}</option>`;
+                    });
+                    
+                    h += `<div style="margin-bottom:12px;padding:10px;background:#f5f5f5;border-radius:4px;border:1px solid #e0e0e0;">`;
+                    h += `<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;">`;
+                    h += `<strong style="font-size:14px;">Wave ${index + 1}</strong>`;
+                    h += `<button type="button" class="remove-wave-btn" data-wave-index="${index}" style="padding:4px 8px;font-size:12px;background:#ff4444;color:#fff;border:none;border-radius:4px;cursor:pointer;">Remove</button>`;
+                    h += `</div>`;
+                    h += `<div class="prop-grid" style="margin-bottom:6px;"><label style="font-size:13px;">Count Column</label><select class="wave-count-column" data-wave-index="${index}" style="font-size:13px;">${countColumnOptions}</select></div>`;
+                    h += `<div class="prop-grid"><label style="font-size:13px;">Weight Column</label><select class="wave-weight-column" data-wave-index="${index}" style="font-size:13px;">${weightColumnOptions}</select></div>`;
+                    h += `</div>`;
+                });
+            }
+            h += `<button type="button" id="add-wave-btn" style="width:100%;padding:8px;margin-top:8px;background:#007aff;color:#fff;border:none;border-radius:4px;cursor:pointer;font-size:14px;">+ Add Wave</button>`;
             h += '</div>';
             pp.innerHTML = h;
             
@@ -1869,8 +1897,49 @@ document.addEventListener('DOMContentLoaded', ()=>{
             // Store update function globally so it can be called when R changes
             window.updateSequenceCountDisplay = updateCountDisplay;
             
-            // Store update function globally so it can be called when R changes
-            window.updateSequenceCountDisplay = updateCountDisplay;
+            // Add event listeners for pack waves configuration
+            const addWaveBtn = pp.querySelector('#add-wave-btn');
+            if(addWaveBtn){
+                addWaveBtn.addEventListener('click', function() {
+                    packWaves.push({ countColumn: '', weightColumn: '' });
+                    saveGlobalSequenceCountColumn();
+                    updateProps();
+                });
+            }
+            
+            // Add event listeners for wave removal
+            pp.querySelectorAll('.remove-wave-btn').forEach(btn => {
+                btn.addEventListener('click', function() {
+                    const waveIndex = parseInt(this.dataset.waveIndex);
+                    if(!isNaN(waveIndex) && waveIndex >= 0 && waveIndex < packWaves.length){
+                        packWaves.splice(waveIndex, 1);
+                        saveGlobalSequenceCountColumn();
+                        updateProps();
+                    }
+                });
+            });
+            
+            // Add event listeners for wave count column changes
+            pp.querySelectorAll('.wave-count-column').forEach(select => {
+                select.addEventListener('change', function() {
+                    const waveIndex = parseInt(this.dataset.waveIndex);
+                    if(!isNaN(waveIndex) && waveIndex >= 0 && waveIndex < packWaves.length){
+                        packWaves[waveIndex].countColumn = this.value || '';
+                        saveGlobalSequenceCountColumn();
+                    }
+                });
+            });
+            
+            // Add event listeners for wave weight column changes
+            pp.querySelectorAll('.wave-weight-column').forEach(select => {
+                select.addEventListener('change', function() {
+                    const waveIndex = parseInt(this.dataset.waveIndex);
+                    if(!isNaN(waveIndex) && waveIndex >= 0 && waveIndex < packWaves.length){
+                        packWaves[waveIndex].weightColumn = this.value || '';
+                        saveGlobalSequenceCountColumn();
+                    }
+                });
+            });
             
             return;
         }
@@ -3061,11 +3130,597 @@ document.addEventListener('DOMContentLoaded', ()=>{
             URL.revokeObjectURL(url);
         }
 
+        // Function to show wave selection popup
+        function showWaveSelectionPopup(callback){
+            if(!packWaves || packWaves.length === 0){
+                callback([]); // No waves, return empty array to use default behavior
+                return;
+            }
+            
+            // Create popup overlay
+            const overlay = document.createElement('div');
+            overlay.style.cssText = 'position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.6);z-index:10000;display:flex;align-items:center;justify-content:center;backdrop-filter:blur(2px);';
+            
+            // Create popup content
+            const popup = document.createElement('div');
+            popup.style.cssText = 'background:#fff;border-radius:12px;padding:0;max-width:550px;width:90%;max-height:85vh;overflow:hidden;box-shadow:0 8px 32px rgba(0,0,0,0.4);display:flex;flex-direction:column;';
+            
+            // Header
+            let html = '<div style="padding:20px 24px;border-bottom:1px solid #e0e0e0;background:linear-gradient(135deg, #667eea 0%, #764ba2 100%);">';
+            html += '<h3 style="margin:0;font-size:20px;font-weight:600;color:#fff;">Select Pack Wave to Print</h3>';
+            html += '</div>';
+            
+            // Content area
+            html += '<div style="padding:20px 24px;overflow-y:auto;flex:1;">';
+            
+            // Build wave list with weight and count info
+            packWaves.forEach((wave, index) => {
+                const count = (wave.countColumn && R && Object.prototype.hasOwnProperty.call(R, wave.countColumn)) ? 
+                    Math.max(0, Math.floor(Number(R[wave.countColumn]))) : 0;
+                const weight = (wave.weightColumn && R && Object.prototype.hasOwnProperty.call(R, wave.weightColumn)) ? 
+                    R[wave.weightColumn] : null;
+                
+                // Display weight in grams (direct value, not converted)
+                let weightDisplay = '—';
+                if(weight !== null && weight !== undefined && weight !== ''){
+                    if(typeof weight === 'number'){
+                        // Show as grams (direct value)
+                        weightDisplay = Math.round(weight) + ' g';
+                    } else {
+                        weightDisplay = String(weight) + ' g';
+                    }
+                }
+                
+                html += `<div class="wave-option" style="margin-bottom:12px;padding:16px;background:#f8f9fa;border-radius:8px;border:2px solid #e0e0e0;transition:all 0.2s;cursor:pointer;">`;
+                html += `<label style="display:flex;align-items:center;cursor:pointer;margin:0;">`;
+                html += `<input type="radio" name="wave-selection" value="${index}" style="margin-right:14px;width:18px;height:18px;cursor:pointer;accent-color:#667eea;">`;
+                html += `<div style="flex:1;">`;
+                html += `<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px;">`;
+                html += `<strong style="font-size:16px;color:#333;font-weight:600;">Wave ${index + 1}</strong>`;
+                html += `<span style="font-size:12px;color:#666;background:#e9ecef;padding:4px 8px;border-radius:4px;">${count} labels</span>`;
+                html += `</div>`;
+                html += `<div style="font-size:14px;color:#666;display:flex;gap:16px;">`;
+                html += `<span><strong>Weight:</strong> ${weightDisplay}</span>`;
+                html += `<span><strong>Count:</strong> ${count}</span>`;
+                html += `</div>`;
+                html += `</div>`;
+                html += `</label>`;
+                html += `</div>`;
+            });
+            
+            // Add "All waves" option
+            html += `<div class="wave-option wave-option-all" style="margin-bottom:0;padding:16px;background:linear-gradient(135deg, #fff3e0 0%, #ffe0b2 100%);border-radius:8px;border:2px solid #ffb74d;transition:all 0.2s;cursor:pointer;">`;
+            html += `<label style="display:flex;align-items:center;cursor:pointer;margin:0;">`;
+            html += `<input type="radio" name="wave-selection" value="all" checked style="margin-right:14px;width:18px;height:18px;cursor:pointer;accent-color:#ff9800;">`;
+            html += `<div style="flex:1;">`;
+            html += `<strong style="font-size:16px;color:#e65100;font-weight:600;">All Waves</strong>`;
+            html += `<div style="font-size:14px;color:#bf360c;margin-top:4px;">Print all waves in sequence</div>`;
+            html += `</div>`;
+            html += `</label>`;
+            html += `</div>`;
+            
+            html += '</div>'; // Close content area
+            
+            // Footer with buttons
+            html += '<div style="padding:16px 24px;border-top:1px solid #e0e0e0;background:#f8f9fa;display:flex;gap:12px;justify-content:flex-end;">';
+            html += `<button id="wave-popup-cancel" style="padding:10px 20px;background:#6c757d;color:#fff;border:none;border-radius:6px;cursor:pointer;font-size:14px;font-weight:500;transition:background 0.2s;">Cancel</button>`;
+            html += `<button id="wave-popup-print" style="padding:10px 24px;background:linear-gradient(135deg, #667eea 0%, #764ba2 100%);color:#fff;border:none;border-radius:6px;cursor:pointer;font-size:14px;font-weight:600;box-shadow:0 2px 8px rgba(102,126,234,0.3);transition:transform 0.2s,box-shadow 0.2s;">Print</button>`;
+            html += `</div>`;
+            
+            popup.innerHTML = html;
+            overlay.appendChild(popup);
+            document.body.appendChild(overlay);
+            
+            // Add hover effects for wave options
+            const waveOptions = popup.querySelectorAll('.wave-option');
+            waveOptions.forEach(option => {
+                option.addEventListener('mouseenter', function() {
+                    if(!this.classList.contains('wave-option-all')){
+                        this.style.borderColor = '#667eea';
+                        this.style.background = '#f0f4ff';
+                    }
+                });
+                option.addEventListener('mouseleave', function() {
+                    if(!this.classList.contains('wave-option-all')){
+                        this.style.borderColor = '#e0e0e0';
+                        this.style.background = '#f8f9fa';
+                    }
+                });
+                // Make entire card clickable
+                option.addEventListener('click', function(e) {
+                    if(e.target.tagName !== 'INPUT' && e.target.tagName !== 'LABEL'){
+                        const radio = this.querySelector('input[type="radio"]');
+                        if(radio){
+                            radio.checked = true;
+                        }
+                    }
+                });
+            });
+            
+            // Add hover effects for buttons
+            const cancelBtn = popup.querySelector('#wave-popup-cancel');
+            const printBtn = popup.querySelector('#wave-popup-print');
+            
+            cancelBtn.addEventListener('mouseenter', function() {
+                this.style.background = '#5a6268';
+            });
+            cancelBtn.addEventListener('mouseleave', function() {
+                this.style.background = '#6c757d';
+            });
+            
+            printBtn.addEventListener('mouseenter', function() {
+                this.style.transform = 'translateY(-1px)';
+                this.style.boxShadow = '0 4px 12px rgba(102,126,234,0.4)';
+            });
+            printBtn.addEventListener('mouseleave', function() {
+                this.style.transform = 'translateY(0)';
+                this.style.boxShadow = '0 2px 8px rgba(102,126,234,0.3)';
+            });
+            
+            const closePopup = () => {
+                document.body.removeChild(overlay);
+            };
+            
+            cancelBtn.addEventListener('click', () => {
+                closePopup();
+                callback(null); // User cancelled
+            });
+            
+            printBtn.addEventListener('click', () => {
+                const selected = popup.querySelector('input[name="wave-selection"]:checked');
+                if(selected){
+                    if(selected.value === 'all'){
+                        closePopup();
+                        callback(packWaves.map((_, i) => i)); // Return all wave indices
+                    } else {
+                        const waveIndex = parseInt(selected.value);
+                        if(!isNaN(waveIndex) && waveIndex >= 0 && waveIndex < packWaves.length){
+                            closePopup();
+                            callback([waveIndex]); // Return single wave index
+                        }
+                    }
+                }
+            });
+            
+            // Close on overlay click
+            overlay.addEventListener('click', (e) => {
+                if(e.target === overlay){
+                    closePopup();
+                    callback(null);
+                }
+            });
+            
+            // Close on Escape key
+            const handleEscape = (e) => {
+                if(e.key === 'Escape'){
+                    closePopup();
+                    callback(null);
+                    document.removeEventListener('keydown', handleEscape);
+                }
+            };
+            document.addEventListener('keydown', handleEscape);
+        }
+        
+        // Function to print selected waves
+        function printSelectedWaves(selectedWaveIndices, profile, design, canvas2Flag, prevSel, prevCanvas, prevS){
+            // Create print container
+            const printContainer = document.createElement('div');
+            printContainer.className = 'print-container';
+            printContainer.style.position = 'absolute';
+            printContainer.style.left = '-9999px';
+            printContainer.style.top = '0';
+            printContainer.style.width = `${profile.width}cm`;
+            printContainer.style.height = 'auto';
+            
+            // Calculate total pages across all selected waves
+            let totalPages = 0;
+            selectedWaveIndices.forEach(waveIndex => {
+                const wave = packWaves[waveIndex];
+                if(wave && wave.countColumn && R && Object.prototype.hasOwnProperty.call(R, wave.countColumn)){
+                    const count = Math.max(0, Math.floor(Number(R[wave.countColumn])));
+                    totalPages += canvas2Flag ? count * 2 : count;
+                }
+            });
+            
+            if(totalPages === 0){
+                msg('Warning: No labels to print for selected waves', true);
+                return;
+            }
+            
+            // Helper function to render canvas to print page (reuse from printBothCanvases)
+            function renderCanvasToPage(canvasNum, sequenceIndex = 1, isLastPage = false, waveContext = null){
+                const canvasData = design[`canvas${canvasNum}`] || [];
+                const tempS = canvasData.map(normalizeElement);
+                
+                const page = document.createElement('div');
+                page.className = 'print-page';
+                page.style.width = `${profile.width}cm`;
+                page.style.height = `${profile.height}cm`;
+                page.style.position = 'relative';
+                page.style.background = '#fff';
+                page.style.overflow = 'hidden';
+                if(isLastPage){
+                    page.style.pageBreakAfter = 'auto';
+                }
+                
+                // Render elements using renderElementsForCanvas logic but adapted for print
+                const sorted = tempS.slice().sort((a,b)=> (a.zIndex||0) - (b.zIndex||0));
+                sorted.forEach(el=>{
+                    const d = document.createElement('div');
+                    d.classList.add('label-element');
+                    d.style.position = 'absolute';
+                    d.style.left = `${el.x}cm`;
+                    d.style.top = `${el.y}cm`;
+                    if(el.type !== 'line'){
+                        d.style.width = `${el.width}cm`;
+                        d.style.height = `${el.height}cm`;
+                    } else {
+                        d.style.width = `${el.width}cm`;
+                    }
+                    d.style.zIndex = el.zIndex || 0;
+                    d.style.fontSize = `${el.props.fontSize || 16}px`;
+                    const fontWeight = el.props.fontWeight;
+                    if(typeof fontWeight === 'number'){
+                        d.style.fontWeight = fontWeight;
+                    } else {
+                        d.style.fontWeight = fontWeight || 'normal';
+                    }
+                    d.style.fontFamily = el.props.fontFamily || 'Arial, sans-serif';
+                    d.style.lineHeight = el.props.lineHeight !== undefined ? String(el.props.lineHeight) : '1.2';
+                    const justifyMap = { left: 'flex-start', center: 'center', right: 'flex-end' };
+                    const alignMap = { top: 'flex-start', middle: 'center', bottom: 'flex-end' };
+                    if(el.type !== 'line'){
+                        d.style.display = 'flex';
+                        d.style.alignItems = alignMap[el.props.valign] || 'flex-start';
+                        d.style.justifyContent = justifyMap[el.props.textAlign] || 'flex-start';
+                        if(el.type === 'text' || el.type === 'data'){
+                            d.style.whiteSpace = 'pre-wrap';
+                        } else {
+                            d.style.whiteSpace = 'normal';
+                        }
+                    }
+                    d.style.textAlign = el.props.textAlign || 'left';
+                    d.style.color = el.props.color || '#000000';
+                    d.style.boxSizing = 'border-box';
+                    const rotation = Number(el.props.rotation) || 0;
+                    d.style.transform = `rotate(${rotation}deg)`;
+                    d.style.transformOrigin = 'center center';
+                    
+                    if((el.type === 'text' || el.type === 'data')){
+                        const pt = Number.isFinite(Number(el.props.paddingTop)) ? Number(el.props.paddingTop) : 0;
+                        const pr = Number.isFinite(Number(el.props.paddingRight)) ? Number(el.props.paddingRight) : 0;
+                        const pb = Number.isFinite(Number(el.props.paddingBottom)) ? Number(el.props.paddingBottom) : 0;
+                        const pl = Number.isFinite(Number(el.props.paddingLeft)) ? Number(el.props.paddingLeft) : 0;
+                        d.style.padding = `${pt}cm ${pr}cm ${pb}cm ${pl}cm`;
+                    }
+                    
+                    // Handle different element types
+                    switch(el.type){
+                        case 'text': {
+                            const span = document.createElement('div');
+                            span.style.display='block';
+                            span.style.width='100%';
+                            span.style.pointerEvents='none';
+                            span.style.overflow='hidden';
+                            span.style.wordWrap='break-word';
+                            span.style.whiteSpace='pre-wrap';
+                            span.textContent = getData(el, sequenceIndex, waveContext);
+                            span.style.fontFamily = el.props.fontFamily || 'Arial, sans-serif';
+                            span.style.fontSize = (el.props.fontSize || 16) + 'px';
+                            span.style.fontWeight = (typeof el.props.fontWeight === 'number') ? el.props.fontWeight : (el.props.fontWeight || 'normal');
+                            span.style.lineHeight = el.props.lineHeight !== undefined ? String(el.props.lineHeight) : '1.2';
+                            span.style.color = el.props.color || '#000000';
+                            d.appendChild(span);
+                            break;
+                        }
+                        case 'data': {
+                            const span = document.createElement('div');
+                            span.style.display='block';
+                            span.style.width='100%';
+                            span.style.pointerEvents='none';
+                            span.style.overflow='hidden';
+                            span.style.wordWrap='break-word';
+                            span.style.whiteSpace='pre-wrap';
+                            span.textContent = getData(el, sequenceIndex, waveContext);
+                            span.style.fontFamily = el.props.fontFamily || 'Arial, sans-serif';
+                            span.style.fontSize = (el.props.fontSize || 16) + 'px';
+                            span.style.fontWeight = (typeof el.props.fontWeight === 'number') ? el.props.fontWeight : (el.props.fontWeight || 'normal');
+                            span.style.lineHeight = el.props.lineHeight !== undefined ? String(el.props.lineHeight) : '1.2';
+                            span.style.color = el.props.color || '#000000';
+                            d.appendChild(span);
+                            break;
+                        }
+                        case 'line':
+                            d.style.background = el.props.color || '#000000';
+                            d.style.height = `${el.props.thickness || 2}px`;
+                            d.style.width = `${el.width}cm`;
+                            d.style.border = 'none';
+                            break;
+                        case 'box':
+                            const printBoxThickness = el.props.thickness !== undefined ? Number(el.props.thickness) : 2;
+                            if(printBoxThickness > 0){
+                                d.style.border = `${printBoxThickness}px solid ${el.props.color || '#000000'}`;
+                                d.style.borderWidth = `${printBoxThickness}px`;
+                            } else {
+                                d.style.border = 'none';
+                                d.style.borderWidth = '0';
+                                d.style.borderStyle = 'none';
+                                d.style.borderColor = 'transparent';
+                            }
+                            d.style.backgroundColor = el.props.fillColor || '#ffffff';
+                            break;
+                        case 'qr': {
+                            const effectiveSequenceIndex = waveContext && waveContext.waveSequenceIndex !== undefined ? waveContext.waveSequenceIndex : sequenceIndex;
+                            const c = getData(el, sequenceIndex, waveContext) || '';
+                            let prefix = el.props.prefix || '';
+                            let suffix = el.props.suffix || '';
+                            prefix = replaceColumnSyntax(prefix, el);
+                            prefix = applySequencePlaceholder(prefix, effectiveSequenceIndex);
+                            suffix = replaceColumnSyntax(suffix, el);
+                            suffix = applySequencePlaceholder(suffix, effectiveSequenceIndex);
+                            const qrValue = prefix + String(c) + suffix;
+                            const q = document.createElement('img');
+                            const dpi = 37.795276;
+                            const qs = Math.min(el.width, el.height) * dpi;
+                            q.src = `https://api.qrserver.com/v1/create-qr-code/?size=${Math.round(qs)}x${Math.round(qs)}&data=${encodeURIComponent(qrValue)}`;
+                            q.style.pointerEvents='none';
+                            q.style.width='100%';
+                            q.style.height='100%';
+                            q.style.objectFit='contain';
+                            d.appendChild(q);
+                            break;
+                        }
+                        case 'barcode': {
+                            const effectiveSequenceIndex = waveContext && waveContext.waveSequenceIndex !== undefined ? waveContext.waveSequenceIndex : sequenceIndex;
+                            const c = getData(el, sequenceIndex, waveContext) || '';
+                            let prefix = el.props.prefix || '';
+                            let suffix = el.props.suffix || '';
+                            prefix = replaceColumnSyntax(prefix, el);
+                            prefix = applySequencePlaceholder(prefix, effectiveSequenceIndex);
+                            suffix = replaceColumnSyntax(suffix, el);
+                            suffix = applySequencePlaceholder(suffix, effectiveSequenceIndex);
+                            const barcodeValue = prefix + String(c) + suffix;
+                            const PIXELS_PER_CM = 37.795276;
+                            const paddingTop = (Number(el.props.paddingTop) || 0) * PIXELS_PER_CM;
+                            const paddingBottom = (Number(el.props.paddingBottom) || 0) * PIXELS_PER_CM;
+                            const paddingLeft = (Number(el.props.paddingLeft) || 0) * PIXELS_PER_CM;
+                            const paddingRight = (Number(el.props.paddingRight) || 0) * PIXELS_PER_CM;
+                            const borderWidth = (Number(el.props.thickness) || 0);
+                            const containerWidthPx = el.width * PIXELS_PER_CM;
+                            const containerHeightPx = el.height * PIXELS_PER_CM;
+                            const availableWidth = containerWidthPx - paddingLeft - paddingRight - (borderWidth * 2);
+                            const availableHeight = containerHeightPx - paddingTop - paddingBottom - (borderWidth * 2);
+                            const sv = document.createElementNS('http://www.w3.org/2000/svg','svg');
+                            sv.style.pointerEvents='none';
+                            sv.style.width = '100%';
+                            sv.style.height = '100%';
+                            sv.style.display = 'block';
+                            sv.style.overflow = 'visible';
+                            d.appendChild(sv);
+                            try{
+                                const barcodeWidth = Math.max(50, availableWidth);
+                                const pxHeight = availableHeight;
+                                const estimatedBars = 50;
+                                const widthPerBar = Math.max(1, barcodeWidth / estimatedBars);
+                                sv.setAttribute('width', barcodeWidth.toString());
+                                sv.setAttribute('height', pxHeight.toString());
+                                sv.setAttribute('viewBox', `0 0 ${barcodeWidth} ${pxHeight}`);
+                                sv.setAttribute('preserveAspectRatio', 'none');
+                                JsBarcode(sv, barcodeValue, {
+                                    format: el.props.format || "CODE128",
+                                    width: widthPerBar,
+                                    height: pxHeight,
+                                    displayValue: el.props.displayValue !== false
+                                });
+                            } catch(e){
+                                console.warn('Barcode generation error:', e);
+                            }
+                            break;
+                        }
+                        case 'image': {
+                            const img = document.createElement('img');
+                            img.style.width = '100%';
+                            img.style.height = '100%';
+                            img.style.objectFit = el.props.objectFit || 'contain';
+                            img.style.pointerEvents = 'none';
+                            let imageUrl = el.props.text || '';
+                            if(imageUrl && R){
+                                imageUrl = replaceColumnSyntax(imageUrl, el);
+                                imageUrl = applySequencePlaceholder(imageUrl, waveContext && waveContext.waveSequenceIndex !== undefined ? waveContext.waveSequenceIndex : sequenceIndex);
+                            }
+                            if(imageUrl && imageUrl.includes('imgur.com')){
+                                const id = imageUrl.match(/imgur\.com\/([a-zA-Z0-9]+)/);
+                                if(id && id[1]){
+                                    const cleanId = id[1].replace(/\.(jpg|jpeg|png|gif|webp)$/i, '');
+                                    imageUrl = `https://i.imgur.com/${cleanId}.jpg`;
+                                }
+                            }
+                            if(imageUrl){
+                                img.src = imageUrl;
+                                img.onerror = function(){
+                                    img.style.display = 'none';
+                                    const errorDiv = document.createElement('div');
+                                    errorDiv.style.width = '100%';
+                                    errorDiv.style.height = '100%';
+                                    errorDiv.style.display = 'flex';
+                                    errorDiv.style.alignItems = 'center';
+                                    errorDiv.style.justifyContent = 'center';
+                                    errorDiv.style.color = '#999';
+                                    errorDiv.style.fontSize = '12px';
+                                    errorDiv.textContent = 'Image not found';
+                                    d.appendChild(errorDiv);
+                                };
+                            } else {
+                                img.style.display = 'none';
+                                const placeholder = document.createElement('div');
+                                placeholder.style.width = '100%';
+                                placeholder.style.height = '100%';
+                                placeholder.style.display = 'flex';
+                                placeholder.style.alignItems = 'center';
+                                placeholder.style.justifyContent = 'center';
+                                placeholder.style.color = '#ccc';
+                                placeholder.style.fontSize = '12px';
+                                placeholder.style.border = '1px dashed #ccc';
+                                placeholder.textContent = 'No image';
+                                d.appendChild(placeholder);
+                            }
+                            d.appendChild(img);
+                            break;
+                        }
+                    }
+                    page.appendChild(d);
+                });
+                return page;
+            }
+            
+            // Add print container to DOM
+            document.body.appendChild(printContainer);
+            
+            // Iterate over selected waves
+            let pageIndex = 0;
+            selectedWaveIndices.forEach(waveIndex => {
+                const wave = packWaves[waveIndex];
+                if(!wave || !wave.countColumn || !R || !Object.prototype.hasOwnProperty.call(R, wave.countColumn)){
+                    return;
+                }
+                
+                const count = Math.max(0, Math.floor(Number(R[wave.countColumn])));
+                if(count <= 0) return;
+                
+                // For each sequence index in this wave (resets to 1 for each wave)
+                for(let waveSequenceIndex = 1; waveSequenceIndex <= count; waveSequenceIndex++){
+                    const waveContext = { waveIndex, waveSequenceIndex, weightColumn: wave.weightColumn };
+                    
+                    // Add canvas 1
+                    pageIndex++;
+                    const isLastPage1 = pageIndex === totalPages;
+                    const page1 = renderCanvasToPage(1, waveSequenceIndex, isLastPage1, waveContext);
+                    printContainer.appendChild(page1);
+                    
+                    // Add canvas 2 if enabled
+                    if(canvas2Flag){
+                        pageIndex++;
+                        const isLastPage2 = pageIndex === totalPages;
+                        const page2 = renderCanvasToPage(2, waveSequenceIndex, isLastPage2, waveContext);
+                        printContainer.appendChild(page2);
+                    }
+                }
+            });
+            
+            // Apply text overflow handling (similar to printBothCanvases)
+            const allPages = printContainer.querySelectorAll('.print-page');
+            const canvas1Data = design.canvas1 || [];
+            const canvas2Data = design.canvas2 || [];
+            
+            allPages.forEach((page) => {
+                const pageIndex = Array.from(allPages).indexOf(page);
+                let canvasData, canvasNum;
+                if(canvas2Flag){
+                    canvasNum = (pageIndex % 2 === 0) ? 1 : 2;
+                } else {
+                    canvasNum = 1;
+                }
+                canvasData = canvasNum === 1 ? canvas1Data : canvas2Data;
+                const tempS = canvasData.map(normalizeElement);
+                const sorted = tempS.slice().sort((a,b)=> (a.zIndex||0) - (b.zIndex||0));
+                page.querySelectorAll('.label-element').forEach((d, index) => {
+                    if(index < sorted.length){
+                        const el = sorted[index];
+                        if((el.type === 'text' || el.type === 'data') && (el.props.textOverflow === 'auto-scale' || el.props.textOverflow === 'squeeze')){
+                            const span = d.querySelector('div[style*="pointer-events: none"]');
+                            if(span){
+                                const containerWidth = d.offsetWidth;
+                                const containerHeight = d.offsetHeight;
+                                applyTextOverflow(span, el, containerWidth, containerHeight, true);
+                            }
+                        }
+                    }
+                });
+            });
+            
+            // Wait for all images to load
+            const allImages = printContainer.querySelectorAll('img');
+            const imagePromises = Array.from(allImages).map(img => {
+                if(img.complete && img.naturalWidth > 0){
+                    return Promise.resolve();
+                }
+                return new Promise((resolve) => {
+                    img.onload = resolve;
+                    img.onerror = resolve;
+                    setTimeout(resolve, 5000);
+                });
+            });
+            
+            Promise.all(imagePromises).then(() => {
+                // Update print CSS
+                const styleId = 'dynamic-print-css';
+                let styleEl = document.getElementById(styleId);
+                if(!styleEl){
+                    styleEl = document.createElement('style');
+                    styleEl.id = styleId;
+                    document.head.appendChild(styleEl);
+                }
+                styleEl.textContent = `
+                    @media print{
+                        @page{size:${profile.width}cm ${profile.height}cm;margin:0}
+                        html,body{margin:0!important;padding:0!important;width:${profile.width}cm!important;height:${profile.height}cm!important;overflow:visible!important;background:#fff!important}
+                        #toolbar,#sidebar,#marquee,.status-message{display:none!important}
+                        #main-content{width:${profile.width}cm!important;height:${profile.height}cm!important;overflow:visible!important;display:block!important;padding:0!important;margin:0!important}
+                        #canvas-container{width:${profile.width}cm!important;height:${profile.height}cm!important;padding:0!important;margin:0!important;overflow:visible!important;background:#fff!important;display:block!important;position:static!important}
+                        #canvas-wrapper{position:static!important;width:${profile.width}cm!important;height:${profile.height}cm!important;margin:0!important;padding:0!important;transform:none!important;display:block!important}
+                        #label-canvas{position:static!important;width:${profile.width}cm!important;height:${profile.height}cm!important;transform:none!important;box-shadow:none!important;display:block!important;overflow:visible!important;background:#fff!important}
+                        .label-element{page-break-inside:avoid!important;-webkit-print-color-adjust:exact!important;print-color-adjust:exact!important}
+                        .label-element.selected{border:1px solid transparent!important;box-shadow:none!important}
+                        .resize-handle{display:none!important}
+                        .label-element[style*="border"]{-webkit-print-color-adjust:exact!important;print-color-adjust:exact!important}
+                        .print-page:not(:last-child){page-break-after:always!important}
+                    }
+                `;
+                window.print();
+                setTimeout(()=>{
+                    currentCanvas = prevCanvas;
+                    S = prevS;
+                    selectedIds = prevSel;
+                    render();
+                    updateProps();
+                    if(printContainer.parentNode){
+                        document.body.removeChild(printContainer);
+                    }
+                    updatePrintCSS();
+                }, 100);
+            });
+        }
+        
         function printBothCanvases(){
             const profile = profiles[currentProfile];
             if(!profile || !profile.designs[currentDesign]) return;
             const design = profile.designs[currentDesign];
             const canvas2Flag = design.canvas2Enabled || false;
+            
+            // Save current canvas
+            saveCurrentDesign();
+            
+            // Store original state
+            const prevSel = deepCopy(selectedIds);
+            const prevCanvas = currentCanvas;
+            const prevS = deepCopy(S);
+            
+            // Check if we have pack waves configured
+            if(packWaves && packWaves.length > 0){
+                // Show wave selection popup
+                showWaveSelectionPopup((selectedWaveIndices) => {
+                    if(selectedWaveIndices === null){
+                        // User cancelled
+                        return;
+                    }
+                    
+                    // Proceed with printing selected waves
+                    printSelectedWaves(selectedWaveIndices, profile, design, canvas2Flag, prevSel, prevCanvas, prevS);
+                });
+                return;
+            }
+            
+            // No waves configured - use default behavior with globalSequenceCountColumn
             // Sequence mode is always enabled
             const sequenceEnabled = true;
             // Validate sequence mode
@@ -3077,14 +3732,6 @@ document.addEventListener('DOMContentLoaded', ()=>{
                 msg('Error: Count column not found in current record', true);
                 return;
             }
-            
-            // Save current canvas
-            saveCurrentDesign();
-            
-            // Store original state
-            const prevSel = deepCopy(selectedIds);
-            const prevCanvas = currentCanvas;
-            const prevS = deepCopy(S);
             
             // Calculate count for sequence mode (always enabled)
             const countRaw = R[globalSequenceCountColumn];
@@ -3108,7 +3755,7 @@ document.addEventListener('DOMContentLoaded', ()=>{
             const totalPages = canvas2Flag ? count * 2 : count;
             
             // Helper function to render canvas to print page
-            function renderCanvasToPage(canvasNum, sequenceIndex = 1, isLastPage = false){
+            function renderCanvasToPage(canvasNum, sequenceIndex = 1, isLastPage = false, waveContext = null){
                 const canvasData = design[`canvas${canvasNum}`] || [];
                 const tempS = canvasData.map(normalizeElement);
                 
@@ -3254,7 +3901,7 @@ document.addEventListener('DOMContentLoaded', ()=>{
                             }
                             span.style.wordWrap='break-word';
                             
-                            span.textContent = getData(el, sequenceIndex);
+                            span.textContent = getData(el, sequenceIndex, waveContext);
                             // Copy font styles to span for overflow calculation
                             span.style.fontFamily = el.props.fontFamily || 'Arial, sans-serif';
                             span.style.fontSize = (el.props.fontSize || 16) + 'px';
@@ -3279,7 +3926,7 @@ document.addEventListener('DOMContentLoaded', ()=>{
                             span.style.wordWrap='break-word';
                             span.style.whiteSpace='pre-wrap'; // Always allow wrapping first
                             
-                            span.textContent = getData(el, sequenceIndex);
+                            span.textContent = getData(el, sequenceIndex, waveContext);
                             // Copy font styles to span for overflow calculation
                             span.style.fontFamily = el.props.fontFamily || 'Arial, sans-serif';
                             span.style.fontSize = (el.props.fontSize || 16) + 'px';
@@ -3332,15 +3979,16 @@ document.addEventListener('DOMContentLoaded', ()=>{
                             d.style.backgroundColor = el.props.fillColor || '#ffffff';
                             break;
                         case 'qr': {
-                            const c = getData(el, sequenceIndex) || '';
+                            const effectiveSequenceIndex = waveContext && waveContext.waveSequenceIndex !== undefined ? waveContext.waveSequenceIndex : sequenceIndex;
+                            const c = getData(el, sequenceIndex, waveContext) || '';
                             let prefix = el.props.prefix || '';
                             let suffix = el.props.suffix || '';
                             
                             // Apply sequence placeholder to prefix and suffix
                             prefix = replaceColumnSyntax(prefix, el);
-                            prefix = applySequencePlaceholder(prefix, sequenceIndex);
+                            prefix = applySequencePlaceholder(prefix, effectiveSequenceIndex);
                             suffix = replaceColumnSyntax(suffix, el);
-                            suffix = applySequencePlaceholder(suffix, sequenceIndex);
+                            suffix = applySequencePlaceholder(suffix, effectiveSequenceIndex);
                             
                             // Combine prefix + code + suffix into the QR code value
                             const qrValue = prefix + String(c) + suffix;
@@ -3357,15 +4005,16 @@ document.addEventListener('DOMContentLoaded', ()=>{
                             break;
                         }
                         case 'barcode': {
-                            const c = getData(el, sequenceIndex) || '';
+                            const effectiveSequenceIndex = waveContext && waveContext.waveSequenceIndex !== undefined ? waveContext.waveSequenceIndex : sequenceIndex;
+                            const c = getData(el, sequenceIndex, waveContext) || '';
                             let prefix = el.props.prefix || '';
                             let suffix = el.props.suffix || '';
                             
                             // Apply sequence placeholder to prefix and suffix
                             prefix = replaceColumnSyntax(prefix, el);
-                            prefix = applySequencePlaceholder(prefix, sequenceIndex);
+                            prefix = applySequencePlaceholder(prefix, effectiveSequenceIndex);
                             suffix = replaceColumnSyntax(suffix, el);
-                            suffix = applySequencePlaceholder(suffix, sequenceIndex);
+                            suffix = applySequencePlaceholder(suffix, effectiveSequenceIndex);
                             
                             // Combine prefix + code + suffix into the barcode value
                             const barcodeValue = prefix + String(c) + suffix;
@@ -3496,14 +4145,14 @@ document.addEventListener('DOMContentLoaded', ()=>{
                 // Add canvas 1 for this sequence index
                 pageIndex++;
                 const isLastPage1 = pageIndex === totalPages;
-                const page1 = renderCanvasToPage(1, sequenceIndex, isLastPage1);
+                const page1 = renderCanvasToPage(1, sequenceIndex, isLastPage1, null);
                 printContainer.appendChild(page1);
                 
                 // Add canvas 2 with the same sequence index if enabled
                 if(canvas2Flag){
                     pageIndex++;
                     const isLastPage2 = pageIndex === totalPages;
-                    const page2 = renderCanvasToPage(2, sequenceIndex, isLastPage2);
+                    const page2 = renderCanvasToPage(2, sequenceIndex, isLastPage2, null);
                     printContainer.appendChild(page2);
                 }
             }
@@ -3660,7 +4309,7 @@ document.addEventListener('DOMContentLoaded', ()=>{
         const totalPages = canvas2Flag ? 2 : 1;
         
         // Helper function to render canvas to print page (identical to printBothCanvases)
-        function renderCanvasToPage(canvasNum, sequenceIndex = 1, isLastPage = false){
+        function renderCanvasToPage(canvasNum, sequenceIndex = 1, isLastPage = false, waveContext = null){
             const canvasData = design[`canvas${canvasNum}`] || [];
             const tempS = canvasData.map(normalizeElement);
             
@@ -3783,7 +4432,7 @@ document.addEventListener('DOMContentLoaded', ()=>{
                         span.style.overflow='hidden';
                         span.style.wordWrap='break-word';
                         span.style.whiteSpace='pre-wrap';
-                        span.textContent = getData(el, sequenceIndex);
+                        span.textContent = getData(el, sequenceIndex, waveContext);
                         span.style.fontFamily = el.props.fontFamily || 'Arial, sans-serif';
                         span.style.fontSize = (el.props.fontSize || 16) + 'px';
                         span.style.color = el.props.color || '#000000';
@@ -3798,7 +4447,7 @@ document.addEventListener('DOMContentLoaded', ()=>{
                         span.style.overflow='hidden';
                         span.style.wordWrap='break-word';
                         span.style.whiteSpace='pre-wrap';
-                        span.textContent = getData(el, sequenceIndex);
+                        span.textContent = getData(el, sequenceIndex, waveContext);
                         span.style.fontFamily = el.props.fontFamily || 'Arial, sans-serif';
                         span.style.fontSize = (el.props.fontSize || 16) + 'px';
                         span.style.color = el.props.color || '#000000';
@@ -3821,15 +4470,16 @@ document.addEventListener('DOMContentLoaded', ()=>{
                         d.style.backgroundColor = el.props.fillColor || '#ffffff';
                         break;
                     case 'qr': {
-                        const c = getData(el, sequenceIndex) || '';
+                        const effectiveSequenceIndex = waveContext && waveContext.waveSequenceIndex !== undefined ? waveContext.waveSequenceIndex : sequenceIndex;
+                        const c = getData(el, sequenceIndex, waveContext) || '';
                         let prefix = el.props.prefix || '';
                         let suffix = el.props.suffix || '';
                         
                         // Apply sequence placeholder to prefix and suffix
                         prefix = replaceColumnSyntax(prefix, el);
-                        prefix = applySequencePlaceholder(prefix, sequenceIndex);
+                        prefix = applySequencePlaceholder(prefix, effectiveSequenceIndex);
                         suffix = replaceColumnSyntax(suffix, el);
-                        suffix = applySequencePlaceholder(suffix, sequenceIndex);
+                        suffix = applySequencePlaceholder(suffix, effectiveSequenceIndex);
                         
                         // Combine prefix + code + suffix into the QR code value
                         const qrValue = prefix + String(c) + suffix;
@@ -3846,13 +4496,14 @@ document.addEventListener('DOMContentLoaded', ()=>{
                         break;
                     }
                     case 'barcode': {
-                        const c = getData(el, sequenceIndex) || '';
+                        const effectiveSequenceIndex = waveContext && waveContext.waveSequenceIndex !== undefined ? waveContext.waveSequenceIndex : sequenceIndex;
+                        const c = getData(el, sequenceIndex, waveContext) || '';
                         let prefix = el.props.prefix || '';
                         let suffix = el.props.suffix || '';
                         prefix = replaceColumnSyntax(prefix, el);
-                        prefix = applySequencePlaceholder(prefix, sequenceIndex);
+                        prefix = applySequencePlaceholder(prefix, effectiveSequenceIndex);
                         suffix = replaceColumnSyntax(suffix, el);
-                        suffix = applySequencePlaceholder(suffix, sequenceIndex);
+                        suffix = applySequencePlaceholder(suffix, effectiveSequenceIndex);
                         
                         // Combine prefix + code + suffix into the barcode value
                         const barcodeValue = prefix + String(c) + suffix;
@@ -3941,12 +4592,12 @@ document.addEventListener('DOMContentLoaded', ()=>{
         
         // Add canvas 1 with specified sequence index
         const isLastPage1 = !canvas2Flag;
-        const page1 = renderCanvasToPage(1, sequenceIndex, isLastPage1);
+        const page1 = renderCanvasToPage(1, sequenceIndex, isLastPage1, null);
         printContainer.appendChild(page1);
         
         // Add canvas 2 if enabled with same sequence index
         if(canvas2Flag){
-            const page2 = renderCanvasToPage(2, sequenceIndex, true);
+            const page2 = renderCanvasToPage(2, sequenceIndex, true, null);
             printContainer.appendChild(page2);
         }
         
@@ -5336,6 +5987,12 @@ document.addEventListener('DOMContentLoaded', ()=>{
                     // Load globalSequenceCountColumn if saved
                     if(parsed.globalSequenceCountColumn !== undefined){
                         globalSequenceCountColumn = parsed.globalSequenceCountColumn || '';
+                    }
+                    // Load packWaves if saved
+                    if(parsed.packWaves && Array.isArray(parsed.packWaves)){
+                        packWaves = parsed.packWaves;
+                    } else {
+                        packWaves = [];
                     }
                     // Restore current profile, design and canvas if saved
                     if(parsed.currentProfile && profiles[parsed.currentProfile]){
