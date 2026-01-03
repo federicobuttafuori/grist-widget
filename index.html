@@ -6104,7 +6104,13 @@ document.addEventListener('DOMContentLoaded', ()=>{
                     // Always update props when columns are loaded, because pack waves need columns
                     // even when no elements are selected
                     updateProps(); 
-                    render(); 
+                    // Use requestAnimationFrame to ensure DOM is ready before rendering
+                    requestAnimationFrame(() => {
+                        render();
+                        void lc.offsetHeight;
+                        void cc.offsetHeight;
+                        fit();
+                    });
                 });
             }
         }catch(e){ console.warn('grist.onRecord error',e); }
@@ -6221,7 +6227,7 @@ document.addEventListener('DOMContentLoaded', ()=>{
                         if(profileKeys.length > 0){
                             currentProfile = profileKeys[0];
                             const designKeys = Object.keys(profiles[currentProfile].designs);
-                            if(designKeys.length > 0){a
+                            if(designKeys.length > 0){
                                 // Try to use last selected design for this profile
                                 const lastDesign = lastDesignByProfile[currentProfile];
                                 if(lastDesign && designKeys.includes(lastDesign)){
@@ -6275,9 +6281,17 @@ document.addEventListener('DOMContentLoaded', ()=>{
             groups.forEach(group => {
                 group.bounds = getGroupBounds(group.elementIds);
             });
-        render();
-        updateProps();
-        fit();
+        // Clear canvas before rendering
+        lc.innerHTML = '';
+        // Use requestAnimationFrame to ensure DOM is ready and dimensions are calculated
+        requestAnimationFrame(() => {
+            render();
+            updateProps();
+            // Force a reflow and fit after DOM update
+            void lc.offsetHeight;
+            void cc.offsetHeight;
+            fit();
+        });
     resetHistory();
         
         // Check full screen mode on initial load
