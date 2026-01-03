@@ -160,6 +160,7 @@ document.addEventListener('DOMContentLoaded', ()=>{
     let selectedIds = [];             // array of selected element ids (multi-select)
         let groups = [];                   // array of groups: [{id: 'group_xxx', elementIds: ['el_xxx', ...], bounds: {x, y, width, height}}]
     let z = 1;
+    let isManuallyEditingGroupScale = false; // Flag to prevent updateProps from overwriting user input
     let R = {}, C = [];
     let drag = false, resizeMode = false, ctx = {};
         let canvasRotation = 0;           // temporary canvas rotation (0, 90, 180, 270 degrees)
@@ -1894,13 +1895,33 @@ document.addEventListener('DOMContentLoaded', ()=>{
                         const originalBounds = group.originalBounds || currentBounds;
                         const currentScale = originalBounds.width > 0 ? (currentBounds.width / originalBounds.width) : 1;
                         
+                        // Check if user is currently editing the input
+                        const existingInput = document.getElementById('group-scale-input');
+                        const isInputFocused = existingInput && document.activeElement === existingInput;
+                        
+                        // If input exists and is focused, don't recreate it - just update the value if needed
+                        if(existingInput && isInputFocused && isManuallyEditingGroupScale){
+                            // Don't recreate the panel, just return
+                            return;
+                        }
+                        
+                        // Get current input value if it exists and user was editing
+                        let inputValue = (currentScale * 100).toFixed(1);
+                        if(existingInput && !isInputFocused){
+                            // If input exists but not focused, use its value if it's valid
+                            const existingValue = parseFloat(existingInput.value);
+                            if(!isNaN(existingValue) && existingValue > 0){
+                                inputValue = existingInput.value;
+                            }
+                        }
+                        
                         pp.innerHTML = `<div style="padding:12px;">
                             <div style="margin-bottom:12px;padding:8px;background:#fff3e0;border:1px solid #ffb74d;border-radius:4px;">
                                 <p style="margin:0;font-size:13px;font-weight:600;color:#e65100;">📦 Group Selected (${group.elementIds.length} elements)</p>
                             </div>
                             <div class="prop-grid" style="margin-bottom:12px;">
                                 <label>Scale (%)</label>
-                                <input type="number" id="group-scale-input" step="0.1" min="10" max="500" value="${(currentScale * 100).toFixed(1)}" style="width:100%">
+                                <input type="number" id="group-scale-input" step="0.1" min="10" max="500" value="${inputValue}" style="width:100%">
                             </div>
                             <div style="font-size:12px;color:#666;margin-top:8px;">
                                 <p style="margin:4px 0;">Use <strong>Ctrl+Shift+G</strong> to ungroup</p>
@@ -1913,14 +1934,60 @@ document.addEventListener('DOMContentLoaded', ()=>{
                             const scaleInput = document.getElementById('group-scale-input');
                             if(scaleInput){
                                 let scaleTimeout = null;
+                                
+                                // Mark as manually editing when user focuses or types
+                                scaleInput.addEventListener('focus', () => {
+                                    isManuallyEditingGroupScale = true;
+                                });
+                                
                                 scaleInput.addEventListener('input', (e) => {
+                                    isManuallyEditingGroupScale = true;
                                     clearTimeout(scaleTimeout);
                                     scaleTimeout = setTimeout(() => {
                                         const scaleValue = parseFloat(e.target.value);
                                         if(!isNaN(scaleValue) && scaleValue > 0){
-                                            scaleGroup(group, scaleValue / 100);
+                                            // Skip updateProps to avoid recreating the input while user is typing
+                                            scaleGroup(group, scaleValue / 100, true);
+                                            // Update the input value manually after scaling
+                                            setTimeout(() => {
+                                                const currentBounds = getGroupBounds(group.elementIds);
+                                                const originalBounds = group.originalBounds || currentBounds;
+                                                const currentScale = originalBounds.width > 0 ? (currentBounds.width / originalBounds.width) : 1;
+                                                if(document.activeElement !== scaleInput){
+                                                    scaleInput.value = (currentScale * 100).toFixed(1);
+                                                }
+                                            }, 50);
                                         }
                                     }, 300);
+                                });
+                                
+                                // Handle Enter key and blur
+                                scaleInput.addEventListener('keydown', (e) => {
+                                    if(e.key === 'Enter'){
+                                        e.preventDefault();
+                                        const scaleValue = parseFloat(scaleInput.value);
+                                        if(!isNaN(scaleValue) && scaleValue > 0){
+                                            isManuallyEditingGroupScale = false;
+                                            scaleGroup(group, scaleValue / 100, false);
+                                        }
+                                        scaleInput.blur();
+                                    }
+                                });
+                                
+                                scaleInput.addEventListener('blur', () => {
+                                    // Apply the value when user leaves the field
+                                    const scaleValue = parseFloat(scaleInput.value);
+                                    if(!isNaN(scaleValue) && scaleValue > 0){
+                                        isManuallyEditingGroupScale = false;
+                                        scaleGroup(group, scaleValue / 100, false);
+                                    } else {
+                                        // Restore previous value if invalid
+                                        const currentBounds = getGroupBounds(group.elementIds);
+                                        const originalBounds = group.originalBounds || currentBounds;
+                                        const currentScale = originalBounds.width > 0 ? (currentBounds.width / originalBounds.width) : 1;
+                                        scaleInput.value = (currentScale * 100).toFixed(1);
+                                        isManuallyEditingGroupScale = false;
+                                    }
                                 });
                             }
                         }, 0);
@@ -2731,7 +2798,7 @@ document.addEventListener('DOMContentLoaded', ()=>{
             msg('Elements grouped');
         }
         
-        function scaleGroup(group, scale){
+        function scaleGroup(group, scale, skipUpdateProps = false){
             if(!group || !group.elementIds || group.elementIds.length === 0) return;
             if(scale <= 0) return;
             
@@ -2808,7 +2875,9 @@ document.addEventListener('DOMContentLoaded', ()=>{
             group.bounds = getGroupBounds(group.elementIds);
             
             render();
-            updateProps();
+            if(!skipUpdateProps){
+                updateProps();
+            }
             saveCurrentDesign();
         }
 
