@@ -554,13 +554,20 @@ document.addEventListener('DOMContentLoaded', ()=>{
             }
             // Load the new design
             loadCurrentDesign();
+            // Clear canvas before updating size to prevent showing old content
+            lc.innerHTML = '';
             updateCanvasSize();
             updateDesignSelector();
             updateCanvasControls();
+            // Render immediately
             render();
             updateProps();
-            // Force canvas refresh
-            fit();
+            // Force a reflow and fit after DOM update
+            requestAnimationFrame(() => {
+                void lc.offsetHeight;
+                void cc.offsetHeight;
+                fit();
+            });
         }
 
         function switchCanvas(canvasNum){
@@ -6094,14 +6101,9 @@ document.addEventListener('DOMContentLoaded', ()=>{
                 window.grist.onRecord(function(record,mappings){ 
                     R = record||{}; 
                     C = Object.keys(R); 
-                    if(selectedIds.length) {
-                        updateProps(); 
-                    } else {
-                        // Update count display even when no elements are selected
-                        if(typeof window.updateSequenceCountDisplay === 'function'){
-                            window.updateSequenceCountDisplay();
-                        }
-                    }
+                    // Always update props when columns are loaded, because pack waves need columns
+                    // even when no elements are selected
+                    updateProps(); 
                     render(); 
                 });
             }
