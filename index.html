@@ -367,12 +367,10 @@ document.addEventListener('DOMContentLoaded', ()=>{
             if(!profile) return;
             W = profile.width;
             H = profile.height;
-            // Clear canvas before updating size to prevent showing old content
-            lc.innerHTML = '';
             lc.style.width = `${W}cm`;
             lc.style.height = `${H}cm`;
             updatePrintCSS();
-            fit();
+            // Don't call fit() here - it will be called after rendering
         }
 
         function updatePrintCSS(){
@@ -507,15 +505,20 @@ document.addEventListener('DOMContentLoaded', ()=>{
             }
             // Load the design
             loadCurrentDesign();
+            // Clear canvas before updating size to prevent showing old content
+            lc.innerHTML = '';
             updateCanvasSize();
             updateProfileSelector();
             updateDesignSelector();
             updateCanvasControls();
-            // Force a re-render after canvas size is updated
-            // Use requestAnimationFrame to ensure DOM is updated before rendering
+            // Render immediately
+            render();
+            updateProps();
+            // Force a reflow and fit after DOM update
             requestAnimationFrame(() => {
-                render();
-                updateProps();
+                void lc.offsetHeight;
+                void cc.offsetHeight;
+                fit();
             });
         }
 
