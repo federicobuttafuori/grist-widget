@@ -1682,9 +1682,57 @@ document.addEventListener('DOMContentLoaded', ()=>{
         }
 
         // Helper function to process mathematical expressions delimited by $$
+        // Supports syntax: $$expression$decimals$ where decimals is optional number of decimal places
         function processMathExpressions(str, el, waveContext = null){
             if(!str || typeof str !== 'string' || !R || typeof R !== 'object') return str;
-            return str.replace(/\$\$([^$]+)\$\$/g, (match, expression) => {
+            // Match $$expression$number$ (with decimals) or $$expression$$ (without decimals)
+            // First try to match pattern with decimals: $$expression$number$
+            let result = str.replace(/\$\$([^$]+)\$(\d+)\$/g, (match, expression, decimalsStr) => {
+                try {
+                    // Parse decimals (e.g., $$...$2$ means 2 decimals)
+                    const decimals = parseInt(decimalsStr, 10);
+                    if(isNaN(decimals) || decimals < 0) return match;
+                    
+                    // Replace **column** syntax with numeric values in the expression
+                    let processedExpression = expression.replace(/\*\*([^*]+)\*\*/g, (colMatch, columnId) => {
+                        const numValue = getColumnValueAsNumber(columnId, waveContext);
+                        if(numValue === null) return '0'; // Return 0 if column not found or not numeric
+                        return String(numValue);
+                    });
+                    
+                    // Evaluate the mathematical expression safely
+                    // Remove any whitespace and validate it contains only safe characters
+                    processedExpression = processedExpression.trim();
+                    // Allow numbers, operators (+, -, *, /, %), parentheses, decimal points, and spaces
+                    // Also allow negative numbers (e.g., -5)
+                    if(!/^[0-9+\-*/().%\s]+$/.test(processedExpression)){
+                        return match; // Return original if contains invalid characters
+                    }
+                    
+                    // Additional safety: check for dangerous patterns
+                    // Block function calls, object access, etc.
+                    if(/[a-zA-Z_$]/.test(processedExpression.replace(/\s/g, ''))){
+                        return match; // Return original if contains letters (should only have numbers and operators)
+                    }
+                    
+                    // Use Function constructor for safe evaluation (more secure than eval)
+                    const calcResult = Function('"use strict"; return (' + processedExpression + ')')();
+                    
+                    // Format the result with specified decimals
+                    if(typeof calcResult === 'number'){
+                        if(isNaN(calcResult) || !isFinite(calcResult)) return match; // Return original if invalid result
+                        // Use the specified number of decimals
+                        return calcResult.toFixed(decimals);
+                    }
+                    return match; // Return original if result is not a number
+                } catch(e){
+                    // If evaluation fails, return the original match
+                    return match;
+                }
+            });
+            
+            // Then process expressions without decimals: $$expression$$
+            result = result.replace(/\$\$([^$]+)\$\$/g, (match, expression) => {
                 try {
                     // Replace **column** syntax with numeric values in the expression
                     let processedExpression = expression.replace(/\*\*([^*]+)\*\*/g, (colMatch, columnId) => {
@@ -1709,19 +1757,20 @@ document.addEventListener('DOMContentLoaded', ()=>{
                     }
                     
                     // Use Function constructor for safe evaluation (more secure than eval)
-                    const result = Function('"use strict"; return (' + processedExpression + ')')();
+                    const calcResult = Function('"use strict"; return (' + processedExpression + ')')();
                     
                     // Format the result
-                    if(typeof result === 'number'){
-                        if(isNaN(result) || !isFinite(result)) return match; // Return original if invalid result
+                    if(typeof calcResult === 'number'){
+                        if(isNaN(calcResult) || !isFinite(calcResult)) return match; // Return original if invalid result
                         // For data fields, use the field's decimal formatting
                         if(el && el.type === 'data'){
                             const dec = (el.props.decimals !== undefined) ? Number(el.props.decimals) : 2;
                             const pct = !!el.props.asPercent;
-                            return fmt(result, dec, pct);
+                            return fmt(calcResult, dec, pct);
+                        } else {
+                            // For other fields, return as string with reasonable precision (2 decimals default)
+                            return calcResult.toFixed(2);
                         }
-                        // For other fields, return as string with reasonable precision
-                        return String(result);
                     }
                     return match; // Return original if result is not a number
                 } catch(e){
@@ -1729,6 +1778,8 @@ document.addEventListener('DOMContentLoaded', ()=>{
                     return match;
                 }
             });
+            
+            return result;
         }
 
         // Helper function to replace **column** syntax with actual data
