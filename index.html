@@ -845,33 +845,33 @@ document.addEventListener('DOMContentLoaded', ()=>{
 
         function removeDesign(){
             const profile = profiles[currentProfile];
-                if(!profile) return;
+            if(!profile) return;
             if(Object.keys(profile.designs).length <= 1){
                 msg('Cannot remove the last design', true);
                 return;
             }
             if(!confirm(`Remove design "${currentDesign}"?`)) return;
-                
-                // Save current design before deletion
-                saveCurrentDesign();
-                
-                // Delete the design
+            
+            // RIMUOVI QUESTA RIGA - NON salvare il design prima di eliminarlo!
+            // saveCurrentDesign(); 
+            
+            // Delete the design
             delete profile.designs[currentDesign];
-                
+            
             // Switch to first available design
-                const remainingDesigns = Object.keys(profile.designs);
-                if(remainingDesigns.length > 0){
-                    const firstKey = remainingDesigns[0];
-                    currentDesign = firstKey;
-                    updateDesignSelector();
-                    loadCurrentDesign();
-                    render();
-                    updateProps();
-                    resetHistory();
-                }
-                
+            const remainingDesigns = Object.keys(profile.designs);
+            if(remainingDesigns.length > 0){
+                const firstKey = remainingDesigns[0];
+                currentDesign = firstKey;
+                updateDesignSelector();
+                loadCurrentDesign();
+                render();
+                updateProps();
+                resetHistory();
+            }
+            
             msg('Design removed');
-            saveCurrentDesign();
+            saveCurrentDesign(); // Salva DOPO aver caricato il nuovo design
         }
 
     // ---------- History (undo/redo) ----------
