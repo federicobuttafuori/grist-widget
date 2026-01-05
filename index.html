@@ -1661,6 +1661,76 @@ document.addEventListener('DOMContentLoaded', ()=>{
             }
         }
         
+        // Helper function to get column value as number (for math calculations)
+        function getColumnValueAsNumber(columnId, waveContext = null){
+            if(!R || typeof R !== 'object') return null;
+            const trimmedColumnId = columnId.trim();
+            let columnToUse = trimmedColumnId;
+            if(waveContext && waveContext.weightColumn){
+                const matchesAnyWaveWeight = packWaves.some(wave => wave.weightColumn === trimmedColumnId);
+                if(matchesAnyWaveWeight){
+                    columnToUse = waveContext.weightColumn;
+                }
+            }
+            if(Object.prototype.hasOwnProperty.call(R, columnToUse)){
+                let v = R[columnToUse];
+                if(v === null || v === undefined) return null;
+                const num = parseFloat(v);
+                return isNaN(num) ? null : num;
+            }
+            return null;
+        }
+
+        // Helper function to process mathematical expressions delimited by $$
+        function processMathExpressions(str, el, waveContext = null){
+            if(!str || typeof str !== 'string' || !R || typeof R !== 'object') return str;
+            return str.replace(/\$\$([^$]+)\$\$/g, (match, expression) => {
+                try {
+                    // Replace **column** syntax with numeric values in the expression
+                    let processedExpression = expression.replace(/\*\*([^*]+)\*\*/g, (colMatch, columnId) => {
+                        const numValue = getColumnValueAsNumber(columnId, waveContext);
+                        if(numValue === null) return '0'; // Return 0 if column not found or not numeric
+                        return String(numValue);
+                    });
+                    
+                    // Evaluate the mathematical expression safely
+                    // Remove any whitespace and validate it contains only safe characters
+                    processedExpression = processedExpression.trim();
+                    // Allow numbers, operators (+, -, *, /, %), parentheses, decimal points, and spaces
+                    // Also allow negative numbers (e.g., -5)
+                    if(!/^[0-9+\-*/().%\s]+$/.test(processedExpression)){
+                        return match; // Return original if contains invalid characters
+                    }
+                    
+                    // Additional safety: check for dangerous patterns
+                    // Block function calls, object access, etc.
+                    if(/[a-zA-Z_$]/.test(processedExpression.replace(/\s/g, ''))){
+                        return match; // Return original if contains letters (should only have numbers and operators)
+                    }
+                    
+                    // Use Function constructor for safe evaluation (more secure than eval)
+                    const result = Function('"use strict"; return (' + processedExpression + ')')();
+                    
+                    // Format the result
+                    if(typeof result === 'number'){
+                        if(isNaN(result) || !isFinite(result)) return match; // Return original if invalid result
+                        // For data fields, use the field's decimal formatting
+                        if(el && el.type === 'data'){
+                            const dec = (el.props.decimals !== undefined) ? Number(el.props.decimals) : 2;
+                            const pct = !!el.props.asPercent;
+                            return fmt(result, dec, pct);
+                        }
+                        // For other fields, return as string with reasonable precision
+                        return String(result);
+                    }
+                    return match; // Return original if result is not a number
+                } catch(e){
+                    // If evaluation fails, return the original match
+                    return match;
+                }
+            });
+        }
+
         // Helper function to replace **column** syntax with actual data
         function replaceColumnSyntax(str, el, waveContext = null){
             if(!str || typeof str !== 'string' || !R || typeof R !== 'object') return str;
@@ -1705,7 +1775,12 @@ document.addEventListener('DOMContentLoaded', ()=>{
             
             // For text fields, check if **column** syntax is used ONLY in the text itself (not prefix/suffix)
             // Prefix and suffix can have **column** syntax independently
-            const hasColumnSyntaxInText = text.includes('**');
+            const hasColumnSyntaxInText = text.includes('**') || text.includes('$$');
+            
+            // Process mathematical expressions first ($$...$$), then **column** syntax
+            // This allows math expressions to use **column** syntax inside them
+            prefix = processMathExpressions(prefix, el, waveContext);
+            suffix = processMathExpressions(suffix, el, waveContext);
             
             // Always process prefix and suffix for **column** syntax (they work independently)
             prefix = replaceColumnSyntax(prefix, el, waveContext);
@@ -1715,8 +1790,11 @@ document.addEventListener('DOMContentLoaded', ()=>{
             prefix = applySequencePlaceholder(prefix, effectiveSequenceIndex);
             suffix = applySequencePlaceholder(suffix, effectiveSequenceIndex);
             
-            // Handle **column** syntax for text, data, barcode, and qr fields
+            // Handle **column** syntax and math expressions for text, data, barcode, and qr fields
             if(el.type === 'text' || el.type === 'data' || el.type === 'barcode' || el.type === 'qr'){
+                // Process mathematical expressions first ($$...$$)
+                text = processMathExpressions(text, el, waveContext);
+                
                 // Process text for **column** syntax
                 text = replaceColumnSyntax(text, el, waveContext);
                 
