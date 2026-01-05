@@ -1824,9 +1824,50 @@ document.addEventListener('DOMContentLoaded', ()=>{
             let prefix = el.props.prefix || '';
             let suffix = el.props.suffix || '';
             
+            // Save original prefix and suffix to check for math expressions surrounding boundColumn
+            const originalPrefix = prefix;
+            const originalSuffix = suffix;
+            
             // For text fields, check if **column** syntax is used ONLY in the text itself (not prefix/suffix)
             // Prefix and suffix can have **column** syntax independently
             const hasColumnSyntaxInText = text.includes('**') || text.includes('$$');
+            
+            // Handle boundColumn with waveContext support
+            // If waveContext is provided and element has boundColumn that matches a wave weight column, use waveContext.weightColumn
+            let boundColumnToUse = el.props.boundColumn;
+            if(waveContext && waveContext.weightColumn && el.props.boundColumn){
+                // Check if boundColumn matches any wave weight column
+                const matchesWaveWeight = packWaves.some(wave => wave.weightColumn === el.props.boundColumn);
+                if(matchesWaveWeight){
+                    boundColumnToUse = waveContext.weightColumn;
+                }
+            }
+            
+            // Check if prefix and suffix contain a math expression that surrounds boundColumn value
+            // This must be checked BEFORE processing prefix/suffix separately
+            if(!hasColumnSyntaxInText && boundColumnToUse && R && Object.prototype.hasOwnProperty.call(R, boundColumnToUse) && (el.type === 'text' || el.type === 'data')){
+                // Check if prefix contains $$ (math expression start) and suffix contains $$ or $number$ (math expression end)
+                const prefixHasMath = originalPrefix.includes('$$');
+                const suffixHasMath = originalSuffix.includes('$$') || /\$\d+\$/.test(originalSuffix);
+                
+                // If both prefix and suffix contain math delimiters, combine them with boundColumn and process
+                if(prefixHasMath && suffixHasMath){
+                    // Build the combined expression: prefix + **boundColumn** + suffix
+                    // This allows the boundColumn value to be used in math expressions while preserving any text outside $$
+                    const combinedExpression = originalPrefix + '**' + boundColumnToUse + '**' + originalSuffix;
+                    
+                    // Process the combined expression completely (math expressions first, then column syntax)
+                    // This will process $$...$$ or $$...$number$ expressions and leave other text unchanged
+                    let processedExpression = processMathExpressions(combinedExpression, el, waveContext);
+                    processedExpression = replaceColumnSyntax(processedExpression, el, waveContext);
+                    
+                    // Use waveSequenceIndex if waveContext is provided, otherwise use sequenceIndex
+                    const effectiveSequenceIndex = waveContext && waveContext.waveSequenceIndex !== undefined ? waveContext.waveSequenceIndex : sequenceIndex;
+                    processedExpression = applySequencePlaceholder(processedExpression, effectiveSequenceIndex);
+                    
+                    return processedExpression;
+                }
+            }
             
             // Process mathematical expressions first ($$...$$), then **column** syntax
             // This allows math expressions to use **column** syntax inside them
@@ -1853,21 +1894,11 @@ document.addEventListener('DOMContentLoaded', ()=>{
                 text = applySequencePlaceholder(text, effectiveSequenceIndex);
             }
             
-            // Handle boundColumn with waveContext support
-            // If waveContext is provided and element has boundColumn that matches a wave weight column, use waveContext.weightColumn
-            let boundColumnToUse = el.props.boundColumn;
-            if(waveContext && waveContext.weightColumn && el.props.boundColumn){
-                // Check if boundColumn matches any wave weight column
-                const matchesWaveWeight = packWaves.some(wave => wave.weightColumn === el.props.boundColumn);
-                if(matchesWaveWeight){
-                    boundColumnToUse = waveContext.weightColumn;
-                }
-            }
-            
             // Handle boundColumn (legacy support) - only if **column** syntax wasn't used in text itself
             // For text fields, we can use boundColumn even if prefix/suffix have **column** syntax
             if(!hasColumnSyntaxInText && boundColumnToUse && R && Object.prototype.hasOwnProperty.call(R, boundColumnToUse)){
                 let v = R[boundColumnToUse];
+                
                 if(el.type === 'data' && typeof v === 'number'){
                     const dec = (el.props.decimals !== undefined) ? Number(el.props.decimals) : 2;
                     const pct = !!el.props.asPercent;
