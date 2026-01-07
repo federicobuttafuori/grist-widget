@@ -1389,8 +1389,27 @@ document.addEventListener('DOMContentLoaded', ()=>{
                                 errorDiv.textContent = 'Image not found';
                                 d.appendChild(errorDiv);
                             };
+                        } else if(el.props.fallbackLink){
+                            // No column selected, but fallback link available - use it directly
+                            const fallbackUrl = String(el.props.fallbackLink).trim();
+                            if(fallbackUrl){
+                                img.src = fallbackUrl;
+                                img.onerror = function(){
+                                    img.style.display = 'none';
+                                    const errorDiv = document.createElement('div');
+                                    errorDiv.style.width = '100%';
+                                    errorDiv.style.height = '100%';
+                                    errorDiv.style.display = 'flex';
+                                    errorDiv.style.alignItems = 'center';
+                                    errorDiv.style.justifyContent = 'center';
+                                    errorDiv.style.color = '#999';
+                                    errorDiv.style.fontSize = '12px';
+                                    errorDiv.textContent = 'Image not found';
+                                    d.appendChild(errorDiv);
+                                };
+                            }
                         } else {
-                            // Show placeholder when no image
+                            // Show placeholder when no image and no fallback
                             img.style.display = 'none';
                             const placeholder = document.createElement('div');
                             placeholder.style.width = '100%';
@@ -3904,8 +3923,27 @@ document.addEventListener('DOMContentLoaded', ()=>{
                                     errorDiv.textContent = 'Image not found';
                                     d.appendChild(errorDiv);
                                 };
+                            } else if(el.props.fallbackLink){
+                                // No column selected, but fallback link available - use it directly
+                                const fallbackUrl = String(el.props.fallbackLink).trim();
+                                if(fallbackUrl){
+                                    img.src = fallbackUrl;
+                                    img.onerror = function(){
+                                        img.style.display = 'none';
+                                        const errorDiv = document.createElement('div');
+                                        errorDiv.style.width = '100%';
+                                        errorDiv.style.height = '100%';
+                                        errorDiv.style.display = 'flex';
+                                        errorDiv.style.alignItems = 'center';
+                                        errorDiv.style.justifyContent = 'center';
+                                        errorDiv.style.color = '#999';
+                                        errorDiv.style.fontSize = '12px';
+                                        errorDiv.textContent = 'Image not found';
+                                        d.appendChild(errorDiv);
+                                    };
+                                }
                             } else {
-                                // Show placeholder when no image
+                                // Show placeholder when no image and no fallback
                                 img.style.display = 'none';
                                 const placeholder = document.createElement('div');
                                 placeholder.style.width = '100%';
@@ -4009,16 +4047,43 @@ document.addEventListener('DOMContentLoaded', ()=>{
                 });
             });
             
-            // Wait for all images to load
+            // Wait for all images to load (including fallbacks)
             const allImages = printContainer.querySelectorAll('img');
             const imagePromises = Array.from(allImages).map(img => {
+                // If image is already loaded (complete), resolve immediately
                 if(img.complete && img.naturalWidth > 0){
                     return Promise.resolve();
                 }
+                // Otherwise wait for load or error, including fallback
                 return new Promise((resolve) => {
-                    img.onload = resolve;
-                    img.onerror = resolve;
-                    setTimeout(resolve, 5000);
+                    let resolved = false;
+                    const resolveOnce = () => {
+                        if(!resolved){
+                            resolved = true;
+                            resolve();
+                        }
+                    };
+                    
+                    let fallbackTried = false;
+                    const fallbackLink = img.dataset.fallbackLink;
+                    
+                    img.onload = resolveOnce;
+                    img.onerror = () => {
+                        // If there's a fallback link and we haven't tried it yet
+                        if(!fallbackTried && fallbackLink && img.src !== fallbackLink){
+                            fallbackTried = true;
+                            img.src = fallbackLink;
+                            // Wait for fallback to load or fail
+                            img.onload = resolveOnce;
+                            img.onerror = resolveOnce;
+                        } else {
+                            // No fallback or fallback also failed
+                            resolveOnce();
+                        }
+                    };
+                    
+                    // Timeout after 5 seconds to prevent hanging
+                    setTimeout(resolveOnce, 5000);
                 });
             });
             
@@ -4469,6 +4534,10 @@ document.addEventListener('DOMContentLoaded', ()=>{
                             }
                             
                             if(imageUrl){
+                                // Save fallback link as data attribute for print waiting logic
+                                if(el.props.fallbackLink){
+                                    img.dataset.fallbackLink = String(el.props.fallbackLink).trim();
+                                }
                                 img.src = imageUrl;
                                 let fallbackTried = false;
                                 img.onerror = function(){
@@ -4494,8 +4563,27 @@ document.addEventListener('DOMContentLoaded', ()=>{
                                     errorDiv.textContent = 'Image not found';
                                     d.appendChild(errorDiv);
                                 };
+                            } else if(el.props.fallbackLink){
+                                // No column selected, but fallback link available - use it directly
+                                const fallbackUrl = String(el.props.fallbackLink).trim();
+                                if(fallbackUrl){
+                                    img.src = fallbackUrl;
+                                    img.onerror = function(){
+                                        img.style.display = 'none';
+                                        const errorDiv = document.createElement('div');
+                                        errorDiv.style.width = '100%';
+                                        errorDiv.style.height = '100%';
+                                        errorDiv.style.display = 'flex';
+                                        errorDiv.style.alignItems = 'center';
+                                        errorDiv.style.justifyContent = 'center';
+                                        errorDiv.style.color = '#999';
+                                        errorDiv.style.fontSize = '12px';
+                                        errorDiv.textContent = 'Image not found';
+                                        d.appendChild(errorDiv);
+                                    };
+                                }
                             } else {
-                                // Show placeholder when no image
+                                // Show placeholder when no image and no fallback
                                 img.style.display = 'none';
                                 const placeholder = document.createElement('div');
                                 placeholder.style.width = '100%';
@@ -4594,19 +4682,43 @@ document.addEventListener('DOMContentLoaded', ()=>{
                 });
             });
             
-            // Wait for all images to load before printing
+            // Wait for all images to load before printing (including fallbacks)
             const allImages = printContainer.querySelectorAll('img');
             const imagePromises = Array.from(allImages).map(img => {
                 // If image is already loaded (complete), resolve immediately
                 if(img.complete && img.naturalWidth > 0){
                     return Promise.resolve();
                 }
-                // Otherwise wait for load or error
+                // Otherwise wait for load or error, including fallback
                 return new Promise((resolve) => {
-                    img.onload = resolve;
-                    img.onerror = resolve; // Resolve even on error so print can proceed
+                    let resolved = false;
+                    const resolveOnce = () => {
+                        if(!resolved){
+                            resolved = true;
+                            resolve();
+                        }
+                    };
+                    
+                    let fallbackTried = false;
+                    const fallbackLink = img.dataset.fallbackLink;
+                    
+                    img.onload = resolveOnce;
+                    img.onerror = () => {
+                        // If there's a fallback link and we haven't tried it yet
+                        if(!fallbackTried && fallbackLink && img.src !== fallbackLink){
+                            fallbackTried = true;
+                            img.src = fallbackLink;
+                            // Wait for fallback to load or fail
+                            img.onload = resolveOnce;
+                            img.onerror = resolveOnce;
+                        } else {
+                            // No fallback or fallback also failed
+                            resolveOnce();
+                        }
+                    };
+                    
                     // Timeout after 5 seconds to prevent hanging
-                    setTimeout(resolve, 5000);
+                    setTimeout(resolveOnce, 5000);
                 });
             });
             
@@ -4969,6 +5081,10 @@ document.addEventListener('DOMContentLoaded', ()=>{
                             }
                         }
                         if(imageUrl){
+                            // Save fallback link as data attribute for print waiting logic
+                            if(el.props.fallbackLink){
+                                img.dataset.fallbackLink = String(el.props.fallbackLink).trim();
+                            }
                             img.src = imageUrl;
                             let fallbackTried = false;
                             img.onerror = function(){
@@ -4984,6 +5100,16 @@ document.addEventListener('DOMContentLoaded', ()=>{
                                 // No fallback or fallback also failed - hide image
                                 img.style.display = 'none';
                             };
+                        } else if(el.props.fallbackLink){
+                            // No column selected, but fallback link available - use it directly
+                            const fallbackUrl = String(el.props.fallbackLink).trim();
+                            if(fallbackUrl){
+                                img.src = fallbackUrl;
+                                img.onerror = function(){
+                                    // No fallback or fallback also failed - hide image
+                                    img.style.display = 'none';
+                                };
+                            }
                         }
                         d.appendChild(img);
                         break;
@@ -5036,19 +5162,43 @@ document.addEventListener('DOMContentLoaded', ()=>{
             });
         });
         
-        // Wait for all images to load before printing
+        // Wait for all images to load before printing (including fallbacks)
         const allImages = printContainer.querySelectorAll('img');
         const imagePromises = Array.from(allImages).map(img => {
             // If image is already loaded (complete), resolve immediately
             if(img.complete && img.naturalWidth > 0){
                 return Promise.resolve();
             }
-            // Otherwise wait for load or error
+            // Otherwise wait for load or error, including fallback
             return new Promise((resolve) => {
-                img.onload = resolve;
-                img.onerror = resolve; // Resolve even on error so print can proceed
+                let resolved = false;
+                const resolveOnce = () => {
+                    if(!resolved){
+                        resolved = true;
+                        resolve();
+                    }
+                };
+                
+                let fallbackTried = false;
+                const fallbackLink = img.dataset.fallbackLink;
+                
+                img.onload = resolveOnce;
+                img.onerror = () => {
+                    // If there's a fallback link and we haven't tried it yet
+                    if(!fallbackTried && fallbackLink && img.src !== fallbackLink){
+                        fallbackTried = true;
+                        img.src = fallbackLink;
+                        // Wait for fallback to load or fail
+                        img.onload = resolveOnce;
+                        img.onerror = resolveOnce;
+                    } else {
+                        // No fallback or fallback also failed
+                        resolveOnce();
+                    }
+                };
+                
                 // Timeout after 5 seconds to prevent hanging
-                setTimeout(resolve, 5000);
+                setTimeout(resolveOnce, 5000);
             });
         });
         
