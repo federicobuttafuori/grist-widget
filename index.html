@@ -1365,7 +1365,18 @@ document.addEventListener('DOMContentLoaded', ()=>{
                         
                         if(imageUrl){
                             img.src = imageUrl;
+                            let fallbackTried = false;
                             img.onerror = function(){
+                                // Try fallback link if available
+                                if(!fallbackTried && el.props.fallbackLink){
+                                    const fallbackUrl = String(el.props.fallbackLink).trim();
+                                    if(fallbackUrl){
+                                        fallbackTried = true;
+                                        img.src = fallbackUrl;
+                                        return; // Retry with fallback
+                                    }
+                                }
+                                // No fallback or fallback also failed
                                 img.style.display = 'none';
                                 const errorDiv = document.createElement('div');
                                 errorDiv.style.width = '100%';
@@ -2326,6 +2337,7 @@ document.addEventListener('DOMContentLoaded', ()=>{
 
             if(el.type==='image'){
                 h += `<hr><label>Object Fit</label><select data-prop="props.objectFit"><option value="contain" ${(el.props.objectFit||'contain')==='contain'?'selected':''}>Contain</option><option value="cover" ${el.props.objectFit==='cover'?'selected':''}>Cover</option><option value="fill" ${el.props.objectFit==='fill'?'selected':''}>Fill</option><option value="none" ${el.props.objectFit==='none'?'selected':''}>None</option><option value="scale-down" ${el.props.objectFit==='scale-down'?'selected':''}>Scale Down</option></select>`;
+                h += `<label>Fallback Link</label><input type="text" data-prop="props.fallbackLink" placeholder="https://..." value="${escapeHtml(el.props.fallbackLink||'')}">`;
             }
 
             if(el.type==='text' || el.type==='data'){
@@ -3868,7 +3880,18 @@ document.addEventListener('DOMContentLoaded', ()=>{
                             
                             if(imageUrl){
                                 img.src = imageUrl;
+                                let fallbackTried = false;
                                 img.onerror = function(){
+                                    // Try fallback link if available
+                                    if(!fallbackTried && el.props.fallbackLink){
+                                        const fallbackUrl = String(el.props.fallbackLink).trim();
+                                        if(fallbackUrl){
+                                            fallbackTried = true;
+                                            img.src = fallbackUrl;
+                                            return; // Retry with fallback
+                                        }
+                                    }
+                                    // No fallback or fallback also failed
                                     img.style.display = 'none';
                                     const errorDiv = document.createElement('div');
                                     errorDiv.style.width = '100%';
@@ -4447,7 +4470,18 @@ document.addEventListener('DOMContentLoaded', ()=>{
                             
                             if(imageUrl){
                                 img.src = imageUrl;
+                                let fallbackTried = false;
                                 img.onerror = function(){
+                                    // Try fallback link if available
+                                    if(!fallbackTried && el.props.fallbackLink){
+                                        const fallbackUrl = String(el.props.fallbackLink).trim();
+                                        if(fallbackUrl){
+                                            fallbackTried = true;
+                                            img.src = fallbackUrl;
+                                            return; // Retry with fallback
+                                        }
+                                    }
+                                    // No fallback or fallback also failed
                                     img.style.display = 'none';
                                     const errorDiv = document.createElement('div');
                                     errorDiv.style.width = '100%';
@@ -4919,19 +4953,37 @@ document.addEventListener('DOMContentLoaded', ()=>{
                         img.style.width='100%';
                         img.style.height='100%';
                         img.style.objectFit = el.props.objectFit || 'contain';
+                        let imageUrl = '';
                         if(el.props.boundColumn && R && Object.prototype.hasOwnProperty.call(R, el.props.boundColumn)){
                             const imgurId = R[el.props.boundColumn];
                             if(imgurId){
                                 const id = String(imgurId).trim();
                                 if(id){
                                     if(id.startsWith('http://') || id.startsWith('https://')){
-                                        img.src = id;
+                                        imageUrl = id;
                                     } else {
                                         const cleanId = id.replace(/\.(jpg|jpeg|png|gif|webp)$/i, '');
-                                        img.src = `https://i.imgur.com/${cleanId}.jpg`;
+                                        imageUrl = `https://i.imgur.com/${cleanId}.jpg`;
                                     }
                                 }
                             }
+                        }
+                        if(imageUrl){
+                            img.src = imageUrl;
+                            let fallbackTried = false;
+                            img.onerror = function(){
+                                // Try fallback link if available
+                                if(!fallbackTried && el.props.fallbackLink){
+                                    const fallbackUrl = String(el.props.fallbackLink).trim();
+                                    if(fallbackUrl){
+                                        fallbackTried = true;
+                                        img.src = fallbackUrl;
+                                        return; // Retry with fallback
+                                    }
+                                }
+                                // No fallback or fallback also failed - hide image
+                                img.style.display = 'none';
+                            };
                         }
                         d.appendChild(img);
                         break;
@@ -6505,4 +6557,5 @@ document.addEventListener('DOMContentLoaded', ()=>{
 </script>
 
 </body>
+</html>
 </html>
