@@ -1163,7 +1163,7 @@ document.addEventListener('DOMContentLoaded', ()=>{
                     }
                     span.style.wordWrap='break-word';
                     
-                    span.textContent = getData(el, sequenceIndex, waveContext);
+                        setTextWithRegexFormatting(span, getData(el, sequenceIndex, waveContext), el.props.regexRules);
                     // Copy font styles to span for overflow calculation
                     span.style.fontFamily = el.props.fontFamily || 'Arial, sans-serif';
                     span.style.fontSize = (el.props.fontSize || 16) + 'px';
@@ -1204,7 +1204,7 @@ document.addEventListener('DOMContentLoaded', ()=>{
                     }
                     span.style.wordWrap='break-word';
                     
-                    span.textContent = getData(el, sequenceIndex, waveContext);
+                    setTextWithRegexFormatting(span, getData(el, sequenceIndex, waveContext), el.props.regexRules);
                     // Copy font styles to span for overflow calculation
                     span.style.fontFamily = el.props.fontFamily || 'Arial, sans-serif';
                     span.style.fontSize = (el.props.fontSize || 16) + 'px';
@@ -1849,6 +1849,118 @@ document.addEventListener('DOMContentLoaded', ()=>{
         return str.replace(/\*\*sequence\*\*/g, String(sequenceIndex));
     }
 
+    // Helper function to set text content with regex formatting
+    function setTextWithRegexFormatting(element, text, rules){
+        if(rules && Array.isArray(rules) && rules.length > 0 && rules.some(r => r.pattern && r.enabled !== false)){
+            element.innerHTML = applyRegexFormatting(text, rules);
+        } else {
+            element.textContent = text;
+        }
+    }
+
+    // Apply regex formatting rules to text
+    function applyRegexFormatting(text, rules){
+        if(!text || typeof text !== 'string' || !rules || !Array.isArray(rules) || rules.length === 0){
+            return text;
+        }
+        
+        // Sort rules by order (if they have an order property, otherwise keep original order)
+        const sortedRules = [...rules].sort((a, b) => (a.order || 0) - (b.order || 0));
+        
+        const matches = [];
+        
+        // Collect all matches from all rules
+        sortedRules.forEach((rule, ruleIndex) => {
+            if(!rule.pattern || rule.enabled === false) return;
+            
+            try {
+                const regex = new RegExp(rule.pattern, 'g');
+                let match;
+                while((match = regex.exec(text)) !== null){
+                    matches.push({
+                        ruleIndex,
+                        start: match.index,
+                        end: match.index + match[0].length,
+                        text: match[0],
+                        rule
+                    });
+                }
+            } catch(e){
+                // Invalid regex, skip this rule
+                console.warn('Invalid regex pattern:', rule.pattern, e);
+            }
+        });
+        
+        // If no matches, return original text
+        if(matches.length === 0){
+            return escapeHtml(text);
+        }
+        
+        // Sort matches by position
+        matches.sort((a, b) => {
+            if(a.start !== b.start) return a.start - b.start;
+            // If same start, prefer longer matches
+            return b.end - a.end;
+        });
+        
+        // Remove overlapping matches (keep first/longest)
+        const nonOverlapping = [];
+        for(let i = 0; i < matches.length; i++){
+            const match = matches[i];
+            let overlaps = false;
+            for(let j = 0; j < nonOverlapping.length; j++){
+                const existing = nonOverlapping[j];
+                if(match.start < existing.end && match.end > existing.start){
+                    overlaps = true;
+                    break;
+                }
+            }
+            if(!overlaps){
+                nonOverlapping.push(match);
+            }
+        }
+        
+        // Build HTML with formatting
+        const htmlParts = [];
+        let currentIndex = 0;
+        
+        nonOverlapping.forEach(match => {
+            // Add text before match
+            if(match.start > currentIndex){
+                htmlParts.push(escapeHtml(text.substring(currentIndex, match.start)));
+            }
+            
+            // Build style string for this match
+            const styles = [];
+            const rule = match.rule;
+            
+            if(rule.fontWeight && rule.fontWeight !== 'inherit'){
+                styles.push(`font-weight: ${rule.fontWeight}`);
+            }
+            if(rule.italic){
+                styles.push('font-style: italic');
+            }
+            if(rule.underline){
+                styles.push('text-decoration: underline');
+            }
+            if(rule.fontSize && rule.fontSize !== '' && rule.fontSize !== 'inherit'){
+                styles.push(`font-size: ${rule.fontSize}px`);
+            }
+            
+            const styleStr = styles.length > 0 ? ` style="${styles.join('; ')}"` : '';
+            htmlParts.push(`<span${styleStr}>${escapeHtml(match.text)}</span>`);
+            
+            currentIndex = match.end;
+        });
+        
+        // Add remaining text
+        if(currentIndex < text.length){
+            htmlParts.push(escapeHtml(text.substring(currentIndex)));
+        }
+        
+        return htmlParts.join('');
+    }
+
     function getData(el, sequenceIndex = 1, waveContext = null){
             let text = el.props.text || '';
             let prefix = el.props.prefix || '';
@@ -2367,6 +2479,47 @@ document.addEventListener('DOMContentLoaded', ()=>{
                 h += `<div class="prop-grid"><label>Overflow</label><select data-prop="props.textOverflow"><option value="clip" ${(el.props.textOverflow||'clip')==='clip'?'selected':''}>Clip (default)</option><option value="auto-scale" ${el.props.textOverflow==='auto-scale'?'selected':''}>Auto-scale to fit</option><option value="squeeze" ${el.props.textOverflow==='squeeze'?'selected':''}>Horizontal squeeze</option></select><label>Rotation°</label><input type="number" step="1" data-prop="props.rotation" value="${el.props.rotation||0}"></div>`;
                 h += `<hr><div class="prop-grid"><label>Padding Top</label><input type="number" step="0.01" data-prop="props.paddingTop" value="${Number(el.props.paddingTop||0).toFixed(2)}" min="0"><label>Padding Right</label><input type="number" step="0.01" data-prop="props.paddingRight" value="${Number(el.props.paddingRight||0).toFixed(2)}" min="0"></div>`;
                 h += `<div class="prop-grid"><label>Padding Bottom</label><input type="number" step="0.01" data-prop="props.paddingBottom" value="${Number(el.props.paddingBottom||0).toFixed(2)}" min="0"><label>Padding Left</label><input type="number" step="0.01" data-prop="props.paddingLeft" value="${Number(el.props.paddingLeft||0).toFixed(2)}" min="0"></div>`;
+                
+                // Regex formatting rules section
+                if(!el.props.regexRules) el.props.regexRules = [];
+                h += `<hr><div style="margin-top:8px"><label style="font-size:14px;font-weight:600;display:block;margin-bottom:8px">Regex Formatting Rules</label>`;
+                h += `<div id="regex-rules-container-${el.id}" style="display:flex;flex-direction:column;gap:8px">`;
+                el.props.regexRules.forEach((rule, index) => {
+                    h += `<div class="regex-rule-item" data-rule-index="${index}" style="border:1px solid #ddd;border-radius:4px;padding:8px;background:#f9f9f9">`;
+                    h += `<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px">`;
+                    h += `<label style="font-size:12px;font-weight:600">Rule ${index + 1}</label>`;
+                    h += `<button type="button" class="remove-regex-rule-btn" data-rule-index="${index}" style="padding:2px 6px;font-size:11px;background:#ff4444;color:#fff;border:none;border-radius:3px;cursor:pointer">Remove</button>`;
+                    h += `</div>`;
+                    h += `<label style="font-size:12px;display:block;margin-bottom:4px">Pattern:</label>`;
+                    h += `<input type="text" class="regex-pattern-input" data-rule-index="${index}" placeholder="e.g., \\d+|[A-Z]+" value="${escapeHtml(rule.pattern || '')}" style="font-size:12px;padding:4px;margin-bottom:6px;font-family:monospace">`;
+                    h += `<div class="prop-grid" style="grid-template-columns:1fr 1fr;gap:6px;margin-bottom:4px">`;
+                    h += `<label style="font-size:12px">Font Weight:</label>`;
+                    h += `<select class="regex-weight-select" data-rule-index="${index}" style="font-size:12px;padding:4px">`;
+                    h += `<option value="inherit" ${rule.fontWeight === 'inherit' || !rule.fontWeight ? 'selected' : ''}>Inherit</option>`;
+                    h += `<option value="normal" ${rule.fontWeight === 'normal' ? 'selected' : ''}>Normal</option>`;
+                    h += `<option value="bold" ${rule.fontWeight === 'bold' ? 'selected' : ''}>Bold</option>`;
+                    h += `<option value="100" ${rule.fontWeight === '100' ? 'selected' : ''}>100</option>`;
+                    h += `<option value="200" ${rule.fontWeight === '200' ? 'selected' : ''}>200</option>`;
+                    h += `<option value="300" ${rule.fontWeight === '300' ? 'selected' : ''}>300</option>`;
+                    h += `<option value="400" ${rule.fontWeight === '400' ? 'selected' : ''}>400</option>`;
+                    h += `<option value="500" ${rule.fontWeight === '500' ? 'selected' : ''}>500</option>`;
+                    h += `<option value="600" ${rule.fontWeight === '600' ? 'selected' : ''}>600</option>`;
+                    h += `<option value="700" ${rule.fontWeight === '700' ? 'selected' : ''}>700</option>`;
+                    h += `<option value="800" ${rule.fontWeight === '800' ? 'selected' : ''}>800</option>`;
+                    h += `<option value="900" ${rule.fontWeight === '900' ? 'selected' : ''}>900</option>`;
+                    h += `</select>`;
+                    h += `<label style="font-size:12px">Font Size:</label>`;
+                    h += `<input type="number" class="regex-size-input" data-rule-index="${index}" placeholder="inherit" value="${rule.fontSize || ''}" min="6" max="200" step="1" style="font-size:12px;padding:4px">`;
+                    h += `</div>`;
+                    h += `<div class="prop-grid" style="grid-template-columns:1fr 1fr;gap:6px">`;
+                    h += `<label style="font-size:12px;display:flex;align-items:center;gap:4px"><input type="checkbox" class="regex-italic-checkbox" data-rule-index="${index}" ${rule.italic ? 'checked' : ''} style="width:auto"> Italic</label>`;
+                    h += `<label style="font-size:12px;display:flex;align-items:center;gap:4px"><input type="checkbox" class="regex-underline-checkbox" data-rule-index="${index}" ${rule.underline ? 'checked' : ''} style="width:auto"> Underline</label>`;
+                    h += `</div>`;
+                    h += `</div>`;
+                });
+                h += `</div>`;
+                h += `<button type="button" class="add-regex-rule-btn" style="width:100%;padding:6px;margin-top:8px;background:#007aff;color:#fff;border:none;border-radius:4px;cursor:pointer;font-size:12px">+ Add Regex Rule</button>`;
+                h += `</div>`;
             }
 
             // border
@@ -2469,6 +2622,95 @@ document.addEventListener('DOMContentLoaded', ()=>{
                         fontFamilySelect.value = selectedValue;
                     });
                 }
+                
+                // Regex rules management
+                const addRuleBtn = pp.querySelector('.add-regex-rule-btn');
+                
+                if(addRuleBtn){
+                    addRuleBtn.addEventListener('click', function(){
+                        if(!el.props.regexRules) el.props.regexRules = [];
+                        el.props.regexRules.push({
+                            pattern: '',
+                            fontWeight: 'inherit',
+                            italic: false,
+                            underline: false,
+                            fontSize: '',
+                            enabled: true,
+                            order: el.props.regexRules.length
+                        });
+                        updateProps();
+                        render();
+                        saveCurrentDesign();
+                    });
+                }
+                
+                // Remove rule buttons
+                pp.querySelectorAll('.remove-regex-rule-btn').forEach(btn => {
+                    btn.addEventListener('click', function(){
+                        const index = parseInt(this.dataset.ruleIndex);
+                        if(!el.props.regexRules) el.props.regexRules = [];
+                        el.props.regexRules.splice(index, 1);
+                        updateProps();
+                        render();
+                        saveCurrentDesign();
+                    });
+                });
+                
+                // Regex rule inputs
+                pp.querySelectorAll('.regex-pattern-input').forEach(input => {
+                    input.addEventListener('input', function(){
+                        const index = parseInt(this.dataset.ruleIndex);
+                        if(!el.props.regexRules) el.props.regexRules = [];
+                        if(!el.props.regexRules[index]) return;
+                        el.props.regexRules[index].pattern = this.value;
+                        render();
+                    });
+                });
+                
+                pp.querySelectorAll('.regex-weight-select').forEach(select => {
+                    select.addEventListener('change', function(){
+                        const index = parseInt(this.dataset.ruleIndex);
+                        if(!el.props.regexRules) el.props.regexRules = [];
+                        if(!el.props.regexRules[index]) return;
+                        el.props.regexRules[index].fontWeight = this.value;
+                        render();
+                        saveCurrentDesign();
+                    });
+                });
+                
+                pp.querySelectorAll('.regex-size-input').forEach(input => {
+                    input.addEventListener('input', function(){
+                        const index = parseInt(this.dataset.ruleIndex);
+                        if(!el.props.regexRules) el.props.regexRules = [];
+                        if(!el.props.regexRules[index]) return;
+                        const val = this.value.trim();
+                        el.props.regexRules[index].fontSize = val === '' ? '' : Number(val);
+                        render();
+                        saveCurrentDesign();
+                    });
+                });
+                
+                pp.querySelectorAll('.regex-italic-checkbox').forEach(checkbox => {
+                    checkbox.addEventListener('change', function(){
+                        const index = parseInt(this.dataset.ruleIndex);
+                        if(!el.props.regexRules) el.props.regexRules = [];
+                        if(!el.props.regexRules[index]) return;
+                        el.props.regexRules[index].italic = this.checked;
+                        render();
+                        saveCurrentDesign();
+                    });
+                });
+                
+                pp.querySelectorAll('.regex-underline-checkbox').forEach(checkbox => {
+                    checkbox.addEventListener('change', function(){
+                        const index = parseInt(this.dataset.ruleIndex);
+                        if(!el.props.regexRules) el.props.regexRules = [];
+                        if(!el.props.regexRules[index]) return;
+                        el.props.regexRules[index].underline = this.checked;
+                        render();
+                        saveCurrentDesign();
+                    });
+                });
             }
     }
 
@@ -3703,7 +3945,7 @@ document.addEventListener('DOMContentLoaded', ()=>{
                             }
                             span.style.wordWrap='break-word';
                             
-                            span.textContent = getData(el, sequenceIndex, waveContext);
+                            setTextWithRegexFormatting(span, getData(el, sequenceIndex, waveContext), el.props.regexRules);
                             // Copy font styles to span for overflow calculation
                             span.style.fontFamily = el.props.fontFamily || 'Arial, sans-serif';
                             span.style.fontSize = (el.props.fontSize || 16) + 'px';
@@ -3728,7 +3970,7 @@ document.addEventListener('DOMContentLoaded', ()=>{
                             span.style.wordWrap='break-word';
                             span.style.whiteSpace='pre-wrap'; // Always allow wrapping first
                             
-                            span.textContent = getData(el, sequenceIndex, waveContext);
+                            setTextWithRegexFormatting(span, getData(el, sequenceIndex, waveContext), el.props.regexRules);
                             // Copy font styles to span for overflow calculation
                             span.style.fontFamily = el.props.fontFamily || 'Arial, sans-serif';
                             span.style.fontSize = (el.props.fontSize || 16) + 'px';
@@ -4340,7 +4582,7 @@ document.addEventListener('DOMContentLoaded', ()=>{
                             }
                             span.style.wordWrap='break-word';
                             
-                            span.textContent = getData(el, sequenceIndex, waveContext);
+                            setTextWithRegexFormatting(span, getData(el, sequenceIndex, waveContext), el.props.regexRules);
                             // Copy font styles to span for overflow calculation
                             span.style.fontFamily = el.props.fontFamily || 'Arial, sans-serif';
                             span.style.fontSize = (el.props.fontSize || 16) + 'px';
@@ -4365,7 +4607,7 @@ document.addEventListener('DOMContentLoaded', ()=>{
                             span.style.wordWrap='break-word';
                             span.style.whiteSpace='pre-wrap'; // Always allow wrapping first
                             
-                            span.textContent = getData(el, sequenceIndex, waveContext);
+                            setTextWithRegexFormatting(span, getData(el, sequenceIndex, waveContext), el.props.regexRules);
                             // Copy font styles to span for overflow calculation
                             span.style.fontFamily = el.props.fontFamily || 'Arial, sans-serif';
                             span.style.fontSize = (el.props.fontSize || 16) + 'px';
@@ -4935,7 +5177,7 @@ document.addEventListener('DOMContentLoaded', ()=>{
                         span.style.overflow='hidden';
                         span.style.wordWrap='break-word';
                         span.style.whiteSpace='pre-wrap';
-                        span.textContent = getData(el, sequenceIndex, waveContext);
+                        setTextWithRegexFormatting(span, getData(el, sequenceIndex, waveContext), el.props.regexRules);
                         span.style.fontFamily = el.props.fontFamily || 'Arial, sans-serif';
                         span.style.fontSize = (el.props.fontSize || 16) + 'px';
                         span.style.color = el.props.color || '#000000';
@@ -4950,7 +5192,7 @@ document.addEventListener('DOMContentLoaded', ()=>{
                         span.style.overflow='hidden';
                         span.style.wordWrap='break-word';
                         span.style.whiteSpace='pre-wrap';
-                        span.textContent = getData(el, sequenceIndex, waveContext);
+                        setTextWithRegexFormatting(span, getData(el, sequenceIndex, waveContext), el.props.regexRules);
                         span.style.fontFamily = el.props.fontFamily || 'Arial, sans-serif';
                         span.style.fontSize = (el.props.fontSize || 16) + 'px';
                         span.style.color = el.props.color || '#000000';
