@@ -128,6 +128,14 @@
             </div>
             <hr>
             <div class="sidebar-section">
+                <h3>Global Regex Rules</h3>
+                <div style="margin-bottom:8px"><small style="color:#666">Rules applied to all text elements</small></div>
+                <div id="global-regex-rules-container" style="display:flex;flex-direction:column;gap:8px">
+                </div>
+                <button type="button" class="add-global-regex-rule-btn" style="width:100%;padding:6px;margin-top:8px;background:#007aff;color:#fff;border:none;border-radius:4px;cursor:pointer;font-size:12px">+ Add Global Rule</button>
+            </div>
+            <hr>
+            <div class="sidebar-section">
                 <h3>Properties</h3>
                 <div id="properties-panel">Select an element to edit its properties.</div>
             </div>
@@ -167,6 +175,7 @@ document.addEventListener('DOMContentLoaded', ()=>{
         let W = 8, H = 5;                 // Current dimensions (dynamic)
         let globalSequenceCountColumn = ''; // Global count column (shared across all designs)
         let packWaves = []; // Array of pack waves: [{ countColumn: string, weightColumn: string }]
+        let globalRegexRules = []; // Global regex formatting rules applied to all text elements
         const KEY = 'grist_label_layout_v2'; // Updated version for profiles
         const FONT_FAVORITES_KEY = 'grist_label_font_favorites'; // Key for font favorites
     const MAX_HISTORY = 100;
@@ -686,8 +695,8 @@ document.addEventListener('DOMContentLoaded', ()=>{
             
             // Save to localStorage (includes globalSequenceCountColumn and packWaves)
             try {
-                const payloadObj = { 
-                    version: 2, 
+                const payloadObj = {
+                    version: 2,
                     profiles: profiles,
                     currentProfile: currentProfile,
                     currentDesign: currentDesign,
@@ -697,7 +706,8 @@ document.addEventListener('DOMContentLoaded', ()=>{
                         lastCanvasByProfile: lastCanvasByProfile,
                         lastCanvasByDesign: lastCanvasByDesign,
                         globalSequenceCountColumn: globalSequenceCountColumn,
-                        packWaves: packWaves || []
+                        packWaves: packWaves || [],
+                        globalRegexRules: globalRegexRules || []
                 };
                 localStorage.setItem(KEY, JSON.stringify(payloadObj));
             } catch(e) {
@@ -1850,9 +1860,18 @@ document.addEventListener('DOMContentLoaded', ()=>{
     }
 
     // Helper function to set text content with regex formatting
-    function setTextWithRegexFormatting(element, text, rules){
-        if(rules && Array.isArray(rules) && rules.length > 0 && rules.some(r => r.pattern && r.enabled !== false)){
-            element.innerHTML = applyRegexFormatting(text, rules);
+    function setTextWithRegexFormatting(element, text, elementRules){
+        // Combine global rules with element-specific rules
+        const allRules = [];
+        if(globalRegexRules && Array.isArray(globalRegexRules) && globalRegexRules.length > 0){
+            allRules.push(...globalRegexRules.filter(r => r.pattern && r.enabled !== false));
+        }
+        if(elementRules && Array.isArray(elementRules) && elementRules.length > 0){
+            allRules.push(...elementRules.filter(r => r.pattern && r.enabled !== false));
+        }
+
+        if(allRules.length > 0){
+            element.innerHTML = applyRegexFormatting(text, allRules);
         } else {
             element.textContent = text;
         }
@@ -6802,6 +6821,12 @@ document.addEventListener('DOMContentLoaded', ()=>{
                     } else {
                         packWaves = [];
                     }
+                    // Load globalRegexRules if saved
+                    if(parsed.globalRegexRules && Array.isArray(parsed.globalRegexRules)){
+                        globalRegexRules = parsed.globalRegexRules;
+                    } else {
+                        globalRegexRules = [];
+                    }
                     // Restore current profile, design and canvas if saved
                     if(parsed.currentProfile && profiles[parsed.currentProfile]){
                         currentProfile = parsed.currentProfile;
@@ -6932,6 +6957,122 @@ document.addEventListener('DOMContentLoaded', ()=>{
             fit();
         });
     resetHistory();
+
+    // Global regex rules management
+    function updateGlobalRegexRulesUI(){
+        const container = document.getElementById('global-regex-rules-container');
+        if(!container) return;
+
+        container.innerHTML = '';
+        if(!globalRegexRules) globalRegexRules = [];
+
+        globalRegexRules.forEach((rule, index) => {
+            const ruleDiv = document.createElement('div');
+            ruleDiv.className = 'regex-rule-item';
+            ruleDiv.dataset.ruleIndex = index;
+            ruleDiv.style.cssText = 'border:1px solid #ddd;border-radius:4px;padding:8px;background:#f9f9f9';
+
+            ruleDiv.innerHTML = `
+                <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px">
+                    <label style="font-size:12px;font-weight:600">Global Rule ${index + 1}</label>
+                    <button type="button" class="remove-global-regex-rule-btn" data-rule-index="${index}" style="padding:2px 6px;font-size:11px;background:#ff4444;color:#fff;border:none;border-radius:3px;cursor:pointer">Remove</button>
+                </div>
+                <label style="font-size:12px;display:block;margin-bottom:4px">Pattern:</label>
+                <input type="text" class="global-regex-pattern-input" data-rule-index="${index}" placeholder="e.g., \\d+|[A-Z]+" value="${escapeHtml(rule.pattern || '')}" style="font-size:12px;padding:4px;margin-bottom:6px;font-family:monospace">
+                <div class="prop-grid" style="grid-template-columns:1fr 1fr;gap:6px;margin-bottom:4px">
+                    <label style="font-size:12px">Font Weight:</label>
+                    <select class="global-regex-weight-select" data-rule-index="${index}" style="font-size:12px;padding:4px">
+                        <option value="inherit" ${rule.fontWeight === 'inherit' || !rule.fontWeight ? 'selected' : ''}>Inherit</option>
+                        <option value="normal" ${rule.fontWeight === 'normal' ? 'selected' : ''}>Normal</option>
+                        <option value="bold" ${rule.fontWeight === 'bold' ? 'selected' : ''}>Bold</option>
+                        <option value="100" ${rule.fontWeight === '100' ? 'selected' : ''}>100</option>
+                        <option value="200" ${rule.fontWeight === '200' ? 'selected' : ''}>200</option>
+                        <option value="300" ${rule.fontWeight === '300' ? 'selected' : ''}>300</option>
+                        <option value="400" ${rule.fontWeight === '400' ? 'selected' : ''}>400</option>
+                        <option value="500" ${rule.fontWeight === '500' ? 'selected' : ''}>500</option>
+                        <option value="600" ${rule.fontWeight === '600' ? 'selected' : ''}>600</option>
+                        <option value="700" ${rule.fontWeight === '700' ? 'selected' : ''}>700</option>
+                        <option value="800" ${rule.fontWeight === '800' ? 'selected' : ''}>800</option>
+                        <option value="900" ${rule.fontWeight === '900' ? 'selected' : ''}>900</option>
+                    </select>
+                    <label style="font-size:12px">Font Size:</label>
+                    <input type="number" class="global-regex-size-input" data-rule-index="${index}" placeholder="inherit" value="${rule.fontSize || ''}" min="6" max="200" step="1" style="font-size:12px;padding:4px">
+                </div>
+                <div class="prop-grid" style="grid-template-columns:1fr 1fr;gap:6px">
+                    <label style="font-size:12px;display:flex;align-items:center;gap:4px"><input type="checkbox" class="global-regex-italic-checkbox" data-rule-index="${index}" ${rule.italic ? 'checked' : ''} style="width:auto"> Italic</label>
+                    <label style="font-size:12px;display:flex;align-items:center;gap:4px"><input type="checkbox" class="global-regex-underline-checkbox" data-rule-index="${index}" ${rule.underline ? 'checked' : ''} style="width:auto"> Underline</label>
+                </div>
+            `;
+
+            container.appendChild(ruleDiv);
+        });
+    }
+
+    // Add event listeners for global regex rules
+    document.addEventListener('click', function(e){
+        if(e.target.classList.contains('add-global-regex-rule-btn')){
+            if(!globalRegexRules) globalRegexRules = [];
+            globalRegexRules.push({
+                pattern: '',
+                fontWeight: 'inherit',
+                italic: false,
+                underline: false,
+                fontSize: '',
+                enabled: true,
+                order: globalRegexRules.length
+            });
+            updateGlobalRegexRulesUI();
+            render();
+            saveCurrentDesign();
+        }
+
+        if(e.target.classList.contains('remove-global-regex-rule-btn')){
+            const index = parseInt(e.target.dataset.ruleIndex);
+            if(!globalRegexRules) globalRegexRules = [];
+            globalRegexRules.splice(index, 1);
+            updateGlobalRegexRulesUI();
+            render();
+            saveCurrentDesign();
+        }
+    });
+
+    document.addEventListener('input', function(e){
+        if(e.target.classList.contains('global-regex-pattern-input')){
+            const index = parseInt(e.target.dataset.ruleIndex);
+            if(!globalRegexRules) globalRegexRules = [];
+            if(!globalRegexRules[index]) return;
+            globalRegexRules[index].pattern = e.target.value;
+            render();
+        }
+    });
+
+    document.addEventListener('change', function(e){
+        if(e.target.classList.contains('global-regex-weight-select') ||
+           e.target.classList.contains('global-regex-italic-checkbox') ||
+           e.target.classList.contains('global-regex-underline-checkbox') ||
+           e.target.classList.contains('global-regex-size-input')){
+            const index = parseInt(e.target.dataset.ruleIndex);
+            if(!globalRegexRules) globalRegexRules = [];
+            if(!globalRegexRules[index]) return;
+
+            if(e.target.classList.contains('global-regex-weight-select')){
+                globalRegexRules[index].fontWeight = e.target.value;
+            } else if(e.target.classList.contains('global-regex-italic-checkbox')){
+                globalRegexRules[index].italic = e.target.checked;
+            } else if(e.target.classList.contains('global-regex-underline-checkbox')){
+                globalRegexRules[index].underline = e.target.checked;
+            } else if(e.target.classList.contains('global-regex-size-input')){
+                const val = e.target.value.trim();
+                globalRegexRules[index].fontSize = val === '' ? '' : Number(val);
+            }
+
+            render();
+            saveCurrentDesign();
+        }
+    });
+
+    // Initialize global regex rules UI
+    updateGlobalRegexRulesUI();
         
         // Check full screen mode on initial load
         checkFullScreenMode();
