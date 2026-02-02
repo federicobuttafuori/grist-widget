@@ -153,7 +153,7 @@
                 <small>Tip: Ctrl/Cmd+E exports layout. Ctrl/Cmd+Z = undo, Ctrl/Cmd+Shift+Z = redo</small>
             </div>
             <div style="margin-top:auto;padding-top:16px;border-top:1px solid #e0e0e0;text-align:center">
-                <small style="color:#999;font-size:11px">Version 2.1.0</small>
+                <small style="color:#999;font-size:11px">Version 2.?.0</small>
             </div>
         </div>
 
@@ -726,9 +726,13 @@ document.addEventListener('DOMContentLoaded', ()=>{
                 if(isGristAvailable()) {
                     try {
                         window.grist.setOption('labelDesigns', JSON.stringify(payloadObj));
+                        console.log('✅ Saved to Grist successfully');
                     } catch(e) {
-                        console.warn('Failed to save to Grist:', e);
+                        console.error('❌ Failed to save to Grist:', e);
+                        msg('⚠️ Failed to save to Grist, using localStorage only', true, 3000);
                     }
+                } else {
+                    console.log('ℹ️ Grist not available, saved to localStorage only');
                 }
             } catch(e) {
                 console.warn('Failed to save to localStorage:', e);
@@ -6880,8 +6884,108 @@ document.addEventListener('DOMContentLoaded', ()=>{
         }
 
     // ---------- Grist integration (optional) ----------
+    // Function to load data (called after Grist is ready)
+    function loadDataFromStorage() {
+        try {
+            let parsed = null;
+            let source = 'none';
+            
+            // Try to load from Grist first (persistent, synchronized storage)
+            if(isGristAvailable()) {
+                try {
+                    const gristData = window.grist.getOption('labelDesigns');
+                    console.log('🔍 Grist data:', gristData ? 'found' : 'not found');
+                    if(gristData) {
+                        // Grist might return a string or already-parsed object
+                        if(typeof gristData === 'string') {
+                            parsed = JSON.parse(gristData);
+                            source = 'Grist (string)';
+                        } else if(typeof gristData === 'object' && gristData !== null) {
+                            // Already parsed object - use directly
+                            parsed = gristData;
+                            source = 'Grist (object)';
+                        }
+                    }
+                } catch(e) {
+                    console.error('❌ Failed to load from Grist:', e);
+                }
+            }
+            
+            // Fallback to localStorage if Grist not available or no data found
+            if(!parsed) {
+                const saved = localStorage.getItem(KEY);
+                if(saved) {
+                    try {
+                        parsed = JSON.parse(saved);
+                        source = 'localStorage';
+                    } catch(e) {
+                        console.error('❌ Failed to parse localStorage data:', e);
+                    }
+                }
+            }
+            
+            if(parsed) {
+                console.log(`✅ Loaded data from ${source}`);
+            } else {
+                console.log('ℹ️ No saved data found');
+            }
+            
+            return parsed;
+        } catch(e) {
+            console.error('❌ Error in loadDataFromStorage:', e);
+            return null;
+        }
+    }
+    
     if(isGristAvailable()){
-        try{ window.grist.ready({ requiredAccess:'full' }); }catch(e){}
+        // Initialize Grist and wait for it to be ready, then retry loading
+        try{ 
+            const gristReady = window.grist.ready({ requiredAccess:'full' });
+            if(gristReady && typeof gristReady.then === 'function') {
+                gristReady.then(() => {
+                    console.log('✅ Grist is ready, checking for saved data...');
+                    // Retry loading after a short delay to ensure Grist is fully initialized
+                    setTimeout(() => {
+                        if(isGristAvailable()) {
+                            try {
+                                const gristData = window.grist.getOption('labelDesigns');
+                                if(gristData) {
+                                    console.log('🔄 Found data in Grist after ready, reloading...');
+                                    // Reload the page data if we found something in Grist
+                                    const retryParsed = loadDataFromStorage();
+                                    if(retryParsed && retryParsed.version === 2 && retryParsed.profiles) {
+                                        // Re-apply the parsing logic
+                                        profiles = retryParsed.profiles;
+                                        // Update selectors and reload
+                                        updateProfileSelector();
+                                        updateDesignSelector();
+                                        if(retryParsed.currentProfile && profiles[retryParsed.currentProfile]) {
+                                            currentProfile = retryParsed.currentProfile;
+                                            if(retryParsed.currentDesign && profiles[currentProfile].designs[retryParsed.currentDesign]) {
+                                                currentDesign = retryParsed.currentDesign;
+                                                currentCanvas = retryParsed.currentCanvas || 1;
+                                                loadCurrentDesign();
+                                                render();
+                                                updateProps();
+                                                msg('Data loaded from Grist', false, 2000);
+                                            }
+                                        }
+                                    }
+                                }
+                            } catch(e) {
+                                console.warn('⚠️ Error retrying Grist load:', e);
+                            }
+                        }
+                    }, 1000);
+                }).catch(e => {
+                    console.warn('⚠️ Grist ready() error:', e);
+                });
+            } else {
+                console.log('✅ Grist ready() called (sync)');
+            }
+        }catch(e){
+            console.warn('⚠️ Grist ready() not available:', e);
+        }
         try{
             if(typeof window.grist.onRecord === 'function'){
                 window.grist.onRecord(function(record,mappings){ 
@@ -6905,42 +7009,16 @@ document.addEventListener('DOMContentLoaded', ()=>{
                 window.grist.onOptions(function(options){ /* no-op */ });
             }
         }catch(e){}
-    } else { R = {}; C = []; }
+    } else { 
+        R = {}; 
+        C = []; 
+        console.log('ℹ️ Grist not available');
+    }
 
         // ---------- Initial setup & history init ----------
-        // Load from Grist first (if available), then fallback to localStorage
+        // Load from storage (Grist first, then localStorage)
         try {
-            let parsed = null;
-            
-            // Try to load from Grist first (persistent, synchronized storage)
-            if(isGristAvailable()) {
-                try {
-                    const gristData = window.grist.getOption('labelDesigns');
-                    if(gristData) {
-                        // Grist might return a string or already-parsed object
-                        if(typeof gristData === 'string') {
-                            parsed = JSON.parse(gristData);
-                        } else if(typeof gristData === 'object' && gristData !== null) {
-                            // Already parsed object - use directly
-                            parsed = gristData;
-                        }
-                    }
-                } catch(e) {
-                    console.warn('Failed to load from Grist:', e);
-                }
-            }
-            
-            // Fallback to localStorage if Grist not available or no data found
-            if(!parsed) {
-                const saved = localStorage.getItem(KEY);
-                if(saved) {
-                    try {
-                        parsed = JSON.parse(saved);
-                    } catch(e) {
-                        console.warn('Failed to parse localStorage data:', e);
-                    }
-                }
-            }
+            let parsed = loadDataFromStorage();
             
             if(parsed){
                 if(parsed && parsed.version === 2 && parsed.profiles){
