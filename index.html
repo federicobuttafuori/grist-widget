@@ -2518,7 +2518,7 @@ document.addEventListener('DOMContentLoaded', ()=>{
                     h += `<button type="button" class="remove-regex-rule-btn" data-rule-index="${index}" style="padding:2px 6px;font-size:11px;background:#ff4444;color:#fff;border:none;border-radius:3px;cursor:pointer">Remove</button>`;
                     h += `</div>`;
                     h += `<label style="font-size:12px;display:block;margin-bottom:4px">Pattern:</label>`;
-                    h += `<input type="text" class="regex-pattern-input" data-rule-index="${index}" placeholder="e.g., \\d+|[A-Z]+" value="${escapeHtml(rule.pattern || '')}" style="font-size:12px;padding:4px;margin-bottom:6px;font-family:monospace">`;
+                    h += `<textarea class="regex-pattern-input" data-rule-index="${index}" placeholder="e.g., \\d+|[A-Z]+" style="font-size:12px;padding:4px;margin-bottom:6px;font-family:monospace;width:100%;min-height:150px;resize:vertical">${escapeHtml(rule.pattern || '')}</textarea>`;
                     h += `<div class="prop-grid" style="grid-template-columns:1fr 1fr;gap:6px;margin-bottom:4px">`;
                     h += `<label style="font-size:12px">Font Weight:</label>`;
                     h += `<select class="regex-weight-select" data-rule-index="${index}" style="font-size:12px;padding:4px">`;
@@ -7094,7 +7094,7 @@ document.addEventListener('DOMContentLoaded', ()=>{
                     <button type="button" class="remove-global-regex-rule-btn" data-rule-index="${index}" style="padding:2px 6px;font-size:11px;background:#ff4444;color:#fff;border:none;border-radius:3px;cursor:pointer">Remove</button>
                 </div>
                 <label style="font-size:12px;display:block;margin-bottom:4px">Pattern:</label>
-                <input type="text" class="global-regex-pattern-input" data-rule-index="${index}" placeholder="e.g., \\d+|[A-Z]+" value="${escapeHtml(rule.pattern || '')}" style="font-size:12px;padding:4px;margin-bottom:6px;font-family:monospace">
+                <textarea class="global-regex-pattern-input" data-rule-index="${index}" placeholder="e.g., \\d+|[A-Z]+" style="font-size:12px;padding:4px;margin-bottom:6px;font-family:monospace;width:100%;min-height:150px;resize:vertical">${escapeHtml(rule.pattern || '')}</textarea>
                 <div class="prop-grid" style="grid-template-columns:1fr 1fr;gap:6px;margin-bottom:4px">
                     <label style="font-size:12px">Font Weight:</label>
                     <select class="global-regex-weight-select" data-rule-index="${index}" style="font-size:12px;padding:4px">
