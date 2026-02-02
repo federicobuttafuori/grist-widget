@@ -718,6 +718,15 @@ document.addEventListener('DOMContentLoaded', ()=>{
                         globalRegexRules: globalRegexRules || []
                 };
                 localStorage.setItem(KEY, JSON.stringify(payloadObj));
+                
+                // Also save to Grist if available (persistent, synchronized storage)
+                if(isGristAvailable()) {
+                    try {
+                        window.grist.setOption('labelDesigns', JSON.stringify(payloadObj));
+                    } catch(e) {
+                        console.warn('Failed to save to Grist:', e);
+                    }
+                }
             } catch(e) {
                 console.warn('Failed to save to localStorage:', e);
             }
@@ -6896,9 +6905,27 @@ document.addEventListener('DOMContentLoaded', ()=>{
     } else { R = {}; C = []; }
 
         // ---------- Initial setup & history init ----------
-        // Load from localStorage on startup
+        // Load from Grist first (if available), then fallback to localStorage
         try {
-            const saved = localStorage.getItem(KEY);
+            let saved = null;
+            
+            // Try to load from Grist first (persistent, synchronized storage)
+            if(isGristAvailable()) {
+                try {
+                    const gristData = window.grist.getOption('labelDesigns');
+                    if(gristData) {
+                        saved = gristData;
+                    }
+                } catch(e) {
+                    console.warn('Failed to load from Grist:', e);
+                }
+            }
+            
+            // Fallback to localStorage if Grist not available or no data found
+            if(!saved) {
+                saved = localStorage.getItem(KEY);
+            }
+            
             if(saved){
                 const parsed = JSON.parse(saved);
                 if(parsed && parsed.version === 2 && parsed.profiles){
