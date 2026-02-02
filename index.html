@@ -152,6 +152,9 @@
                 </div>
                 <small>Tip: Ctrl/Cmd+E exports layout. Ctrl/Cmd+Z = undo, Ctrl/Cmd+Shift+Z = redo</small>
             </div>
+            <div style="margin-top:auto;padding-top:16px;border-top:1px solid #e0e0e0;text-align:center">
+                <small style="color:#999;font-size:11px">Version 2.1.0</small>
+            </div>
         </div>
 
         <div id="canvas-container">
@@ -6907,14 +6910,20 @@ document.addEventListener('DOMContentLoaded', ()=>{
         // ---------- Initial setup & history init ----------
         // Load from Grist first (if available), then fallback to localStorage
         try {
-            let saved = null;
+            let parsed = null;
             
             // Try to load from Grist first (persistent, synchronized storage)
             if(isGristAvailable()) {
                 try {
                     const gristData = window.grist.getOption('labelDesigns');
                     if(gristData) {
-                        saved = gristData;
+                        // Grist might return a string or already-parsed object
+                        if(typeof gristData === 'string') {
+                            parsed = JSON.parse(gristData);
+                        } else if(typeof gristData === 'object' && gristData !== null) {
+                            // Already parsed object - use directly
+                            parsed = gristData;
+                        }
                     }
                 } catch(e) {
                     console.warn('Failed to load from Grist:', e);
@@ -6922,12 +6931,18 @@ document.addEventListener('DOMContentLoaded', ()=>{
             }
             
             // Fallback to localStorage if Grist not available or no data found
-            if(!saved) {
-                saved = localStorage.getItem(KEY);
+            if(!parsed) {
+                const saved = localStorage.getItem(KEY);
+                if(saved) {
+                    try {
+                        parsed = JSON.parse(saved);
+                    } catch(e) {
+                        console.warn('Failed to parse localStorage data:', e);
+                    }
+                }
             }
             
-            if(saved){
-                const parsed = JSON.parse(saved);
+            if(parsed){
                 if(parsed && parsed.version === 2 && parsed.profiles){
                     profiles = parsed.profiles;
                     // Ensure backward compatibility: add sequence fields to all designs
