@@ -146,6 +146,10 @@
                     <button id="btn-export">⬇️ Export</button>
                     <button id="btn-import">⬆️ Import</button>
                 </div>
+                <div style="display:flex;gap:8px;margin-top:8px">
+                    <button id="btn-export-snapshot">⬇️ Export Snapshot</button>
+                    <button id="btn-import-snapshot">⬆️ Import Snapshot</button>
+                </div>
                 <small>Tip: Ctrl/Cmd+E exports layout. Ctrl/Cmd+Z = undo, Ctrl/Cmd+Shift+Z = redo</small>
             </div>
         </div>
@@ -159,6 +163,7 @@
     </div>
 
     <input id="file-import" type="file" accept="application/json" style="display:none" />
+    <input id="file-import-snapshot" type="file" accept="application/json" style="display:none" />
 
 <script>
 document.addEventListener('DOMContentLoaded', ()=>{
@@ -307,8 +312,11 @@ document.addEventListener('DOMContentLoaded', ()=>{
     const bf = document.getElementById('btn-bring-front');
     const bs = document.getElementById('btn-send-back');
     const fileInput = document.getElementById('file-import');
+    const fileInputSnapshot = document.getElementById('file-import-snapshot');
     const btnExport = document.getElementById('btn-export');
     const btnImport = document.getElementById('btn-import');
+    const btnExportSnapshot = document.getElementById('btn-export-snapshot');
+    const btnImportSnapshot = document.getElementById('btn-import-snapshot');
     const marquee = document.getElementById('marquee');
         const profileSelector = document.getElementById('profile-selector');
         const designSelector = document.getElementById('design-selector');
@@ -3610,6 +3618,106 @@ document.addEventListener('DOMContentLoaded', ()=>{
             URL.revokeObjectURL(url);
         }
 
+        function exportSnapshotToFile(){
+            saveCurrentDesign();
+
+            const payloadObj = {
+                version: 2,
+                timestamp: Date.now(),
+                profiles: profiles,
+                currentProfile: currentProfile,
+                currentDesign: currentDesign,
+                currentCanvas: currentCanvas,
+                groups: groups,
+                lastDesignByProfile: lastDesignByProfile,
+                lastCanvasByProfile: lastCanvasByProfile,
+                lastCanvasByDesign: lastCanvasByDesign,
+                globalSequenceCountColumn: globalSequenceCountColumn,
+                packWaves: packWaves || [],
+                globalRegexRules: globalRegexRules || [],
+                fontFavorites: fontFavorites || []
+            };
+
+            const blob = new Blob([JSON.stringify(payloadObj, null, 2)], { type: 'application/json' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = `label-snapshot-${new Date().toISOString().slice(0, 10)}.json`;
+            document.body.appendChild(a);
+            a.click();
+            a.remove();
+            URL.revokeObjectURL(url);
+        }
+
+        function importSnapshotFromFile(fileContent){
+            try{
+                const parsed = JSON.parse(fileContent);
+                if(!parsed || parsed.version !== 2 || !parsed.profiles || typeof parsed.profiles !== 'object'){
+                    throw new Error('Unknown snapshot structure');
+                }
+
+                if(!confirm('Import snapshot? This will replace ALL sizes (profiles) and designs currently stored.')){
+                    return false;
+                }
+
+                saveCurrentDesign();
+
+                profiles = deepCopy(parsed.profiles);
+                groups = Array.isArray(parsed.groups) ? deepCopy(parsed.groups) : [];
+                lastDesignByProfile = parsed.lastDesignByProfile && typeof parsed.lastDesignByProfile === 'object' ? deepCopy(parsed.lastDesignByProfile) : {};
+                lastCanvasByProfile = parsed.lastCanvasByProfile && typeof parsed.lastCanvasByProfile === 'object' ? deepCopy(parsed.lastCanvasByProfile) : {};
+                lastCanvasByDesign = parsed.lastCanvasByDesign && typeof parsed.lastCanvasByDesign === 'object' ? deepCopy(parsed.lastCanvasByDesign) : {};
+                globalSequenceCountColumn = typeof parsed.globalSequenceCountColumn === 'string' ? parsed.globalSequenceCountColumn : '';
+                packWaves = Array.isArray(parsed.packWaves) ? deepCopy(parsed.packWaves) : [];
+                globalRegexRules = Array.isArray(parsed.globalRegexRules) ? deepCopy(parsed.globalRegexRules) : [];
+
+                if(Array.isArray(parsed.fontFavorites)){
+                    fontFavorites = deepCopy(parsed.fontFavorites);
+                    saveFontFavorites();
+                }
+
+                const profileKeys = Object.keys(profiles);
+                if(profileKeys.length === 0){
+                    throw new Error('Snapshot has no profiles');
+                }
+
+                currentProfile = (typeof parsed.currentProfile === 'string' && profiles[parsed.currentProfile]) ? parsed.currentProfile : profileKeys[0];
+                const designKeys = profiles[currentProfile] && profiles[currentProfile].designs ? Object.keys(profiles[currentProfile].designs) : [];
+                if(designKeys.length === 0){
+                    if(!profiles[currentProfile].designs) profiles[currentProfile].designs = {};
+                    profiles[currentProfile].designs['default'] = { canvas1: [], canvas2: [], canvas2Enabled: false, sequenceEnabled: false };
+                }
+
+                currentDesign = (typeof parsed.currentDesign === 'string' && profiles[currentProfile].designs && profiles[currentProfile].designs[parsed.currentDesign]) ? parsed.currentDesign : Object.keys(profiles[currentProfile].designs)[0];
+                const design = profiles[currentProfile].designs[currentDesign];
+
+                const parsedCanvas = (parsed.currentCanvas === 1 || parsed.currentCanvas === 2) ? parsed.currentCanvas : 1;
+                if(parsedCanvas === 2 && !(design && design.canvas2Enabled)){
+                    currentCanvas = 1;
+                } else {
+                    currentCanvas = parsedCanvas;
+                }
+
+                updateProfileSelector();
+                updateDesignSelector();
+                updateCanvasControls();
+                lc.innerHTML = '';
+                updateCanvasSize();
+                loadCurrentDesign();
+                render();
+                updateProps();
+                resetHistory();
+
+                saveCurrentDesign();
+                msg('Snapshot imported');
+                return true;
+            }catch(e){
+                console.error('Parse error while importing snapshot:', e);
+                msg('Error importing snapshot: invalid JSON', true, 4000);
+                return false;
+            }
+        }
+
         // Function to show wave selection popup
         function showWaveSelectionPopup(callback, canvas2Flag = false){
             if(!packWaves || packWaves.length === 0){
@@ -6501,6 +6609,25 @@ document.addEventListener('DOMContentLoaded', ()=>{
     btnExport.addEventListener('click', ()=>{ exportToFile(); msg('Layout exported to file.'); });
     btnImport.addEventListener('click', ()=>{ fileInput.value=''; fileInput.click(); });
 
+    btnExportSnapshot.addEventListener('click', ()=>{ exportSnapshotToFile(); msg('Snapshot exported to file.'); });
+    btnImportSnapshot.addEventListener('click', ()=>{ fileInputSnapshot.value=''; fileInputSnapshot.click(); });
+
+    fileInput.addEventListener('change', (ev)=>{
+        const f = ev.target.files && ev.target.files[0];
+        if(!f) return;
+        const reader = new FileReader();
+        reader.onload = () => { importFromFile(reader.result); };
+        reader.readAsText(f);
+    });
+
+    fileInputSnapshot.addEventListener('change', (ev)=>{
+        const f = ev.target.files && ev.target.files[0];
+        if(!f) return;
+        const reader = new FileReader();
+        reader.onload = () => { importSnapshotFromFile(reader.result); };
+        reader.readAsText(f);
+    });
+
         // Profile/Design management
         profileSelector.addEventListener('change', (e)=>{
             switchProfile(e.target.value);
@@ -6534,17 +6661,6 @@ document.addEventListener('DOMContentLoaded', ()=>{
         });
         canvas2Checkbox.addEventListener('change', (e)=>{
             toggleCanvas2(e.target.checked);
-        });
-    fileInput.addEventListener('change', (ev)=>{
-        const f = ev.target.files && ev.target.files[0];
-        if(!f) return;
-        const reader = new FileReader();
-            reader.onload = function(e){ importFromFile(e.target.result); };
-        reader.readAsText(f);
-    });
-
-    window.addEventListener('keydown', (e)=>{
-        if((e.ctrlKey||e.metaKey) && e.key.toLowerCase() === 'e'){ e.preventDefault(); exportToFile(); msg('Layout exported to file.'); }
     });
 
         // Listen for window resize to detect full screen mode changes
