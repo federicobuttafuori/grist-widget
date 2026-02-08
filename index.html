@@ -181,6 +181,7 @@ document.addEventListener('DOMContentLoaded', ()=>{
         let globalSequenceCountColumn = ''; // Global count column (shared across all designs)
         let packWaves = []; // Array of pack waves: [{ countColumn: string, weightColumn: string }]
         let globalRegexRules = []; // Global regex formatting rules applied to all text elements
+        let clipboard = []; // Clipboard for copy/paste across designs
         const KEY = 'grist_label_layout_v2'; // Updated version for profiles
         const FONT_FAVORITES_KEY = 'grist_label_font_favorites'; // Key for font favorites
     const MAX_HISTORY = 100;
@@ -3225,6 +3226,106 @@ document.addEventListener('DOMContentLoaded', ()=>{
             saveCurrentDesign();
     }
 
+    function copySelected(){
+        if(selectedIds.length === 0){
+            msg('No elements selected to copy');
+            return;
+        }
+        clipboard = [];
+        selectedIds.forEach(id => {
+            const el = S.find(e => e.id === id);
+            if(el){
+                clipboard.push(deepCopy(el));
+            }
+        });
+        if(clipboard.length > 0){
+            msg(`Copied ${clipboard.length} element(s)`);
+        }
+    }
+
+    function pasteFromClipboard(){
+        if(clipboard.length === 0){
+            msg('Clipboard is empty');
+            return;
+        }
+        pushBeforeChange();
+        const mz = S.length > 0 ? Math.max(...S.map(e => e.zIndex || 0)) : 0;
+        const newIds = [];
+        
+        // Try to offset by 0.2cm (like duplicate) first
+        const offset = 0.2;
+        let useOffset = true;
+        
+        // Check if offset would cause elements to go out of bounds
+        clipboard.forEach(el => {
+            const newX = el.x + offset;
+            const newY = el.y + offset;
+            if(newX + el.width > W || newY + el.height > H || newX < 0 || newY < 0){
+                useOffset = false;
+            }
+        });
+        
+        if(useOffset){
+            // Use offset positioning (like duplicate)
+            clipboard.forEach((el, idx) => {
+                const copy = deepCopy(el);
+                copy.id = `el_${Date.now()}_${idx}`;
+                copy.x = Math.min(el.x + offset, W - el.width);
+                copy.y = Math.min(el.y + offset, H - el.height);
+                copy.zIndex = mz + idx + 1;
+                S.push(copy);
+                newIds.push(copy.id);
+            });
+        } else {
+            // Center elements in canvas
+            let minX = Infinity, minY = Infinity;
+            clipboard.forEach(el => {
+                minX = Math.min(minX, el.x);
+                minY = Math.min(minY, el.y);
+            });
+            
+            let maxX = -Infinity, maxY = -Infinity;
+            clipboard.forEach(el => {
+                maxX = Math.max(maxX, el.x + el.width);
+                maxY = Math.max(maxY, el.y + el.height);
+            });
+            
+            const clipboardCenterX = (minX + maxX) / 2;
+            const clipboardCenterY = (minY + maxY) / 2;
+            const centerX = W / 2;
+            const centerY = H / 2;
+            
+            const offsetX = centerX - clipboardCenterX;
+            const offsetY = centerY - clipboardCenterY;
+            
+            clipboard.forEach((el, idx) => {
+                const copy = deepCopy(el);
+                copy.id = `el_${Date.now()}_${idx}`;
+                
+                let newX = el.x + offsetX;
+                let newY = el.y + offsetY;
+                
+                // Ensure elements stay within canvas bounds
+                newX = Math.max(0, Math.min(newX, W - copy.width));
+                newY = Math.max(0, Math.min(newY, H - copy.height));
+                
+                copy.x = newX;
+                copy.y = newY;
+                copy.zIndex = mz + idx + 1;
+                
+                S.push(copy);
+                newIds.push(copy.id);
+            });
+        }
+        
+        setSelection(newIds);
+        render();
+        updateProps();
+        updateBtns();
+        saveCurrentDesign();
+        msg(`Pasted ${clipboard.length} element(s)`);
+    }
+
     function bringToFront(){
         if(selectedIds.length===0) return;
         pushBeforeChange();
@@ -6166,6 +6267,26 @@ document.addEventListener('DOMContentLoaded', ()=>{
                         render(); updateProps(); saveCurrentDesign();
                 }
             }
+        }
+
+        if((e.ctrlKey||e.metaKey) && e.key.toLowerCase() === 'c'){
+            // Check if user is typing in input/textarea/select
+            const activeElement = document.activeElement;
+            if(activeElement && (activeElement.tagName === 'INPUT' || activeElement.tagName === 'TEXTAREA' || activeElement.tagName === 'SELECT')){
+                return; // Allow default copy behavior for text inputs
+            }
+            e.preventDefault();
+            copySelected();
+        }
+
+        if((e.ctrlKey||e.metaKey) && e.key.toLowerCase() === 'v'){
+            // Check if user is typing in input/textarea/select
+            const activeElement = document.activeElement;
+            if(activeElement && (activeElement.tagName === 'INPUT' || activeElement.tagName === 'TEXTAREA' || activeElement.tagName === 'SELECT')){
+                return; // Allow default paste behavior for text inputs
+            }
+            e.preventDefault();
+            pasteFromClipboard();
         }
 
         if((e.ctrlKey||e.metaKey) && e.key.toLowerCase() === 'd'){
