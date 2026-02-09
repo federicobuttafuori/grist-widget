@@ -43,6 +43,7 @@
         #marquee{position:absolute;border:1px dashed #007aff;background:rgba(0,122,255,0.08);pointer-events:none;display:none;z-index:9999}
         .label-element{position:absolute;cursor:move;border:1px solid transparent;font-size:16px;line-height:1.2;overflow:hidden;word-wrap:break-word;user-select:none;transform-origin:center center}
         .label-element.selected{border:2px dashed #007aff;box-shadow:0 0 0 1px rgba(0,122,255,.1)}
+        .label-element.synchronized-selected{border:2px dashed #4CAF50;box-shadow:0 0 0 1px rgba(76,175,80,.2), 0 0 8px rgba(76,175,80,.3)}
         .resize-handle{position:absolute;width:24px;height:24px;bottom:-12px;right:-12px;cursor:nwse-resize;display:none;z-index:10000;pointer-events:auto;background:transparent}
         .resize-handle-inner{position:absolute;width:12px;height:12px;background:#007aff;border:2px solid #fff;border-radius:50%;top:50%;left:50%;transform:translate(-50%,-50%);box-shadow:0 2px 4px rgba(0,0,0,.2)}
         .label-element.selected .resize-handle{display:block}
@@ -133,6 +134,17 @@
             </div>
             <hr>
             <div class="sidebar-section">
+                <h3>Synchronized Blocks</h3>
+                <div style="display:flex;gap:8px;flex-direction:column;margin-bottom:12px">
+                    <button id="btn-synchronize" style="width:100%;padding:6px;background:#4CAF50;color:#fff;border:none;border-radius:4px;cursor:pointer;font-size:12px">🔗 Synchronize Selected</button>
+                    <button id="btn-desynchronize" style="width:100%;padding:6px;background:#ff9800;color:#fff;border:none;border-radius:4px;cursor:pointer;font-size:12px">🔓 Desynchronize Selected</button>
+                </div>
+                <div id="synchronized-threads-list" style="display:flex;flex-direction:column;gap:4px;max-height:200px;overflow-y:auto">
+                </div>
+                <small style="color:#666;font-size:11px;margin-top:4px;display:block">Sync content (boundColumn, prefix, suffix, text) across elements. Style and layout remain independent.</small>
+            </div>
+            <hr>
+            <div class="sidebar-section">
                 <h3>Import/Export</h3>
                 <div style="display:flex;gap:8px">
                     <button id="btn-export">⬇️ Export</button>
@@ -182,6 +194,7 @@ document.addEventListener('DOMContentLoaded', ()=>{
         let packWaves = []; // Array of pack waves: [{ countColumn: string, weightColumn: string }]
         let globalRegexRules = []; // Global regex formatting rules applied to all text elements
         let clipboard = []; // Clipboard for copy/paste across designs
+        let masterDataThreads = []; // Master Data Threads: [{id: 'thread_xxx', name: 'Nome Thread', data: {boundColumn: '', prefix: '', suffix: '', text: '', fallbackLink: ''}}]
         const KEY = 'grist_label_layout_v2'; // Updated version for profiles
         const FONT_FAVORITES_KEY = 'grist_label_font_favorites'; // Key for font favorites
     const MAX_HISTORY = 100;
@@ -661,6 +674,7 @@ document.addEventListener('DOMContentLoaded', ()=>{
                     if(parsed && parsed.version === 2){
                         parsed.globalSequenceCountColumn = globalSequenceCountColumn;
                         parsed.packWaves = packWaves || [];
+                        parsed.masterDataThreads = masterDataThreads || [];
                         localStorage.setItem(KEY, JSON.stringify(parsed));
                     }
                 } else {
@@ -676,7 +690,8 @@ document.addEventListener('DOMContentLoaded', ()=>{
                         lastCanvasByProfile: lastCanvasByProfile || {},
                         lastCanvasByDesign: lastCanvasByDesign || {},
                         globalSequenceCountColumn: globalSequenceCountColumn,
-                        packWaves: packWaves || []
+                        packWaves: packWaves || [],
+                        masterDataThreads: masterDataThreads || []
                     };
                     localStorage.setItem(KEY, JSON.stringify(payloadObj));
                 }
@@ -716,7 +731,8 @@ document.addEventListener('DOMContentLoaded', ()=>{
                         lastCanvasByDesign: lastCanvasByDesign,
                         globalSequenceCountColumn: globalSequenceCountColumn,
                         packWaves: packWaves || [],
-                        globalRegexRules: globalRegexRules || []
+                        globalRegexRules: globalRegexRules || [],
+                        masterDataThreads: masterDataThreads || []
                 };
                 localStorage.setItem(KEY, JSON.stringify(payloadObj));
             } catch(e) {
@@ -741,6 +757,18 @@ document.addEventListener('DOMContentLoaded', ()=>{
             const canvasKey = `canvas${currentCanvas}`;
             const canvasData = design[canvasKey] || [];
             S = canvasData.map(normalizeElement);
+            
+            // Validate and clean up masterThreadId references
+            S.forEach(el => {
+                if(el.masterThreadId){
+                    const thread = getMasterThread(el.masterThreadId);
+                    if(!thread){
+                        // Thread doesn't exist, remove reference
+                        delete el.masterThreadId;
+                    }
+                }
+            });
+            
             selectedIds = [];
             // Reset history when switching design/profile/canvas
             resetHistory();
@@ -1452,6 +1480,10 @@ document.addEventListener('DOMContentLoaded', ()=>{
             // selection visuals
             if(selectedIds.includes(el.id)){
                 d.classList.add('selected');
+                    // Check if element is synchronized
+                    if(el.masterThreadId){
+                        d.classList.add('synchronized-selected');
+                    }
                     const group = getGroupForElement(el.id);
                     
                     // Show resize handle for groups when all group elements are selected
@@ -3391,12 +3423,39 @@ document.addEventListener('DOMContentLoaded', ()=>{
                     elementIds: group.elementIds.filter(eid => eid !== id)
                 })).filter(group => group.elementIds.length > 0);
             });
+            // Remove elements from synchronized threads (threads are not deleted automatically)
+            selectedIds.forEach(id => {
+                const el = S.find(e => e.id === id);
+                if(el && el.masterThreadId){
+                    delete el.masterThreadId;
+                }
+            });
         S = S.filter(e => !selectedIds.includes(e.id));
         selectedIds = [];
         render(); updateProps(); updateBtns();
             saveCurrentDesign();
             saveCurrentDesign();
             }
+
+    function updateBtns(){
+        const has = selectedIds.length>0;
+        bd.disabled = !has; bf.disabled = !has; bs.disabled = !has;
+        
+        // Update synchronize/desynchronize buttons
+        const btnSynchronize = document.getElementById('btn-synchronize');
+        const btnDesynchronize = document.getElementById('btn-desynchronize');
+        if(btnSynchronize){
+            const canSync = canSynchronizeElements(selectedIds);
+            btnSynchronize.disabled = !canSync;
+        }
+        if(btnDesynchronize){
+            const hasSyncBlock = selectedIds.some(id => {
+                const el = S.find(e => e.id === id);
+                return el && el.masterThreadId;
+            });
+            btnDesynchronize.disabled = !hasSyncBlock;
+        }
+    }
 
         // ---------- Grouping functions ----------
         function getGroupForElement(elementId){
@@ -3557,6 +3616,348 @@ document.addEventListener('DOMContentLoaded', ()=>{
                 saveCurrentDesign();
                 msg('Group ungrouped');
             }
+        }
+
+        // ---------- Master Data Thread Functions ----------
+        function getMasterThread(threadId){
+            return masterDataThreads.find(t => t.id === threadId);
+        }
+
+        function getThreadForElement(elementId){
+            const el = S.find(e => e.id === elementId);
+            if(!el || !el.masterThreadId) return null;
+            return getMasterThread(el.masterThreadId);
+        }
+
+        function createMasterThread(name){
+            if(!name || name.trim() === ''){
+                name = `Thread ${masterDataThreads.length + 1}`;
+            }
+            const thread = {
+                id: `thread_${Date.now()}`,
+                name: name.trim(),
+                data: {
+                    boundColumn: '',
+                    prefix: '',
+                    suffix: '',
+                    text: '',
+                    fallbackLink: ''
+                }
+            };
+            masterDataThreads.push(thread);
+            saveCurrentDesign();
+            return thread;
+        }
+
+        function renameMasterThread(threadId, newName){
+            const thread = getMasterThread(threadId);
+            if(!thread) return false;
+            if(!newName || newName.trim() === ''){
+                msg('Thread name cannot be empty', true);
+                return false;
+            }
+            thread.name = newName.trim();
+            saveCurrentDesign();
+            updateSynchronizedBlocksUI();
+            return true;
+        }
+
+        function deleteMasterThread(threadId){
+            const threadIndex = masterDataThreads.findIndex(t => t.id === threadId);
+            if(threadIndex === -1) return false;
+            
+            pushBeforeChange();
+            
+            // Remove masterThreadId from all elements in all designs
+            Object.keys(profiles).forEach(profileKey => {
+                const profile = profiles[profileKey];
+                if(profile && profile.designs){
+                    Object.keys(profile.designs).forEach(designKey => {
+                        const design = profile.designs[designKey];
+                        if(design){
+                            ['canvas1', 'canvas2'].forEach(canvasKey => {
+                                const canvasData = design[canvasKey] || [];
+                                canvasData.forEach(el => {
+                                    if(el.masterThreadId === threadId){
+                                        delete el.masterThreadId;
+                                    }
+                                });
+                            });
+                        }
+                    });
+                }
+            });
+            
+            // Remove from current S array if present
+            S.forEach(el => {
+                if(el.masterThreadId === threadId){
+                    delete el.masterThreadId;
+                }
+            });
+            
+            masterDataThreads.splice(threadIndex, 1);
+            saveCurrentDesign();
+            render();
+            updateProps();
+            updateSynchronizedBlocksUI();
+            msg('Thread deleted');
+            return true;
+        }
+
+        function syncElementToThread(elementId, threadId){
+            const el = S.find(e => e.id === elementId);
+            if(!el) return false;
+            
+            const thread = getMasterThread(threadId);
+            if(!thread) return false;
+            
+            // Check if element type is synchronizable
+            const validTypes = ['text', 'data', 'qr', 'image'];
+            if(!validTypes.includes(el.type)) return false;
+            
+            pushBeforeChange();
+            
+            // Link element to thread
+            el.masterThreadId = threadId;
+            
+            // Copy values from thread to element (based on type)
+            if(el.type === 'text'){
+                el.props.text = thread.data.text || '';
+            } else if(el.type === 'data'){
+                el.props.boundColumn = thread.data.boundColumn || '';
+                el.props.prefix = thread.data.prefix || '';
+                el.props.suffix = thread.data.suffix || '';
+            } else if(el.type === 'qr'){
+                el.props.boundColumn = thread.data.boundColumn || '';
+                el.props.text = thread.data.text || '';
+                el.props.prefix = thread.data.prefix || '';
+                el.props.suffix = thread.data.suffix || '';
+            } else if(el.type === 'image'){
+                el.props.boundColumn = thread.data.boundColumn || '';
+                el.props.fallbackLink = thread.data.fallbackLink || '';
+            }
+            
+            saveCurrentDesign();
+            render();
+            updateProps();
+            return true;
+        }
+
+        function unsyncElement(elementId){
+            const el = S.find(e => e.id === elementId);
+            if(!el || !el.masterThreadId) return false;
+            
+            pushBeforeChange();
+            delete el.masterThreadId;
+            saveCurrentDesign();
+            render();
+            updateProps();
+            return true;
+        }
+
+        function syncPropertyToThread(threadId, property, value){
+            const thread = getMasterThread(threadId);
+            if(!thread) return;
+            
+            // Update thread data
+            if(property === 'boundColumn'){
+                thread.data.boundColumn = value || '';
+            } else if(property === 'prefix'){
+                thread.data.prefix = value || '';
+            } else if(property === 'suffix'){
+                thread.data.suffix = value || '';
+            } else if(property === 'text'){
+                thread.data.text = value || '';
+            } else if(property === 'fallbackLink'){
+                thread.data.fallbackLink = value || '';
+            }
+            
+            // Propagate to all elements with this threadId across all designs
+            Object.keys(profiles).forEach(profileKey => {
+                const profile = profiles[profileKey];
+                if(profile && profile.designs){
+                    Object.keys(profile.designs).forEach(designKey => {
+                        const design = profile.designs[designKey];
+                        if(design){
+                            ['canvas1', 'canvas2'].forEach(canvasKey => {
+                                const canvasData = design[canvasKey] || [];
+                                canvasData.forEach(el => {
+                                    if(el.masterThreadId === threadId){
+                                        // Update only relevant properties based on element type
+                                        if(el.type === 'text' && property === 'text'){
+                                            el.props.text = value || '';
+                                        } else if(el.type === 'data'){
+                                            if(property === 'boundColumn') el.props.boundColumn = value || '';
+                                            if(property === 'prefix') el.props.prefix = value || '';
+                                            if(property === 'suffix') el.props.suffix = value || '';
+                                        } else if(el.type === 'qr'){
+                                            if(property === 'boundColumn') el.props.boundColumn = value || '';
+                                            if(property === 'text') el.props.text = value || '';
+                                            if(property === 'prefix') el.props.prefix = value || '';
+                                            if(property === 'suffix') el.props.suffix = value || '';
+                                        } else if(el.type === 'image'){
+                                            if(property === 'boundColumn') el.props.boundColumn = value || '';
+                                            if(property === 'fallbackLink') el.props.fallbackLink = value || '';
+                                        }
+                                    }
+                                });
+                            });
+                        }
+                    });
+                }
+            });
+            
+            // Update current S array
+            S.forEach(el => {
+                if(el.masterThreadId === threadId){
+                    if(el.type === 'text' && property === 'text'){
+                        el.props.text = value || '';
+                    } else if(el.type === 'data'){
+                        if(property === 'boundColumn') el.props.boundColumn = value || '';
+                        if(property === 'prefix') el.props.prefix = value || '';
+                        if(property === 'suffix') el.props.suffix = value || '';
+                    } else if(el.type === 'qr'){
+                        if(property === 'boundColumn') el.props.boundColumn = value || '';
+                        if(property === 'text') el.props.text = value || '';
+                        if(property === 'prefix') el.props.prefix = value || '';
+                        if(property === 'suffix') el.props.suffix = value || '';
+                    } else if(el.type === 'image'){
+                        if(property === 'boundColumn') el.props.boundColumn = value || '';
+                        if(property === 'fallbackLink') el.props.fallbackLink = value || '';
+                    }
+                }
+            });
+            
+            saveCurrentDesign();
+            render();
+            updateProps();
+        }
+
+        function getThreadElementCount(threadId){
+            let count = 0;
+            Object.keys(profiles).forEach(profileKey => {
+                const profile = profiles[profileKey];
+                if(profile && profile.designs){
+                    Object.keys(profile.designs).forEach(designKey => {
+                        const design = profile.designs[designKey];
+                        if(design){
+                            ['canvas1', 'canvas2'].forEach(canvasKey => {
+                                const canvasData = design[canvasKey] || [];
+                                canvasData.forEach(el => {
+                                    if(el.masterThreadId === threadId) count++;
+                                });
+                            });
+                        }
+                    });
+                }
+            });
+            return count;
+        }
+
+        function canSynchronizeElements(elementIds){
+            if(!elementIds || elementIds.length === 0) return false;
+            
+            const elements = elementIds.map(id => S.find(e => e.id === id)).filter(Boolean);
+            if(elements.length === 0) return false;
+            
+            // Check if all elements are of a synchronizable type
+            const validTypes = ['text', 'data', 'qr', 'image'];
+            return elements.every(el => validTypes.includes(el.type));
+        }
+
+        function synchronizeSelected(){
+            if(selectedIds.length === 0){
+                msg('Select at least one element to synchronize');
+                return;
+            }
+            
+            if(!canSynchronizeElements(selectedIds)){
+                msg('Selected elements must be of type: text, data, qr, or image');
+                return;
+            }
+            
+            // Ask for thread name
+            const threadName = prompt('Enter thread name:', '');
+            if(threadName === null) return; // User cancelled
+            
+            pushBeforeChange();
+            
+            // Create new thread
+            const thread = createMasterThread(threadName || undefined);
+            
+            // Sync all selected elements to the thread
+            selectedIds.forEach(id => {
+                syncElementToThread(id, thread.id);
+            });
+            
+            updateSynchronizedBlocksUI();
+            msg(`Synchronized ${selectedIds.length} element(s) to thread "${thread.name}"`);
+        }
+
+        function desynchronizeSelected(){
+            if(selectedIds.length === 0) return;
+            
+            pushBeforeChange();
+            
+            let desynchronized = false;
+            selectedIds.forEach(id => {
+                if(unsyncElement(id)){
+                    desynchronized = true;
+                }
+            });
+            
+            if(desynchronized){
+                updateSynchronizedBlocksUI();
+                msg('Elements desynchronized');
+            }
+        }
+
+        function updateSynchronizedBlocksUI(){
+            const container = document.getElementById('synchronized-threads-list');
+            if(!container) return;
+            
+            container.innerHTML = '';
+            
+            if(masterDataThreads.length === 0){
+                container.innerHTML = '<div style="color:#666;font-size:11px;padding:8px;text-align:center">No synchronized threads</div>';
+                return;
+            }
+            
+            masterDataThreads.forEach(thread => {
+                const count = getThreadElementCount(thread.id);
+                const item = document.createElement('div');
+                item.style.cssText = 'display:flex;align-items:center;gap:4px;padding:4px;border:1px solid #ddd;border-radius:4px;background:#f9f9f9';
+                
+                const nameSpan = document.createElement('span');
+                nameSpan.textContent = thread.name;
+                nameSpan.style.cssText = 'flex:1;font-size:12px;cursor:pointer;padding:2px 4px';
+                nameSpan.title = 'Click to rename';
+                nameSpan.addEventListener('click', () => {
+                    const newName = prompt('Enter new thread name:', thread.name);
+                    if(newName !== null && newName.trim() !== ''){
+                        renameMasterThread(thread.id, newName);
+                    }
+                });
+                
+                const countSpan = document.createElement('span');
+                countSpan.textContent = `(${count})`;
+                countSpan.style.cssText = 'font-size:11px;color:#666';
+                
+                const deleteBtn = document.createElement('button');
+                deleteBtn.textContent = '🗑️';
+                deleteBtn.style.cssText = 'padding:2px 6px;background:transparent;border:1px solid #ccc;border-radius:3px;cursor:pointer;font-size:11px';
+                deleteBtn.title = 'Delete thread';
+                deleteBtn.addEventListener('click', () => {
+                    if(confirm(`Delete thread "${thread.name}"? This will desynchronize all linked elements.`)){
+                        deleteMasterThread(thread.id);
+                    }
+                });
+                
+                item.appendChild(nameSpan);
+                item.appendChild(countSpan);
+                item.appendChild(deleteBtn);
+                container.appendChild(item);
+            });
         }
 
         // ---------- Import ----------
@@ -3736,6 +4137,7 @@ document.addEventListener('DOMContentLoaded', ()=>{
                 globalSequenceCountColumn: globalSequenceCountColumn,
                 packWaves: packWaves || [],
                 globalRegexRules: globalRegexRules || [],
+                masterDataThreads: masterDataThreads || [],
                 fontFavorites: fontFavorites || []
             };
 
@@ -3771,6 +4173,7 @@ document.addEventListener('DOMContentLoaded', ()=>{
                 globalSequenceCountColumn = typeof parsed.globalSequenceCountColumn === 'string' ? parsed.globalSequenceCountColumn : '';
                 packWaves = Array.isArray(parsed.packWaves) ? deepCopy(parsed.packWaves) : [];
                 globalRegexRules = Array.isArray(parsed.globalRegexRules) ? deepCopy(parsed.globalRegexRules) : [];
+                masterDataThreads = Array.isArray(parsed.masterDataThreads) ? deepCopy(parsed.masterDataThreads) : [];
 
                 if(Array.isArray(parsed.fontFavorites)){
                     fontFavorites = deepCopy(parsed.fontFavorites);
@@ -3807,6 +4210,7 @@ document.addEventListener('DOMContentLoaded', ()=>{
                 loadCurrentDesign();
                 render();
                 updateProps();
+                updateSynchronizedBlocksUI();
                 resetHistory();
 
                 saveCurrentDesign();
@@ -6497,6 +6901,9 @@ document.addEventListener('DOMContentLoaded', ()=>{
             }
         }
 
+        // For textarea, don't render immediately to avoid losing focus
+        const isTextarea = target.tagName === 'TEXTAREA';
+        
         pushBeforeChange();
         if(applyToAll){
             selectedIds.forEach(id=>{
@@ -6506,11 +6913,92 @@ document.addEventListener('DOMContentLoaded', ()=>{
         } else {
             const id = selectedIds[0];
             const el = S.find(s=>s.id===id);
-            if(el) applyPropToElement(el, prop, parsedValue);
+            if(el) {
+                applyPropToElement(el, prop, parsedValue);
+                
+                // Check if element is synchronized and property is syncable
+                // For textarea, defer sync to avoid losing focus
+                if(el.masterThreadId && !isTextarea){
+                    const syncProps = ['props.boundColumn', 'props.prefix', 'props.suffix', 'props.text', 'props.fallbackLink'];
+                    if(syncProps.includes(prop)){
+                        // Map prop to thread property name
+                        let threadProp = prop.replace('props.', '');
+                        if(threadProp === 'fallbackLink') threadProp = 'fallbackLink';
+                        syncPropertyToThread(el.masterThreadId, threadProp, parsedValue);
+                    }
+                }
+            }
         }
+        
+        // For textarea, only update the element value, don't render or sync yet
+        if(isTextarea){
+            // Just save the value, render will happen on blur
+            saveCurrentDesign();
+        } else {
             render(); 
             saveCurrentDesign(); 
             saveCurrentDesign();
+        }
+    });
+
+    // Handle textarea blur to sync and render after typing
+    pp.addEventListener('blur', (e)=>{
+        if(selectedIds.length === 0) return;
+        
+        const target = e.target;
+        if(target.tagName !== 'TEXTAREA') return;
+        
+        const prop = target.dataset.prop;
+        if(!prop) return;
+        
+        const id = selectedIds[0];
+        const el = S.find(s=>s.id===id);
+        if(el) {
+            // Update the value
+            applyPropToElement(el, prop, target.value);
+            
+            // Check if element is synchronized and property is syncable
+            if(el.masterThreadId){
+                const syncProps = ['props.boundColumn', 'props.prefix', 'props.suffix', 'props.text', 'props.fallbackLink'];
+                if(syncProps.includes(prop)){
+                    // Map prop to thread property name
+                    let threadProp = prop.replace('props.', '');
+                    if(threadProp === 'fallbackLink') threadProp = 'fallbackLink';
+                    syncPropertyToThread(el.masterThreadId, threadProp, target.value);
+                }
+            }
+            
+            // Now render and save
+            render();
+            saveCurrentDesign();
+        }
+    }, true);
+
+    pp.addEventListener('change', (e)=>{
+        if(selectedIds.length === 0) return;
+        
+        const target = e.target;
+        const prop = target.dataset.prop;
+        if(!prop) return;
+        
+        // Skip if it's a textarea (handled by blur)
+        if(target.tagName === 'TEXTAREA') return;
+        
+        // Handle synchronized blocks for select changes (e.g., boundColumn)
+        if(selectedIds.length === 1){
+            const id = selectedIds[0];
+            const el = S.find(s=>s.id===id);
+            if(el && el.masterThreadId){
+                const syncProps = ['props.boundColumn'];
+                if(syncProps.includes(prop)){
+                    const value = target.value || '';
+                    el.props.boundColumn = value;
+                    
+                    // Sync to thread and propagate
+                    syncPropertyToThread(el.masterThreadId, 'boundColumn', value);
+                }
+            }
+        }
     });
 
     pp.addEventListener('click', (e)=>{
@@ -6783,6 +7271,14 @@ document.addEventListener('DOMContentLoaded', ()=>{
         canvas2Checkbox.addEventListener('change', (e)=>{
             toggleCanvas2(e.target.checked);
     });
+
+        // Synchronized Blocks event listeners
+        document.getElementById('btn-synchronize').addEventListener('click', ()=>{
+            synchronizeSelected();
+        });
+        document.getElementById('btn-desynchronize').addEventListener('click', ()=>{
+            desynchronizeSelected();
+        });
 
         // Listen for window resize to detect full screen mode changes
         window.addEventListener('resize', () => {
@@ -7064,6 +7560,12 @@ document.addEventListener('DOMContentLoaded', ()=>{
                     } else {
                         globalRegexRules = [];
                     }
+                    // Load masterDataThreads if saved
+                    if(parsed.masterDataThreads && Array.isArray(parsed.masterDataThreads)){
+                        masterDataThreads = deepCopy(parsed.masterDataThreads);
+                    } else {
+                        masterDataThreads = [];
+                    }
                     // Restore current profile, design and canvas if saved
                     if(parsed.currentProfile && profiles[parsed.currentProfile]){
                         currentProfile = parsed.currentProfile;
@@ -7188,6 +7690,7 @@ document.addEventListener('DOMContentLoaded', ()=>{
         requestAnimationFrame(() => {
             render();
             updateProps();
+            updateSynchronizedBlocksUI();
             // Force a reflow and fit after DOM update
             void lc.offsetHeight;
             void cc.offsetHeight;
