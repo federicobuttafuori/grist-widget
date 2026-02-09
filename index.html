@@ -3905,7 +3905,27 @@ document.addEventListener('DOMContentLoaded', ()=>{
             // Create new thread
             const thread = createMasterThread(threadName || undefined);
             
-            // Sync all selected elements to the thread
+            // Initialize thread with values from first selected element (so content is preserved)
+            const firstElement = S.find(e => e.id === selectedIds[0]);
+            if(firstElement){
+                if(firstElement.type === 'text'){
+                    thread.data.text = firstElement.props.text || '';
+                } else if(firstElement.type === 'data'){
+                    thread.data.boundColumn = firstElement.props.boundColumn || '';
+                    thread.data.prefix = firstElement.props.prefix || '';
+                    thread.data.suffix = firstElement.props.suffix || '';
+                } else if(firstElement.type === 'qr'){
+                    thread.data.boundColumn = firstElement.props.boundColumn || '';
+                    thread.data.text = firstElement.props.text || '';
+                    thread.data.prefix = firstElement.props.prefix || '';
+                    thread.data.suffix = firstElement.props.suffix || '';
+                } else if(firstElement.type === 'image'){
+                    thread.data.boundColumn = firstElement.props.boundColumn || '';
+                    thread.data.fallbackLink = firstElement.props.fallbackLink || '';
+                }
+            }
+            
+            // Sync all selected elements to the thread (now with initialized values)
             selectedIds.forEach(id => {
                 syncElementToThread(id, thread.id);
             });
