@@ -1522,13 +1522,16 @@ document.addEventListener('DOMContentLoaded', ()=>{
                             h.appendChild(inner);
                             d.appendChild(h);
                         }
-                        // Add elegant group indicator with subtle styling
-                        d.style.borderColor = '#ff6b00';
-                        d.style.borderStyle = 'dashed';
-                        d.style.borderWidth = '2px';
-                        d.style.borderRadius = '3px';
-                        d.style.boxShadow = '0 0 0 1px rgba(255,107,0,0.15), inset 0 0 0 1px rgba(255,107,0,0.05)';
-                        d.style.opacity = '0.9';
+                        // Add elegant group indicator with subtle styling (hide during resize)
+                        const isResizingGroup = resizeMode && ctx.isGroup && ctx.group && ctx.group.id === group.id;
+                        if(!isResizingGroup){
+                            d.style.borderColor = '#ff6b00';
+                            d.style.borderStyle = 'dashed';
+                            d.style.borderWidth = '2px';
+                            d.style.borderRadius = '3px';
+                            d.style.boxShadow = '0 0 0 1px rgba(255,107,0,0.15), inset 0 0 0 1px rgba(255,107,0,0.05)';
+                            d.style.opacity = '0.9';
+                        }
                     } else {
                         // Regular resize handle for non-grouped elements
                 const h = document.createElement('div');
@@ -3503,11 +3506,28 @@ document.addEventListener('DOMContentLoaded', ()=>{
             // Create new group
             const groupId = `group_${Date.now()}`;
             const bounds = getGroupBounds(selectedIds);
+            
+            // Store original element states for scaling
+            const originalElements = {};
+            selectedIds.forEach(elementId => {
+                const el = S.find(e => e.id === elementId);
+                if(el){
+                    originalElements[elementId] = {
+                        x: el.x,
+                        y: el.y,
+                        width: el.width,
+                        height: el.height,
+                        props: deepCopy(el.props)
+                    };
+                }
+            });
+            
             groups.push({
                 id: groupId,
                 elementIds: [...selectedIds],
                 bounds: bounds,
-                originalBounds: {...bounds}
+                originalBounds: {...bounds},
+                originalElements: originalElements
             });
             
             render(); updateProps(); updateBtns();
@@ -3521,22 +3541,20 @@ document.addEventListener('DOMContentLoaded', ()=>{
             
             pushBeforeChange();
             
-            // Get original bounds if not set
+            // Get original bounds if not set (backward compatibility)
             if(!group.originalBounds){
                 group.originalBounds = getGroupBounds(group.elementIds);
             }
             
             const originalBounds = group.originalBounds;
             
-            // Store original element states if not already stored
-            const originalElements = {};
-            group.elementIds.forEach(elementId => {
-                const el = S.find(e => e.id === elementId);
-                if(el){
-                    // Check if we need to store original values
-                    const needsStorage = !originalElements[elementId];
-                    if(needsStorage){
-                        originalElements[elementId] = {
+            // Get or initialize original element states (only once, never update)
+            if(!group.originalElements){
+                group.originalElements = {};
+                group.elementIds.forEach(elementId => {
+                    const el = S.find(e => e.id === elementId);
+                    if(el){
+                        group.originalElements[elementId] = {
                             x: el.x,
                             y: el.y,
                             width: el.width,
@@ -3544,8 +3562,10 @@ document.addEventListener('DOMContentLoaded', ()=>{
                             props: deepCopy(el.props)
                         };
                     }
-                }
-            });
+                });
+            }
+            
+            const originalElements = group.originalElements;
             
             // Apply uniform scaling to all elements in group
             group.elementIds.forEach(elementId => {
@@ -6255,20 +6275,28 @@ document.addEventListener('DOMContentLoaded', ()=>{
                     if(allGroupSelected || (selectedIds.length === 1 && selectedIds[0] === id)){
             resizeMode = true;
                         const groupBounds = getGroupBounds(group.elementIds);
-                        // Store original element positions, sizes, and properties for scaling
-                        const originalElements = {};
-                        group.elementIds.forEach(elementId => {
-                            const el = S.find(e => e.id === elementId);
-                            if(el){
-                                originalElements[elementId] = {
-                                    x: el.x,
-                                    y: el.y,
-                                    width: el.width,
-                                    height: el.height,
-                                    props: deepCopy(el.props)
-                                };
-                            }
-                        });
+                        
+                        // Ensure originalBounds and originalElements are set in the group
+                        if(!group.originalBounds){
+                            group.originalBounds = {...groupBounds};
+                        }
+                        if(!group.originalElements){
+                            group.originalElements = {};
+                            group.elementIds.forEach(elementId => {
+                                const el = S.find(e => e.id === elementId);
+                                if(el){
+                                    group.originalElements[elementId] = {
+                                        x: el.x,
+                                        y: el.y,
+                                        width: el.width,
+                                        height: el.height,
+                                        props: deepCopy(el.props)
+                                    };
+                                }
+                            });
+                        }
+                        
+                        // Use the stored original bounds and elements from the group
                         ctx = { 
                             isGroup: true,
                             groupId: group.id,
@@ -6277,9 +6305,20 @@ document.addEventListener('DOMContentLoaded', ()=>{
                             startHeight: groupBounds.height,
                             startMouseX: smx,
                             startMouseY: smy,
-                            originalBounds: {...groupBounds},
-                            originalElements: originalElements
+                            originalBounds: {...group.originalBounds},
+                            originalElements: {}
                         };
+                        // Deep copy original elements to avoid mutations
+                        Object.keys(group.originalElements).forEach(elementId => {
+                            const orig = group.originalElements[elementId];
+                            ctx.originalElements[elementId] = {
+                                x: orig.x,
+                                y: orig.y,
+                                width: orig.width,
+                                height: orig.height,
+                                props: deepCopy(orig.props)
+                            };
+                        });
                     }
                 } else if(!isGrouped && selectedIds.length <= 1){
                     resizeMode = true;
@@ -6402,21 +6441,8 @@ document.addEventListener('DOMContentLoaded', ()=>{
                         const el = S.find(e => e.id === elementId);
                         if(!el) return;
                         
-                        // Store original values if not already stored
-                        if(!ctx.originalElements){
-                            ctx.originalElements = {};
-                        }
-                        if(!ctx.originalElements[elementId]){
-                            ctx.originalElements[elementId] = {
-                                x: el.x,
-                                y: el.y,
-                                width: el.width,
-                                height: el.height,
-                                props: deepCopy(el.props)
-                            };
-                        }
-                        
                         const orig = ctx.originalElements[elementId];
+                        if(!orig) return;
                         
                         // Calculate relative position from group origin
                         const relX = orig.x - originalBounds.x;
@@ -7663,9 +7689,29 @@ document.addEventListener('DOMContentLoaded', ()=>{
                                 group.elementIds = group.elementIds.filter(id => S.some(e => e.id === id));
                                 return group.elementIds.length > 0;
                             });
-                            // Recalculate bounds for loaded groups
+                            // Recalculate bounds and initialize originalBounds/originalElements for loaded groups
                             groups.forEach(group => {
                                 group.bounds = getGroupBounds(group.elementIds);
+                                // Initialize originalBounds if not set (backward compatibility)
+                                if(!group.originalBounds){
+                                    group.originalBounds = {...group.bounds};
+                                }
+                                // Initialize originalElements if not set (backward compatibility)
+                                if(!group.originalElements){
+                                    group.originalElements = {};
+                                    group.elementIds.forEach(elementId => {
+                                        const el = S.find(e => e.id === elementId);
+                                        if(el){
+                                            group.originalElements[elementId] = {
+                                                x: el.x,
+                                                y: el.y,
+                                                width: el.width,
+                                                height: el.height,
+                                                props: deepCopy(el.props)
+                                            };
+                                        }
+                                    });
+                                }
                             });
                     }
                 }
