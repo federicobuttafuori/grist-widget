@@ -3840,21 +3840,15 @@ document.addEventListener('DOMContentLoaded', ()=>{
         }
 
         function syncPropertyToThread(threadId, property, value){
-            console.log('[SYNC DEBUG] syncPropertyToThread called', {threadId, property, value, valueType: typeof value});
-            
             const thread = getMasterThread(threadId);
-            if(!thread) {
-                console.warn('[SYNC DEBUG] Thread not found!', threadId);
-                return;
-            }
+            if(!thread) return;
             
             // Ensure value is a string for text properties
             const stringValue = String(value || '');
-            console.log('[SYNC DEBUG] String value:', stringValue);
             
             pushBeforeChange();
             
-            // Update thread data FIRST
+            // Update thread data
             if(property === 'boundColumn'){
                 thread.data.boundColumn = stringValue;
             } else if(property === 'prefix'){
@@ -3867,39 +3861,26 @@ document.addEventListener('DOMContentLoaded', ()=>{
                 thread.data.fallbackLink = stringValue;
             }
             
-            console.log('[SYNC DEBUG] Thread data updated:', thread.data);
-            
-            let updatedCountS = 0;
-            let updatedCountDesigns = 0;
-            
-            // Update current S array FIRST (before updating saved designs)
+            // Update current S array
             S.forEach(el => {
                 if(el.masterThreadId === threadId){
-                    let updated = false;
                     if(el.type === 'text' && property === 'text'){
                         el.props.text = stringValue;
-                        updated = true;
                     } else if(el.type === 'data'){
-                        if(property === 'boundColumn') { el.props.boundColumn = stringValue; updated = true; }
-                        if(property === 'prefix') { el.props.prefix = stringValue; updated = true; }
-                        if(property === 'suffix') { el.props.suffix = stringValue; updated = true; }
+                        if(property === 'boundColumn') el.props.boundColumn = stringValue;
+                        if(property === 'prefix') el.props.prefix = stringValue;
+                        if(property === 'suffix') el.props.suffix = stringValue;
                     } else if(el.type === 'qr'){
-                        if(property === 'boundColumn') { el.props.boundColumn = stringValue; updated = true; }
-                        if(property === 'text') { el.props.text = stringValue; updated = true; }
-                        if(property === 'prefix') { el.props.prefix = stringValue; updated = true; }
-                        if(property === 'suffix') { el.props.suffix = stringValue; updated = true; }
+                        if(property === 'boundColumn') el.props.boundColumn = stringValue;
+                        if(property === 'text') el.props.text = stringValue;
+                        if(property === 'prefix') el.props.prefix = stringValue;
+                        if(property === 'suffix') el.props.suffix = stringValue;
                     } else if(el.type === 'image'){
-                        if(property === 'boundColumn') { el.props.boundColumn = stringValue; updated = true; }
-                        if(property === 'fallbackLink') { el.props.fallbackLink = stringValue; updated = true; }
-                    }
-                    if(updated) {
-                        updatedCountS++;
-                        console.log('[SYNC DEBUG] Updated element in S:', el.id, el.type, property, '=', stringValue, 'new value:', el.props[property] || el.props.text || el.props.boundColumn);
+                        if(property === 'boundColumn') el.props.boundColumn = stringValue;
+                        if(property === 'fallbackLink') el.props.fallbackLink = stringValue;
                     }
                 }
             });
-            
-            console.log('[SYNC DEBUG] Updated', updatedCountS, 'elements in current S array');
             
             // Propagate to all elements with this threadId across all designs
             Object.keys(profiles).forEach(profileKey => {
@@ -3912,25 +3893,22 @@ document.addEventListener('DOMContentLoaded', ()=>{
                                 const canvasData = design[canvasKey] || [];
                                 canvasData.forEach(el => {
                                     if(el.masterThreadId === threadId){
-                                        let updated = false;
                                         // Update only relevant properties based on element type
                                         if(el.type === 'text' && property === 'text'){
                                             el.props.text = stringValue;
-                                            updated = true;
                                         } else if(el.type === 'data'){
-                                            if(property === 'boundColumn') { el.props.boundColumn = stringValue; updated = true; }
-                                            if(property === 'prefix') { el.props.prefix = stringValue; updated = true; }
-                                            if(property === 'suffix') { el.props.suffix = stringValue; updated = true; }
+                                            if(property === 'boundColumn') el.props.boundColumn = stringValue;
+                                            if(property === 'prefix') el.props.prefix = stringValue;
+                                            if(property === 'suffix') el.props.suffix = stringValue;
                                         } else if(el.type === 'qr'){
-                                            if(property === 'boundColumn') { el.props.boundColumn = stringValue; updated = true; }
-                                            if(property === 'text') { el.props.text = stringValue; updated = true; }
-                                            if(property === 'prefix') { el.props.prefix = stringValue; updated = true; }
-                                            if(property === 'suffix') { el.props.suffix = stringValue; updated = true; }
+                                            if(property === 'boundColumn') el.props.boundColumn = stringValue;
+                                            if(property === 'text') el.props.text = stringValue;
+                                            if(property === 'prefix') el.props.prefix = stringValue;
+                                            if(property === 'suffix') el.props.suffix = stringValue;
                                         } else if(el.type === 'image'){
-                                            if(property === 'boundColumn') { el.props.boundColumn = stringValue; updated = true; }
-                                            if(property === 'fallbackLink') { el.props.fallbackLink = stringValue; updated = true; }
+                                            if(property === 'boundColumn') el.props.boundColumn = stringValue;
+                                            if(property === 'fallbackLink') el.props.fallbackLink = stringValue;
                                         }
-                                        if(updated) updatedCountDesigns++;
                                     }
                                 });
                             });
@@ -3939,22 +3917,9 @@ document.addEventListener('DOMContentLoaded', ()=>{
                 }
             });
             
-            console.log('[SYNC DEBUG] Updated', updatedCountDesigns, 'elements in saved designs');
-            console.log('[SYNC DEBUG] Total elements updated:', updatedCountS + updatedCountDesigns);
-            
-            // Save current design (which includes updated S array)
             saveCurrentDesign();
-            console.log('[SYNC DEBUG] Design saved');
-            
-            // Render to show updates
             render();
-            console.log('[SYNC DEBUG] Rendered');
-            
-            // Update props panel
             updateProps();
-            console.log('[SYNC DEBUG] Props updated');
-            
-            console.log('[SYNC DEBUG] syncPropertyToThread completed');
         }
 
         function getThreadElementCount(threadId){
@@ -7174,26 +7139,13 @@ document.addEventListener('DOMContentLoaded', ()=>{
                 if(el.masterThreadId && !isTextarea){
                     const syncProps = ['props.boundColumn', 'props.prefix', 'props.suffix', 'props.text', 'props.fallbackLink'];
                     if(syncProps.includes(prop)){
-                        console.log('[SYNC DEBUG] Input handler - element is synchronized', {
-                            elementId: el.id,
-                            masterThreadId: el.masterThreadId,
-                            prop,
-                            parsedValue,
-                            parsedValueType: typeof parsedValue
-                        });
                         // Map prop to thread property name
                         let threadProp = prop.replace('props.', '');
                         if(threadProp === 'fallbackLink') threadProp = 'fallbackLink';
                         // Use string value for text properties
                         const stringValue = String(parsedValue || '');
-                        console.log('[SYNC DEBUG] Calling syncPropertyToThread with:', {threadId: el.masterThreadId, property: threadProp, value: stringValue});
                         syncPropertyToThread(el.masterThreadId, threadProp, stringValue);
-                    } else {
-                        console.log('[SYNC DEBUG] Property not syncable:', prop);
                     }
-                } else {
-                    if(!el.masterThreadId) console.log('[SYNC DEBUG] Element not synchronized');
-                    if(isTextarea) console.log('[SYNC DEBUG] Textarea - deferring sync');
                 }
             }
         }
@@ -7204,7 +7156,6 @@ document.addEventListener('DOMContentLoaded', ()=>{
             saveCurrentDesign();
         } else {
             render(); 
-            saveCurrentDesign(); 
             saveCurrentDesign();
         }
     });
@@ -7222,13 +7173,6 @@ document.addEventListener('DOMContentLoaded', ()=>{
         const id = selectedIds[0];
         const el = S.find(s=>s.id===id);
         if(el) {
-            console.log('[SYNC DEBUG] Textarea blur - element:', {
-                elementId: el.id,
-                masterThreadId: el.masterThreadId,
-                prop,
-                value: target.value
-            });
-            
             // Update the value
             applyPropToElement(el, prop, target.value);
             
@@ -7240,22 +7184,12 @@ document.addEventListener('DOMContentLoaded', ()=>{
                     let threadProp = prop.replace('props.', '');
                     if(threadProp === 'fallbackLink') threadProp = 'fallbackLink';
                     const stringValue = String(target.value || '');
-                    console.log('[SYNC DEBUG] Textarea blur - calling syncPropertyToThread:', {
-                        threadId: el.masterThreadId,
-                        property: threadProp,
-                        value: stringValue
-                    });
                     syncPropertyToThread(el.masterThreadId, threadProp, stringValue);
                 } else {
-                    console.log('[SYNC DEBUG] Textarea blur - property not syncable:', prop);
+                    render();
+                    saveCurrentDesign();
                 }
             } else {
-                console.log('[SYNC DEBUG] Textarea blur - element not synchronized');
-            }
-            
-            // Note: syncPropertyToThread already calls render() and saveCurrentDesign()
-            // But we call it again to ensure UI is updated
-            if(!el.masterThreadId || !syncProps.includes(prop)){
                 render();
                 saveCurrentDesign();
             }
