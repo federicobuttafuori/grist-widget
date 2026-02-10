@@ -1522,16 +1522,13 @@ document.addEventListener('DOMContentLoaded', ()=>{
                             h.appendChild(inner);
                             d.appendChild(h);
                         }
-                        // Add elegant group indicator with subtle styling (hide during resize)
-                        const isResizingGroup = resizeMode && ctx.isGroup && ctx.group && ctx.group.id === group.id;
-                        if(!isResizingGroup){
-                            d.style.borderColor = '#ff6b00';
-                            d.style.borderStyle = 'dashed';
-                            d.style.borderWidth = '2px';
-                            d.style.borderRadius = '3px';
-                            d.style.boxShadow = '0 0 0 1px rgba(255,107,0,0.15), inset 0 0 0 1px rgba(255,107,0,0.05)';
-                            d.style.opacity = '0.9';
-                        }
+                        // Add elegant group indicator with subtle styling
+                        d.style.borderColor = '#ff6b00';
+                        d.style.borderStyle = 'dashed';
+                        d.style.borderWidth = '2px';
+                        d.style.borderRadius = '3px';
+                        d.style.boxShadow = '0 0 0 1px rgba(255,107,0,0.15), inset 0 0 0 1px rgba(255,107,0,0.05)';
+                        d.style.opacity = '0.9';
                     } else {
                         // Regular resize handle for non-grouped elements
                 const h = document.createElement('div');
@@ -2157,24 +2154,6 @@ document.addEventListener('DOMContentLoaded', ()=>{
     function updateBtns(){
         const has = selectedIds.length>0;
         bd.disabled = !has; bf.disabled = !has; bs.disabled = !has;
-        
-        // Update synchronize/desynchronize buttons
-        const btnSynchronize = document.getElementById('btn-synchronize');
-        const btnDesynchronize = document.getElementById('btn-desynchronize');
-        if(btnSynchronize){
-            const canSync = canSynchronizeElements(selectedIds);
-            btnSynchronize.disabled = !canSync;
-        }
-        if(btnDesynchronize){
-            const hasSyncBlock = selectedIds.some(id => {
-                const el = S.find(e => e.id === id);
-                return el && el.masterThreadId;
-            });
-            btnDesynchronize.disabled = !hasSyncBlock;
-        }
-        
-        // Update synchronized blocks UI to highlight selected thread
-        updateSynchronizedBlocksUI();
     }
 
     function setSelection(ids, append=false){
@@ -3326,11 +3305,6 @@ document.addEventListener('DOMContentLoaded', ()=>{
                 copy.x = Math.min(el.x + offset, W - el.width);
                 copy.y = Math.min(el.y + offset, H - el.height);
                 copy.zIndex = mz + idx + 1;
-                // Preserve masterThreadId if element was synchronized
-                // (deepCopy already preserves it, but we ensure it's maintained)
-                if(el.masterThreadId){
-                    copy.masterThreadId = el.masterThreadId;
-                }
                 S.push(copy);
                 newIds.push(copy.id);
             });
@@ -3370,12 +3344,6 @@ document.addEventListener('DOMContentLoaded', ()=>{
                 copy.x = newX;
                 copy.y = newY;
                 copy.zIndex = mz + idx + 1;
-                
-                // Preserve masterThreadId if element was synchronized
-                // (deepCopy already preserves it, but we ensure it's maintained)
-                if(el.masterThreadId){
-                    copy.masterThreadId = el.masterThreadId;
-                }
                 
                 S.push(copy);
                 newIds.push(copy.id);
@@ -3465,10 +3433,29 @@ document.addEventListener('DOMContentLoaded', ()=>{
         S = S.filter(e => !selectedIds.includes(e.id));
         selectedIds = [];
         render(); updateProps(); updateBtns();
-        updateSynchronizedBlocksUI(); // Update thread counters after deletion
             saveCurrentDesign();
             saveCurrentDesign();
             }
+
+    function updateBtns(){
+        const has = selectedIds.length>0;
+        bd.disabled = !has; bf.disabled = !has; bs.disabled = !has;
+        
+        // Update synchronize/desynchronize buttons
+        const btnSynchronize = document.getElementById('btn-synchronize');
+        const btnDesynchronize = document.getElementById('btn-desynchronize');
+        if(btnSynchronize){
+            const canSync = canSynchronizeElements(selectedIds);
+            btnSynchronize.disabled = !canSync;
+        }
+        if(btnDesynchronize){
+            const hasSyncBlock = selectedIds.some(id => {
+                const el = S.find(e => e.id === id);
+                return el && el.masterThreadId;
+            });
+            btnDesynchronize.disabled = !hasSyncBlock;
+        }
+    }
 
         // ---------- Grouping functions ----------
         function getGroupForElement(elementId){
@@ -3516,28 +3503,11 @@ document.addEventListener('DOMContentLoaded', ()=>{
             // Create new group
             const groupId = `group_${Date.now()}`;
             const bounds = getGroupBounds(selectedIds);
-            
-            // Store original element states for scaling
-            const originalElements = {};
-            selectedIds.forEach(elementId => {
-                const el = S.find(e => e.id === elementId);
-                if(el){
-                    originalElements[elementId] = {
-                        x: el.x,
-                        y: el.y,
-                        width: el.width,
-                        height: el.height,
-                        props: deepCopy(el.props)
-                    };
-                }
-            });
-            
             groups.push({
                 id: groupId,
                 elementIds: [...selectedIds],
                 bounds: bounds,
-                originalBounds: {...bounds},
-                originalElements: originalElements
+                originalBounds: {...bounds}
             });
             
             render(); updateProps(); updateBtns();
@@ -3551,20 +3521,22 @@ document.addEventListener('DOMContentLoaded', ()=>{
             
             pushBeforeChange();
             
-            // Get original bounds if not set (backward compatibility)
+            // Get original bounds if not set
             if(!group.originalBounds){
                 group.originalBounds = getGroupBounds(group.elementIds);
             }
             
             const originalBounds = group.originalBounds;
             
-            // Get or initialize original element states (only once, never update)
-            if(!group.originalElements){
-                group.originalElements = {};
-                group.elementIds.forEach(elementId => {
-                    const el = S.find(e => e.id === elementId);
-                    if(el){
-                        group.originalElements[elementId] = {
+            // Store original element states if not already stored
+            const originalElements = {};
+            group.elementIds.forEach(elementId => {
+                const el = S.find(e => e.id === elementId);
+                if(el){
+                    // Check if we need to store original values
+                    const needsStorage = !originalElements[elementId];
+                    if(needsStorage){
+                        originalElements[elementId] = {
                             x: el.x,
                             y: el.y,
                             width: el.width,
@@ -3572,10 +3544,8 @@ document.addEventListener('DOMContentLoaded', ()=>{
                             props: deepCopy(el.props)
                         };
                     }
-                });
-            }
-            
-            const originalElements = group.originalElements;
+                }
+            });
             
             // Apply uniform scaling to all elements in group
             group.elementIds.forEach(elementId => {
@@ -3659,7 +3629,7 @@ document.addEventListener('DOMContentLoaded', ()=>{
             return getMasterThread(el.masterThreadId);
         }
 
-        function createMasterThread(name, templateElement = null){
+        function createMasterThread(name){
             if(!name || name.trim() === ''){
                 name = `Thread ${masterDataThreads.length + 1}`;
             }
@@ -3672,36 +3642,8 @@ document.addEventListener('DOMContentLoaded', ()=>{
                     suffix: '',
                     text: '',
                     fallbackLink: ''
-                },
-                template: null
+                }
             };
-            
-            // If template element provided, save template
-            if(templateElement){
-                thread.template = {
-                    type: templateElement.type,
-                    width: templateElement.width,
-                    height: templateElement.height,
-                    props: {
-                        fontSize: templateElement.props.fontSize || 16,
-                        fontWeight: templateElement.props.fontWeight || 'normal',
-                        fontFamily: templateElement.props.fontFamily || 'Arial, sans-serif',
-                        color: templateElement.props.color || '#000000',
-                        textAlign: templateElement.props.textAlign || 'left',
-                        valign: templateElement.props.valign || 'top',
-                        lineHeight: templateElement.props.lineHeight || 1.2,
-                        rotation: templateElement.props.rotation || 0,
-                        showBorder: templateElement.props.showBorder || false,
-                        borderColor: templateElement.props.borderColor || '#000000',
-                        borderWidth: templateElement.props.borderWidth || 1,
-                        paddingTop: templateElement.props.paddingTop || 0,
-                        paddingRight: templateElement.props.paddingRight || 0,
-                        paddingBottom: templateElement.props.paddingBottom || 0,
-                        paddingLeft: templateElement.props.paddingLeft || 0
-                    }
-                };
-            }
-            
             masterDataThreads.push(thread);
             saveCurrentDesign();
             return thread;
@@ -3775,32 +3717,6 @@ document.addEventListener('DOMContentLoaded', ()=>{
             
             pushBeforeChange();
             
-            // If thread has no template, create it from this element
-            if(!thread.template){
-                thread.template = {
-                    type: el.type,
-                    width: el.width,
-                    height: el.height,
-                    props: {
-                        fontSize: el.props.fontSize || 16,
-                        fontWeight: el.props.fontWeight || 'normal',
-                        fontFamily: el.props.fontFamily || 'Arial, sans-serif',
-                        color: el.props.color || '#000000',
-                        textAlign: el.props.textAlign || 'left',
-                        valign: el.props.valign || 'top',
-                        lineHeight: el.props.lineHeight || 1.2,
-                        rotation: el.props.rotation || 0,
-                        showBorder: el.props.showBorder || false,
-                        borderColor: el.props.borderColor || '#000000',
-                        borderWidth: el.props.borderWidth || 1,
-                        paddingTop: el.props.paddingTop || 0,
-                        paddingRight: el.props.paddingRight || 0,
-                        paddingBottom: el.props.paddingBottom || 0,
-                        paddingLeft: el.props.paddingLeft || 0
-                    }
-                };
-            }
-            
             // Link element to thread
             el.masterThreadId = threadId;
             
@@ -3840,66 +3756,21 @@ document.addEventListener('DOMContentLoaded', ()=>{
         }
 
         function syncPropertyToThread(threadId, property, value){
-            console.log('[SYNC DEBUG] syncPropertyToThread called', {threadId, property, value, valueType: typeof value});
-            
             const thread = getMasterThread(threadId);
-            if(!thread) {
-                console.warn('[SYNC DEBUG] Thread not found!', threadId);
-                return;
-            }
+            if(!thread) return;
             
-            // Ensure value is a string for text properties
-            const stringValue = String(value || '');
-            console.log('[SYNC DEBUG] String value:', stringValue);
-            
-            pushBeforeChange();
-            
-            // Update thread data FIRST
+            // Update thread data
             if(property === 'boundColumn'){
-                thread.data.boundColumn = stringValue;
+                thread.data.boundColumn = value || '';
             } else if(property === 'prefix'){
-                thread.data.prefix = stringValue;
+                thread.data.prefix = value || '';
             } else if(property === 'suffix'){
-                thread.data.suffix = stringValue;
+                thread.data.suffix = value || '';
             } else if(property === 'text'){
-                thread.data.text = stringValue;
+                thread.data.text = value || '';
             } else if(property === 'fallbackLink'){
-                thread.data.fallbackLink = stringValue;
+                thread.data.fallbackLink = value || '';
             }
-            
-            console.log('[SYNC DEBUG] Thread data updated:', thread.data);
-            
-            let updatedCountS = 0;
-            let updatedCountDesigns = 0;
-            
-            // Update current S array FIRST (before updating saved designs)
-            S.forEach(el => {
-                if(el.masterThreadId === threadId){
-                    let updated = false;
-                    if(el.type === 'text' && property === 'text'){
-                        el.props.text = stringValue;
-                        updated = true;
-                    } else if(el.type === 'data'){
-                        if(property === 'boundColumn') { el.props.boundColumn = stringValue; updated = true; }
-                        if(property === 'prefix') { el.props.prefix = stringValue; updated = true; }
-                        if(property === 'suffix') { el.props.suffix = stringValue; updated = true; }
-                    } else if(el.type === 'qr'){
-                        if(property === 'boundColumn') { el.props.boundColumn = stringValue; updated = true; }
-                        if(property === 'text') { el.props.text = stringValue; updated = true; }
-                        if(property === 'prefix') { el.props.prefix = stringValue; updated = true; }
-                        if(property === 'suffix') { el.props.suffix = stringValue; updated = true; }
-                    } else if(el.type === 'image'){
-                        if(property === 'boundColumn') { el.props.boundColumn = stringValue; updated = true; }
-                        if(property === 'fallbackLink') { el.props.fallbackLink = stringValue; updated = true; }
-                    }
-                    if(updated) {
-                        updatedCountS++;
-                        console.log('[SYNC DEBUG] Updated element in S:', el.id, el.type, property, '=', stringValue, 'new value:', el.props[property] || el.props.text || el.props.boundColumn);
-                    }
-                }
-            });
-            
-            console.log('[SYNC DEBUG] Updated', updatedCountS, 'elements in current S array');
             
             // Propagate to all elements with this threadId across all designs
             Object.keys(profiles).forEach(profileKey => {
@@ -3912,25 +3783,22 @@ document.addEventListener('DOMContentLoaded', ()=>{
                                 const canvasData = design[canvasKey] || [];
                                 canvasData.forEach(el => {
                                     if(el.masterThreadId === threadId){
-                                        let updated = false;
                                         // Update only relevant properties based on element type
                                         if(el.type === 'text' && property === 'text'){
-                                            el.props.text = stringValue;
-                                            updated = true;
+                                            el.props.text = value || '';
                                         } else if(el.type === 'data'){
-                                            if(property === 'boundColumn') { el.props.boundColumn = stringValue; updated = true; }
-                                            if(property === 'prefix') { el.props.prefix = stringValue; updated = true; }
-                                            if(property === 'suffix') { el.props.suffix = stringValue; updated = true; }
+                                            if(property === 'boundColumn') el.props.boundColumn = value || '';
+                                            if(property === 'prefix') el.props.prefix = value || '';
+                                            if(property === 'suffix') el.props.suffix = value || '';
                                         } else if(el.type === 'qr'){
-                                            if(property === 'boundColumn') { el.props.boundColumn = stringValue; updated = true; }
-                                            if(property === 'text') { el.props.text = stringValue; updated = true; }
-                                            if(property === 'prefix') { el.props.prefix = stringValue; updated = true; }
-                                            if(property === 'suffix') { el.props.suffix = stringValue; updated = true; }
+                                            if(property === 'boundColumn') el.props.boundColumn = value || '';
+                                            if(property === 'text') el.props.text = value || '';
+                                            if(property === 'prefix') el.props.prefix = value || '';
+                                            if(property === 'suffix') el.props.suffix = value || '';
                                         } else if(el.type === 'image'){
-                                            if(property === 'boundColumn') { el.props.boundColumn = stringValue; updated = true; }
-                                            if(property === 'fallbackLink') { el.props.fallbackLink = stringValue; updated = true; }
+                                            if(property === 'boundColumn') el.props.boundColumn = value || '';
+                                            if(property === 'fallbackLink') el.props.fallbackLink = value || '';
                                         }
-                                        if(updated) updatedCountDesigns++;
                                     }
                                 });
                             });
@@ -3939,22 +3807,30 @@ document.addEventListener('DOMContentLoaded', ()=>{
                 }
             });
             
-            console.log('[SYNC DEBUG] Updated', updatedCountDesigns, 'elements in saved designs');
-            console.log('[SYNC DEBUG] Total elements updated:', updatedCountS + updatedCountDesigns);
+            // Update current S array
+            S.forEach(el => {
+                if(el.masterThreadId === threadId){
+                    if(el.type === 'text' && property === 'text'){
+                        el.props.text = value || '';
+                    } else if(el.type === 'data'){
+                        if(property === 'boundColumn') el.props.boundColumn = value || '';
+                        if(property === 'prefix') el.props.prefix = value || '';
+                        if(property === 'suffix') el.props.suffix = value || '';
+                    } else if(el.type === 'qr'){
+                        if(property === 'boundColumn') el.props.boundColumn = value || '';
+                        if(property === 'text') el.props.text = value || '';
+                        if(property === 'prefix') el.props.prefix = value || '';
+                        if(property === 'suffix') el.props.suffix = value || '';
+                    } else if(el.type === 'image'){
+                        if(property === 'boundColumn') el.props.boundColumn = value || '';
+                        if(property === 'fallbackLink') el.props.fallbackLink = value || '';
+                    }
+                }
+            });
             
-            // Save current design (which includes updated S array)
             saveCurrentDesign();
-            console.log('[SYNC DEBUG] Design saved');
-            
-            // Render to show updates
             render();
-            console.log('[SYNC DEBUG] Rendered');
-            
-            // Update props panel
             updateProps();
-            console.log('[SYNC DEBUG] Props updated');
-            
-            console.log('[SYNC DEBUG] syncPropertyToThread completed');
         }
 
         function getThreadElementCount(threadId){
@@ -3986,13 +3862,7 @@ document.addEventListener('DOMContentLoaded', ()=>{
             
             // Check if all elements are of a synchronizable type
             const validTypes = ['text', 'data', 'qr', 'image'];
-            if(!elements.every(el => validTypes.includes(el.type))) return false;
-            
-            // Check if any element is already synchronized
-            const hasSynchronized = elements.some(el => el.masterThreadId);
-            if(hasSynchronized) return false;
-            
-            return true;
+            return elements.every(el => validTypes.includes(el.type));
         }
 
         function synchronizeSelected(){
@@ -4012,37 +3882,15 @@ document.addEventListener('DOMContentLoaded', ()=>{
             
             pushBeforeChange();
             
-            // Get first selected element to use as template
-            const firstElement = S.find(e => e.id === selectedIds[0]);
-            if(!firstElement) return;
+            // Create new thread
+            const thread = createMasterThread(threadName || undefined);
             
-            // Create new thread with template from first element
-            const thread = createMasterThread(threadName || undefined, firstElement);
-            
-            // Initialize thread data with values from first selected element (so content is preserved)
-            if(firstElement.type === 'text'){
-                thread.data.text = firstElement.props.text || '';
-            } else if(firstElement.type === 'data'){
-                thread.data.boundColumn = firstElement.props.boundColumn || '';
-                thread.data.prefix = firstElement.props.prefix || '';
-                thread.data.suffix = firstElement.props.suffix || '';
-            } else if(firstElement.type === 'qr'){
-                thread.data.boundColumn = firstElement.props.boundColumn || '';
-                thread.data.text = firstElement.props.text || '';
-                thread.data.prefix = firstElement.props.prefix || '';
-                thread.data.suffix = firstElement.props.suffix || '';
-            } else if(firstElement.type === 'image'){
-                thread.data.boundColumn = firstElement.props.boundColumn || '';
-                thread.data.fallbackLink = firstElement.props.fallbackLink || '';
-            }
-            
-            // Sync all selected elements to the thread (now with initialized values)
+            // Sync all selected elements to the thread
             selectedIds.forEach(id => {
                 syncElementToThread(id, thread.id);
             });
             
             updateSynchronizedBlocksUI();
-            updateBtns();
             msg(`Synchronized ${selectedIds.length} element(s) to thread "${thread.name}"`);
         }
 
@@ -4060,67 +3908,8 @@ document.addEventListener('DOMContentLoaded', ()=>{
             
             if(desynchronized){
                 updateSynchronizedBlocksUI();
-                updateBtns();
                 msg('Elements desynchronized');
             }
-        }
-
-        function addElementFromThread(threadId){
-            const thread = getMasterThread(threadId);
-            if(!thread) return;
-            
-            // If thread has no template, cannot add element
-            if(!thread.template){
-                msg('Thread has no template. Synchronize an element first to create a template.', true);
-                return;
-            }
-            
-            pushBeforeChange();
-            
-            const template = thread.template;
-            const mz = S.length > 0 ? Math.max(...S.map(e => e.zIndex || 0)) : 0;
-            
-            // Create new element based on template
-            const newEl = {
-                id: `el_${Date.now()}`,
-                type: template.type,
-                x: W / 2 - template.width / 2, // Center horizontally
-                y: H / 2 - template.height / 2, // Center vertically
-                width: template.width,
-                height: template.height,
-                zIndex: mz + 1,
-                masterThreadId: threadId,
-                props: deepCopy(template.props)
-            };
-            
-            // Copy synchronized data from thread based on type
-            if(newEl.type === 'text'){
-                newEl.props.text = thread.data.text || '';
-            } else if(newEl.type === 'data'){
-                newEl.props.boundColumn = thread.data.boundColumn || '';
-                newEl.props.prefix = thread.data.prefix || '';
-                newEl.props.suffix = thread.data.suffix || '';
-            } else if(newEl.type === 'qr'){
-                newEl.props.boundColumn = thread.data.boundColumn || '';
-                newEl.props.text = thread.data.text || '';
-                newEl.props.prefix = thread.data.prefix || '';
-                newEl.props.suffix = thread.data.suffix || '';
-            } else if(newEl.type === 'image'){
-                newEl.props.boundColumn = thread.data.boundColumn || '';
-                newEl.props.fallbackLink = thread.data.fallbackLink || '';
-            }
-            
-            // Ensure element stays within canvas bounds
-            newEl.x = Math.max(0, Math.min(newEl.x, W - newEl.width));
-            newEl.y = Math.max(0, Math.min(newEl.y, H - newEl.height));
-            
-            S.push(newEl);
-            setSelection([newEl.id]);
-            saveCurrentDesign();
-            render();
-            updateProps();
-            updateSynchronizedBlocksUI();
-            msg(`Added synchronized element from thread "${thread.name}"`);
         }
 
         function updateSynchronizedBlocksUI(){
@@ -4129,38 +3918,19 @@ document.addEventListener('DOMContentLoaded', ()=>{
             
             container.innerHTML = '';
             
-            // Remove threads with count 0
-            masterDataThreads = masterDataThreads.filter(thread => {
-                const count = getThreadElementCount(thread.id);
-                return count > 0;
-            });
-            
-            // Save after cleanup
             if(masterDataThreads.length === 0){
                 container.innerHTML = '<div style="color:#666;font-size:11px;padding:8px;text-align:center">No synchronized threads</div>';
-                saveCurrentDesign();
                 return;
-            }
-            
-            // Get thread ID of currently selected element (if any)
-            let selectedThreadId = null;
-            if(selectedIds.length > 0){
-                const selectedEl = S.find(e => e.id === selectedIds[0]);
-                if(selectedEl && selectedEl.masterThreadId){
-                    selectedThreadId = selectedEl.masterThreadId;
-                }
             }
             
             masterDataThreads.forEach(thread => {
                 const count = getThreadElementCount(thread.id);
-                const isSelected = thread.id === selectedThreadId;
-                
                 const item = document.createElement('div');
-                item.style.cssText = `display:flex;align-items:center;gap:4px;padding:4px;border:1px solid ${isSelected ? '#4CAF50' : '#ddd'};border-radius:4px;background:${isSelected ? '#e8f5e9' : '#f9f9f9'}`;
+                item.style.cssText = 'display:flex;align-items:center;gap:4px;padding:4px;border:1px solid #ddd;border-radius:4px;background:#f9f9f9';
                 
                 const nameSpan = document.createElement('span');
                 nameSpan.textContent = thread.name;
-                nameSpan.style.cssText = `flex:1;font-size:12px;cursor:pointer;padding:2px 4px;font-weight:${isSelected ? '600' : 'normal'};color:${isSelected ? '#2e7d32' : 'inherit'}`;
+                nameSpan.style.cssText = 'flex:1;font-size:12px;cursor:pointer;padding:2px 4px';
                 nameSpan.title = 'Click to rename';
                 nameSpan.addEventListener('click', () => {
                     const newName = prompt('Enter new thread name:', thread.name);
@@ -4172,20 +3942,6 @@ document.addEventListener('DOMContentLoaded', ()=>{
                 const countSpan = document.createElement('span');
                 countSpan.textContent = `(${count})`;
                 countSpan.style.cssText = 'font-size:11px;color:#666';
-                
-                const addBtn = document.createElement('button');
-                addBtn.textContent = '➕';
-                addBtn.style.cssText = 'padding:2px 6px;background:transparent;border:1px solid #4CAF50;border-radius:3px;cursor:pointer;font-size:11px;color:#4CAF50';
-                addBtn.title = 'Add synchronized element to canvas';
-                addBtn.disabled = !thread.template; // Disable if no template
-                if(thread.template){
-                    addBtn.addEventListener('click', () => {
-                        addElementFromThread(thread.id);
-                    });
-                } else {
-                    addBtn.style.opacity = '0.5';
-                    addBtn.style.cursor = 'not-allowed';
-                }
                 
                 const deleteBtn = document.createElement('button');
                 deleteBtn.textContent = '🗑️';
@@ -4199,12 +3955,9 @@ document.addEventListener('DOMContentLoaded', ()=>{
                 
                 item.appendChild(nameSpan);
                 item.appendChild(countSpan);
-                item.appendChild(addBtn);
                 item.appendChild(deleteBtn);
                 container.appendChild(item);
             });
-            
-            saveCurrentDesign();
         }
 
         // ---------- Import ----------
@@ -6502,28 +6255,20 @@ document.addEventListener('DOMContentLoaded', ()=>{
                     if(allGroupSelected || (selectedIds.length === 1 && selectedIds[0] === id)){
             resizeMode = true;
                         const groupBounds = getGroupBounds(group.elementIds);
-                        
-                        // Ensure originalBounds and originalElements are set in the group
-                        if(!group.originalBounds){
-                            group.originalBounds = {...groupBounds};
-                        }
-                        if(!group.originalElements){
-                            group.originalElements = {};
-                            group.elementIds.forEach(elementId => {
-                                const el = S.find(e => e.id === elementId);
-                                if(el){
-                                    group.originalElements[elementId] = {
-                                        x: el.x,
-                                        y: el.y,
-                                        width: el.width,
-                                        height: el.height,
-                                        props: deepCopy(el.props)
-                                    };
-                                }
-                            });
-                        }
-                        
-                        // Use the stored original bounds and elements from the group
+                        // Store original element positions, sizes, and properties for scaling
+                        const originalElements = {};
+                        group.elementIds.forEach(elementId => {
+                            const el = S.find(e => e.id === elementId);
+                            if(el){
+                                originalElements[elementId] = {
+                                    x: el.x,
+                                    y: el.y,
+                                    width: el.width,
+                                    height: el.height,
+                                    props: deepCopy(el.props)
+                                };
+                            }
+                        });
                         ctx = { 
                             isGroup: true,
                             groupId: group.id,
@@ -6532,20 +6277,9 @@ document.addEventListener('DOMContentLoaded', ()=>{
                             startHeight: groupBounds.height,
                             startMouseX: smx,
                             startMouseY: smy,
-                            originalBounds: {...group.originalBounds},
-                            originalElements: {}
+                            originalBounds: {...groupBounds},
+                            originalElements: originalElements
                         };
-                        // Deep copy original elements to avoid mutations
-                        Object.keys(group.originalElements).forEach(elementId => {
-                            const orig = group.originalElements[elementId];
-                            ctx.originalElements[elementId] = {
-                                x: orig.x,
-                                y: orig.y,
-                                width: orig.width,
-                                height: orig.height,
-                                props: deepCopy(orig.props)
-                            };
-                        });
                     }
                 } else if(!isGrouped && selectedIds.length <= 1){
                     resizeMode = true;
@@ -6668,8 +6402,21 @@ document.addEventListener('DOMContentLoaded', ()=>{
                         const el = S.find(e => e.id === elementId);
                         if(!el) return;
                         
+                        // Store original values if not already stored
+                        if(!ctx.originalElements){
+                            ctx.originalElements = {};
+                        }
+                        if(!ctx.originalElements[elementId]){
+                            ctx.originalElements[elementId] = {
+                                x: el.x,
+                                y: el.y,
+                                width: el.width,
+                                height: el.height,
+                                props: deepCopy(el.props)
+                            };
+                        }
+                        
                         const orig = ctx.originalElements[elementId];
-                        if(!orig) return;
                         
                         // Calculate relative position from group origin
                         const relX = orig.x - originalBounds.x;
@@ -6963,25 +6710,6 @@ document.addEventListener('DOMContentLoaded', ()=>{
     });
 
     // ---------- Property edits (apply to single or multiple) ----------
-    function applyPropToElement(el, p, v){
-        if(p === 'widthHeight'){ el.height = Number(v); return; }
-        if(p.includes('.')){
-            const [o,k] = p.split('.');
-            if(!el[o]) el[o] = {};
-                if(['fontSize','decimals','thickness','borderWidth','rotation','paddingTop','paddingRight','paddingBottom','paddingLeft','x','y','width','height','borderRadiusTopLeft','borderRadiusTopRight','borderRadiusBottomRight','borderRadiusBottomLeft'].includes(k)) el[o][k] = Number(v);
-                else if(['showBorder','displayValue','asPercent','borderTop','borderRight','borderBottom','borderLeft'].includes(k)) el[o][k] = !!v;
-                else if(k === 'fontWeight'){
-                    // Handle fontWeight: can be number (100-900) or string ('normal', 'bold')
-                    const numVal = Number(v);
-                    el[o][k] = (!isNaN(numVal) && numVal >= 100 && numVal <= 900) ? numVal : v;
-                }
-            else el[o][k] = v;
-        } else {
-            if(['x','y','width','height','zIndex'].includes(p)) el[p] = Number(v);
-            else el[p] = v;
-        }
-    }
-
     pp.addEventListener('input', (e)=>{
         if(selectedIds.length === 0 && e.target.dataset.prop !== 'bind_search') return;
             
@@ -7154,6 +6882,25 @@ document.addEventListener('DOMContentLoaded', ()=>{
                 return;
             }
 
+        function applyPropToElement(el, p, v){
+            if(p === 'widthHeight'){ el.height = Number(v); return; }
+            if(p.includes('.')){
+                const [o,k] = p.split('.');
+                if(!el[o]) el[o] = {};
+                    if(['fontSize','decimals','thickness','borderWidth','rotation','paddingTop','paddingRight','paddingBottom','paddingLeft','x','y','width','height','borderRadiusTopLeft','borderRadiusTopRight','borderRadiusBottomRight','borderRadiusBottomLeft'].includes(k)) el[o][k] = Number(v);
+                    else if(['showBorder','displayValue','asPercent','borderTop','borderRight','borderBottom','borderLeft'].includes(k)) el[o][k] = !!v;
+                    else if(k === 'fontWeight'){
+                        // Handle fontWeight: can be number (100-900) or string ('normal', 'bold')
+                        const numVal = Number(v);
+                        el[o][k] = (!isNaN(numVal) && numVal >= 100 && numVal <= 900) ? numVal : v;
+                    }
+                else el[o][k] = v;
+            } else {
+                if(['x','y','width','height','zIndex'].includes(p)) el[p] = Number(v);
+                else el[p] = v;
+            }
+        }
+
         // For textarea, don't render immediately to avoid losing focus
         const isTextarea = target.tagName === 'TEXTAREA';
         
@@ -7174,26 +6921,11 @@ document.addEventListener('DOMContentLoaded', ()=>{
                 if(el.masterThreadId && !isTextarea){
                     const syncProps = ['props.boundColumn', 'props.prefix', 'props.suffix', 'props.text', 'props.fallbackLink'];
                     if(syncProps.includes(prop)){
-                        console.log('[SYNC DEBUG] Input handler - element is synchronized', {
-                            elementId: el.id,
-                            masterThreadId: el.masterThreadId,
-                            prop,
-                            parsedValue,
-                            parsedValueType: typeof parsedValue
-                        });
                         // Map prop to thread property name
                         let threadProp = prop.replace('props.', '');
                         if(threadProp === 'fallbackLink') threadProp = 'fallbackLink';
-                        // Use string value for text properties
-                        const stringValue = String(parsedValue || '');
-                        console.log('[SYNC DEBUG] Calling syncPropertyToThread with:', {threadId: el.masterThreadId, property: threadProp, value: stringValue});
-                        syncPropertyToThread(el.masterThreadId, threadProp, stringValue);
-                    } else {
-                        console.log('[SYNC DEBUG] Property not syncable:', prop);
+                        syncPropertyToThread(el.masterThreadId, threadProp, parsedValue);
                     }
-                } else {
-                    if(!el.masterThreadId) console.log('[SYNC DEBUG] Element not synchronized');
-                    if(isTextarea) console.log('[SYNC DEBUG] Textarea - deferring sync');
                 }
             }
         }
@@ -7222,13 +6954,6 @@ document.addEventListener('DOMContentLoaded', ()=>{
         const id = selectedIds[0];
         const el = S.find(s=>s.id===id);
         if(el) {
-            console.log('[SYNC DEBUG] Textarea blur - element:', {
-                elementId: el.id,
-                masterThreadId: el.masterThreadId,
-                prop,
-                value: target.value
-            });
-            
             // Update the value
             applyPropToElement(el, prop, target.value);
             
@@ -7239,26 +6964,13 @@ document.addEventListener('DOMContentLoaded', ()=>{
                     // Map prop to thread property name
                     let threadProp = prop.replace('props.', '');
                     if(threadProp === 'fallbackLink') threadProp = 'fallbackLink';
-                    const stringValue = String(target.value || '');
-                    console.log('[SYNC DEBUG] Textarea blur - calling syncPropertyToThread:', {
-                        threadId: el.masterThreadId,
-                        property: threadProp,
-                        value: stringValue
-                    });
-                    syncPropertyToThread(el.masterThreadId, threadProp, stringValue);
-                } else {
-                    console.log('[SYNC DEBUG] Textarea blur - property not syncable:', prop);
+                    syncPropertyToThread(el.masterThreadId, threadProp, target.value);
                 }
-            } else {
-                console.log('[SYNC DEBUG] Textarea blur - element not synchronized');
             }
             
-            // Note: syncPropertyToThread already calls render() and saveCurrentDesign()
-            // But we call it again to ensure UI is updated
-            if(!el.masterThreadId || !syncProps.includes(prop)){
-                render();
-                saveCurrentDesign();
-            }
+            // Now render and save
+            render();
+            saveCurrentDesign();
         }
     }, true);
 
@@ -7951,29 +7663,9 @@ document.addEventListener('DOMContentLoaded', ()=>{
                                 group.elementIds = group.elementIds.filter(id => S.some(e => e.id === id));
                                 return group.elementIds.length > 0;
                             });
-                            // Recalculate bounds and initialize originalBounds/originalElements for loaded groups
+                            // Recalculate bounds for loaded groups
                             groups.forEach(group => {
                                 group.bounds = getGroupBounds(group.elementIds);
-                                // Initialize originalBounds if not set (backward compatibility)
-                                if(!group.originalBounds){
-                                    group.originalBounds = {...group.bounds};
-                                }
-                                // Initialize originalElements if not set (backward compatibility)
-                                if(!group.originalElements){
-                                    group.originalElements = {};
-                                    group.elementIds.forEach(elementId => {
-                                        const el = S.find(e => e.id === elementId);
-                                        if(el){
-                                            group.originalElements[elementId] = {
-                                                x: el.x,
-                                                y: el.y,
-                                                width: el.width,
-                                                height: el.height,
-                                                props: deepCopy(el.props)
-                                            };
-                                        }
-                                    });
-                                }
                             });
                     }
                 }
