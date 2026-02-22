@@ -1631,6 +1631,7 @@ document.addEventListener('DOMContentLoaded', ()=>{
                         span.style.width = 'auto';
                         span.style.overflow = 'visible';
                         span.style.maxWidth = 'none';
+                        span.style.wordWrap = 'normal'; // Disable word wrapping for squeeze
                         
                         // Allow container to show compressed text
                         if(container){
@@ -4782,12 +4783,13 @@ document.addEventListener('DOMContentLoaded', ()=>{
                                 span.style.whiteSpace = 'nowrap'; // No wrapping for squeeze
                                 span.style.width = 'auto'; // Allow natural text width for squeeze
                                 span.style.overflow = 'visible'; // Don't clip compressed text
+                                span.style.wordWrap = 'normal'; // Disable word wrapping for squeeze
                             } else {
                                 span.style.width = '100%';
                                 span.style.overflow = 'hidden';
                                 span.style.whiteSpace = 'pre-wrap'; // Allow wrapping for clip and auto-scale
+                                span.style.wordWrap='break-word';
                             }
-                            span.style.wordWrap='break-word';
                             
                             setTextWithRegexFormatting(span, getData(el, sequenceIndex, waveContext), el.props.regexRules);
                             // Copy font styles to span for overflow calculation
@@ -4808,11 +4810,21 @@ document.addEventListener('DOMContentLoaded', ()=>{
                         case 'data': {
                             const span = document.createElement('div');
                             span.style.display='block';
-                            span.style.width='100%';
                             span.style.pointerEvents='none';
-                            span.style.overflow='hidden';
-                            span.style.wordWrap='break-word';
-                            span.style.whiteSpace='pre-wrap'; // Always allow wrapping first
+                            
+                            // Set whiteSpace and width based on textOverflow mode
+                            const overflowMode = el.props.textOverflow || 'clip';
+                            if(overflowMode === 'squeeze'){
+                                span.style.whiteSpace = 'nowrap'; // No wrapping for squeeze
+                                span.style.width = 'auto'; // Allow natural text width for squeeze
+                                span.style.overflow = 'visible'; // Don't clip compressed text
+                                span.style.wordWrap = 'normal'; // Disable word wrapping for squeeze
+                            } else {
+                                span.style.width = '100%';
+                                span.style.overflow = 'hidden';
+                                span.style.whiteSpace = 'pre-wrap'; // Allow wrapping for clip and auto-scale
+                                span.style.wordWrap='break-word';
+                            }
                             
                             setTextWithRegexFormatting(span, getData(el, sequenceIndex, waveContext), el.props.regexRules);
                             // Copy font styles to span for overflow calculation
@@ -5419,12 +5431,13 @@ document.addEventListener('DOMContentLoaded', ()=>{
                                 span.style.whiteSpace = 'nowrap'; // No wrapping for squeeze
                                 span.style.width = 'auto'; // Allow natural text width for squeeze
                                 span.style.overflow = 'visible'; // Don't clip compressed text
+                                span.style.wordWrap = 'normal'; // Disable word wrapping for squeeze
                             } else {
                                 span.style.width = '100%';
                                 span.style.overflow = 'hidden';
                                 span.style.whiteSpace = 'pre-wrap'; // Allow wrapping for clip and auto-scale
+                                span.style.wordWrap='break-word';
                             }
-                            span.style.wordWrap='break-word';
                             
                             setTextWithRegexFormatting(span, getData(el, sequenceIndex, waveContext), el.props.regexRules);
                             // Copy font styles to span for overflow calculation
@@ -5445,11 +5458,21 @@ document.addEventListener('DOMContentLoaded', ()=>{
                         case 'data': {
                             const span = document.createElement('div');
                             span.style.display='block';
-                            span.style.width='100%';
                             span.style.pointerEvents='none';
-                            span.style.overflow='hidden';
-                            span.style.wordWrap='break-word';
-                            span.style.whiteSpace='pre-wrap'; // Always allow wrapping first
+                            
+                            // Set whiteSpace and width based on textOverflow mode
+                            const overflowMode = el.props.textOverflow || 'clip';
+                            if(overflowMode === 'squeeze'){
+                                span.style.whiteSpace = 'nowrap'; // No wrapping for squeeze
+                                span.style.width = 'auto'; // Allow natural text width for squeeze
+                                span.style.overflow = 'visible'; // Don't clip compressed text
+                                span.style.wordWrap = 'normal'; // Disable word wrapping for squeeze
+                            } else {
+                                span.style.width = '100%';
+                                span.style.overflow = 'hidden';
+                                span.style.whiteSpace = 'pre-wrap'; // Allow wrapping for clip and auto-scale
+                                span.style.wordWrap='break-word';
+                            }
                             
                             setTextWithRegexFormatting(span, getData(el, sequenceIndex, waveContext), el.props.regexRules);
                             // Copy font styles to span for overflow calculation
@@ -6017,10 +6040,21 @@ document.addEventListener('DOMContentLoaded', ()=>{
                         const span = document.createElement('div');
                         span.style.display='block';
                         span.style.pointerEvents='none';
-                        span.style.width='100%';
-                        span.style.overflow='hidden';
-                        span.style.wordWrap='break-word';
-                        span.style.whiteSpace='pre-wrap';
+                        
+                        // Set whiteSpace and width based on textOverflow mode
+                        const overflowMode = el.props.textOverflow || 'clip';
+                        if(overflowMode === 'squeeze'){
+                            span.style.whiteSpace = 'nowrap'; // No wrapping for squeeze
+                            span.style.width = 'auto'; // Allow natural text width for squeeze
+                            span.style.overflow = 'visible'; // Don't clip compressed text
+                            span.style.wordWrap = 'normal'; // Disable word wrapping for squeeze
+                        } else {
+                            span.style.width = '100%';
+                            span.style.overflow = 'hidden';
+                            span.style.whiteSpace = 'pre-wrap'; // Allow wrapping for clip and auto-scale
+                            span.style.wordWrap='break-word';
+                        }
+                        
                         setTextWithRegexFormatting(span, getData(el, sequenceIndex, waveContext), el.props.regexRules);
                         span.style.fontFamily = el.props.fontFamily || 'Arial, sans-serif';
                         span.style.fontSize = (el.props.fontSize || 16) + 'px';
@@ -6031,11 +6065,22 @@ document.addEventListener('DOMContentLoaded', ()=>{
                     case 'data': {
                         const span = document.createElement('div');
                         span.style.display='block';
-                        span.style.width='100%';
                         span.style.pointerEvents='none';
-                        span.style.overflow='hidden';
-                        span.style.wordWrap='break-word';
-                        span.style.whiteSpace='pre-wrap';
+                        
+                        // Set whiteSpace and width based on textOverflow mode
+                        const overflowMode = el.props.textOverflow || 'clip';
+                        if(overflowMode === 'squeeze'){
+                            span.style.whiteSpace = 'nowrap'; // No wrapping for squeeze
+                            span.style.width = 'auto'; // Allow natural text width for squeeze
+                            span.style.overflow = 'visible'; // Don't clip compressed text
+                            span.style.wordWrap = 'normal'; // Disable word wrapping for squeeze
+                        } else {
+                            span.style.width = '100%';
+                            span.style.overflow = 'hidden';
+                            span.style.whiteSpace = 'pre-wrap'; // Allow wrapping for clip and auto-scale
+                            span.style.wordWrap='break-word';
+                        }
+                        
                         setTextWithRegexFormatting(span, getData(el, sequenceIndex, waveContext), el.props.regexRules);
                         span.style.fontFamily = el.props.fontFamily || 'Arial, sans-serif';
                         span.style.fontSize = (el.props.fontSize || 16) + 'px';
