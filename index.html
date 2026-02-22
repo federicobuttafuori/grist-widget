@@ -509,7 +509,7 @@ document.addEventListener('DOMContentLoaded', ()=>{
             const miniCanvasSelect = document.getElementById('mini-canvas-selector');
             if (miniCanvasSelect) {
                 // Mostra solo se canvas2 è abilitato
-                miniCanvasSelect.style.display = enabled ? 'block' : 'none';
+                miniCanvasSelect.style.display = canvas2Flag ? 'block' : 'none';
                 miniCanvasSelect.value = currentCanvas.toString();
             }
         }
@@ -4399,11 +4399,16 @@ document.addEventListener('DOMContentLoaded', ()=>{
             URL.revokeObjectURL(url);
         }
 
+        // Snapshot import: accepts UTF-8 (with or without BOM), normalizes profile.designs, shows real error messages.
         function importSnapshotFromFile(fileContent){
             try{
-                const parsed = JSON.parse(fileContent);
-                if(!parsed || parsed.version !== 2 || !parsed.profiles || typeof parsed.profiles !== 'object'){
-                    throw new Error('Unknown snapshot structure');
+                if(fileContent == null || typeof fileContent !== 'string'){
+                    throw new Error('No file content (file may be empty or unreadable)');
+                }
+                const trimmed = String(fileContent).replace(/^\uFEFF/, ''); // strip UTF-8 BOM
+                const parsed = JSON.parse(trimmed);
+                if(!parsed || Number(parsed.version) !== 2 || !parsed.profiles || typeof parsed.profiles !== 'object'){
+                    throw new Error('Unknown snapshot structure (expected version 2 with profiles)');
                 }
 
                 if(!confirm('Import snapshot? This will replace ALL sizes (profiles) and designs currently stored.')){
@@ -4413,6 +4418,13 @@ document.addEventListener('DOMContentLoaded', ()=>{
                 saveCurrentDesign();
 
                 profiles = deepCopy(parsed.profiles);
+                const defaultDesign = { canvas1: [], canvas2: [], canvas2Enabled: false, sequenceEnabled: false };
+                Object.keys(profiles).forEach(key => {
+                    if(!profiles[key] || typeof profiles[key] !== 'object') return;
+                    if(!profiles[key].designs || typeof profiles[key].designs !== 'object'){
+                        profiles[key].designs = { default: deepCopy(defaultDesign) };
+                    }
+                });
                 groups = Array.isArray(parsed.groups) ? deepCopy(parsed.groups) : [];
                 lastDesignByProfile = parsed.lastDesignByProfile && typeof parsed.lastDesignByProfile === 'object' ? deepCopy(parsed.lastDesignByProfile) : {};
                 lastCanvasByProfile = parsed.lastCanvasByProfile && typeof parsed.lastCanvasByProfile === 'object' ? deepCopy(parsed.lastCanvasByProfile) : {};
@@ -4464,8 +4476,8 @@ document.addEventListener('DOMContentLoaded', ()=>{
                 msg('Snapshot imported');
                 return true;
             }catch(e){
-                console.error('Parse error while importing snapshot:', e);
-                msg('Error importing snapshot: invalid JSON', true, 4000);
+                const errMsg = (e && e.message) ? e.message : String(e);
+                msg('Error importing snapshot: ' + errMsg, true, 5000);
                 return false;
             }
         }
@@ -7658,7 +7670,8 @@ document.addEventListener('DOMContentLoaded', ()=>{
         if(!f) return;
         const reader = new FileReader();
         reader.onload = () => { importSnapshotFromFile(reader.result); };
-        reader.readAsText(f);
+        reader.onerror = () => { msg('Error reading file', true, 4000); };
+        reader.readAsText(f, 'UTF-8');
     });
 
         // Profile/Design management
