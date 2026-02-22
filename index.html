@@ -1748,8 +1748,13 @@ document.addEventListener('DOMContentLoaded', ()=>{
         
         // Helper function to get column value as number (for math calculations)
         function getColumnValueAsNumber(columnId, waveContext = null){
-            if(!R || typeof R !== 'object') return null;
             const trimmedColumnId = columnId.trim();
+            // Print single: override weight column with user-entered weight
+            if(waveContext && waveContext.overrideWeight !== undefined && packWaves.some(wave => wave.weightColumn === trimmedColumnId)){
+                const num = parseFloat(waveContext.overrideWeight);
+                return isNaN(num) ? null : num;
+            }
+            if(!R || typeof R !== 'object') return null;
             let columnToUse = trimmedColumnId;
             if(waveContext && waveContext.weightColumn){
                 const matchesAnyWaveWeight = packWaves.some(wave => wave.weightColumn === trimmedColumnId);
@@ -1869,24 +1874,34 @@ document.addEventListener('DOMContentLoaded', ()=>{
 
         // Helper function to replace **column** syntax with actual data
         function replaceColumnSyntax(str, el, waveContext = null){
-            if(!str || typeof str !== 'string' || !R || typeof R !== 'object') return str;
+            if(!str || typeof str !== 'string') return str;
+            const hasR = R && typeof R === 'object';
             return str.replace(/\*\*([^*]+)\*\*/g, (match, columnId) => {
                 const trimmedColumnId = columnId.trim();
+                // Print single: override weight column with user-entered weight
+                if(waveContext && waveContext.overrideWeight !== undefined && packWaves.some(wave => wave.weightColumn === trimmedColumnId)){
+                    let v = waveContext.overrideWeight;
+                    if(v === null || v === undefined) return '';
+                    const num = parseFloat(v);
+                    if(el && el.type === 'data' && !isNaN(num)){
+                        const dec = (el.props.decimals !== undefined) ? Number(el.props.decimals) : 2;
+                        const pct = !!el.props.asPercent;
+                        return fmt(num, dec, pct);
+                    }
+                    return String(v);
+                }
+                if(!hasR) return match;
                 // If waveContext is provided, check if this column matches any wave's weightColumn
-                // If it does, use the current wave's weightColumn value
                 let columnToUse = trimmedColumnId;
                 if(waveContext && waveContext.weightColumn){
-                    // Check if the column matches any wave's weightColumn
                     const matchesAnyWaveWeight = packWaves.some(wave => wave.weightColumn === trimmedColumnId);
                     if(matchesAnyWaveWeight){
-                        // Use the current wave's weightColumn value
                         columnToUse = waveContext.weightColumn;
                     }
                 }
                 if(Object.prototype.hasOwnProperty.call(R, columnToUse)){
                     let v = R[columnToUse];
                     if(v === null || v === undefined) return '';
-                    // Format numbers if it's a data field
                     if(el && el.type === 'data' && typeof v === 'number'){
                         const dec = (el.props.decimals !== undefined) ? Number(el.props.decimals) : 2;
                         const pct = !!el.props.asPercent;
@@ -1894,7 +1909,6 @@ document.addEventListener('DOMContentLoaded', ()=>{
                     }
                     return String(v);
                 }
-                // Return the original match if column not found (so user can see what's missing)
                 return match;
         });
     }
@@ -2102,10 +2116,13 @@ document.addEventListener('DOMContentLoaded', ()=>{
             
             // Handle boundColumn (legacy support) - only if **column** syntax wasn't used in text itself
             // For text fields, we can use boundColumn even if prefix/suffix have **column** syntax
-            if(!hasColumnSyntaxInText && boundColumnToUse && R && Object.prototype.hasOwnProperty.call(R, boundColumnToUse)){
-                let v = R[boundColumnToUse];
-                
-                if(el.type === 'data' && typeof v === 'number'){
+            // Print single: use overrideWeight when boundColumn is a weight column
+            const boundIsWeightColumn = boundColumnToUse && packWaves.some(wave => wave.weightColumn === boundColumnToUse);
+            const useOverrideForBound = waveContext && waveContext.overrideWeight !== undefined && boundIsWeightColumn;
+            const hasBoundValue = useOverrideForBound || (R && Object.prototype.hasOwnProperty.call(R, boundColumnToUse));
+            if(!hasColumnSyntaxInText && boundColumnToUse && hasBoundValue){
+                let v = useOverrideForBound ? waveContext.overrideWeight : R[boundColumnToUse];
+                if(el.type === 'data' && (typeof v === 'number' || (typeof v === 'string' && !isNaN(parseFloat(v))))){
                     const dec = (el.props.decimals !== undefined) ? Number(el.props.decimals) : 2;
                     const pct = !!el.props.asPercent;
                     return prefix + fmt(v,dec,pct) + suffix;
@@ -2128,13 +2145,16 @@ document.addEventListener('DOMContentLoaded', ()=>{
             
             // For barcode and qr, return only the text value (prefix/suffix will be shown separately in rendering)
             if(el.type === 'barcode' || el.type === 'qr'){
-                // If text is empty but we have boundColumn, use boundColumn as fallback
                 let boundColumnToUse = el.props.boundColumn;
                 if(waveContext && waveContext.weightColumn && el.props.boundColumn){
                     const matchesWaveWeight = packWaves.some(wave => wave.weightColumn === el.props.boundColumn);
                     if(matchesWaveWeight){
                         boundColumnToUse = waveContext.weightColumn;
                     }
+                }
+                const boundIsWeightCol = boundColumnToUse && packWaves.some(wave => wave.weightColumn === boundColumnToUse);
+                if(!text && boundColumnToUse && (boundIsWeightCol && waveContext && waveContext.overrideWeight !== undefined)){
+                    return String(waveContext.overrideWeight);
                 }
                 if(!text && boundColumnToUse && R && Object.prototype.hasOwnProperty.call(R, boundColumnToUse)){
                     return String(R[boundColumnToUse]);
@@ -5889,7 +5909,7 @@ document.addEventListener('DOMContentLoaded', ()=>{
             const design = profile.designs[currentDesign];
             const canvas2Flag = design.canvas2Enabled || false;
             
-            // Ask user for sequence number
+            // Ask user for sequence number and optional weight override
             const sequenceInput = prompt('Enter sequence number:', '1');
             if(sequenceInput === null) return; // User cancelled
             
@@ -5898,6 +5918,10 @@ document.addEventListener('DOMContentLoaded', ()=>{
                 msg('Error: Invalid sequence number', true);
                 return;
             }
+            
+            const weightInput = prompt('Enter weight (optional – overrides weight column for this print). Leave empty to use column value:', '');
+            if(weightInput === null) return; // User cancelled
+            const overrideWeight = String(weightInput).trim() !== '' ? String(weightInput).trim() : undefined;
             
             // Save current canvas
             saveCurrentDesign();
@@ -6256,14 +6280,17 @@ document.addEventListener('DOMContentLoaded', ()=>{
         // Add print container to DOM first so measurements work correctly
         document.body.appendChild(printContainer);
         
+        // Build waveContext for print single: override weight column if user entered a weight
+        const singlePrintContext = overrideWeight !== undefined ? { overrideWeight } : null;
+        
         // Add canvas 1 with specified sequence index
         const isLastPage1 = !canvas2Flag;
-        const page1 = renderCanvasToPage(1, sequenceIndex, isLastPage1, null);
+        const page1 = renderCanvasToPage(1, sequenceIndex, isLastPage1, singlePrintContext);
         printContainer.appendChild(page1);
         
         // Add canvas 2 if enabled with same sequence index
         if(canvas2Flag){
-            const page2 = renderCanvasToPage(2, sequenceIndex, true, null);
+            const page2 = renderCanvasToPage(2, sequenceIndex, true, singlePrintContext);
             printContainer.appendChild(page2);
         }
         
