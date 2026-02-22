@@ -58,6 +58,11 @@
             #mini-toolbar select{padding:6px 8px;font-size:13px;border:1px solid #ccc;border-radius:4px;background:#fff;min-width:100px;max-width:150px}
             .widget-mode #canvas-container .label-element{pointer-events:none;cursor:default}
             .widget-mode #canvas-container{cursor:default}
+        .column-mention-dropdown{position:fixed;z-index:10000;background:#fff;border:1px solid #ccc;border-radius:4px;box-shadow:0 4px 12px rgba(0,0,0,.15);max-height:200px;overflow-y:auto;min-width:160px;display:none}
+        .column-mention-dropdown.column-mention-dropdown-visible{display:block}
+        .column-mention-dropdown-item{padding:8px 12px;cursor:pointer;font-size:14px;border-bottom:1px solid #f0f0f0}
+        .column-mention-dropdown-item:last-child{border-bottom:none}
+        .column-mention-dropdown-item:hover,.column-mention-dropdown-item.column-mention-dropdown-item-selected{background:#e8f0fe;color:#1967d2}
     </style>
 </head>
 <body>
@@ -1783,10 +1788,14 @@ document.addEventListener('DOMContentLoaded', ()=>{
                     const decimals = parseInt(decimalsStr, 10);
                     if(isNaN(decimals) || decimals < 0) return match;
                     
-                    // Replace **column** syntax with numeric values in the expression
+                    // Replace **column** and @column@ syntax with numeric values in the expression
                     let processedExpression = expression.replace(/\*\*([^*]+)\*\*/g, (colMatch, columnId) => {
-                        const numValue = getColumnValueAsNumber(columnId, waveContext);
-                        if(numValue === null) return '0'; // Return 0 if column not found or not numeric
+                        const numValue = getColumnValueAsNumber(columnId.trim(), waveContext);
+                        if(numValue === null) return '0';
+                        return String(numValue);
+                    }).replace(/@([^@]+)@/g, (colMatch, columnId) => {
+                        const numValue = getColumnValueAsNumber(columnId.trim(), waveContext);
+                        if(numValue === null) return '0';
                         return String(numValue);
                     });
                     
@@ -1824,10 +1833,14 @@ document.addEventListener('DOMContentLoaded', ()=>{
             // Then process expressions without decimals: $$expression$$
             result = result.replace(/\$\$([^$]+)\$\$/g, (match, expression) => {
                 try {
-                    // Replace **column** syntax with numeric values in the expression
+                    // Replace **column** and @column@ syntax with numeric values in the expression
                     let processedExpression = expression.replace(/\*\*([^*]+)\*\*/g, (colMatch, columnId) => {
-                        const numValue = getColumnValueAsNumber(columnId, waveContext);
-                        if(numValue === null) return '0'; // Return 0 if column not found or not numeric
+                        const numValue = getColumnValueAsNumber(columnId.trim(), waveContext);
+                        if(numValue === null) return '0';
+                        return String(numValue);
+                    }).replace(/@([^@]+)@/g, (colMatch, columnId) => {
+                        const numValue = getColumnValueAsNumber(columnId.trim(), waveContext);
+                        if(numValue === null) return '0';
                         return String(numValue);
                     });
                     
@@ -1872,12 +1885,13 @@ document.addEventListener('DOMContentLoaded', ()=>{
             return result;
         }
 
-        // Helper function to replace **column** syntax with actual data
+        // Helper function to replace **column** or @column@ syntax with actual data
         function replaceColumnSyntax(str, el, waveContext = null){
             if(!str || typeof str !== 'string') return str;
             const hasR = R && typeof R === 'object';
-            return str.replace(/\*\*([^*]+)\*\*/g, (match, columnId) => {
-                const trimmedColumnId = columnId.trim();
+            const replacer = (match, columnId) => {
+                const trimmedColumnId = (columnId || '').trim();
+                if(!trimmedColumnId) return match;
                 // Print single: override weight column with user-entered weight
                 if(waveContext && waveContext.overrideWeight !== undefined && packWaves.some(wave => wave.weightColumn === trimmedColumnId)){
                     let v = waveContext.overrideWeight;
@@ -1891,7 +1905,6 @@ document.addEventListener('DOMContentLoaded', ()=>{
                     return String(v);
                 }
                 if(!hasR) return match;
-                // If waveContext is provided, check if this column matches any wave's weightColumn
                 let columnToUse = trimmedColumnId;
                 if(waveContext && waveContext.weightColumn){
                     const matchesAnyWaveWeight = packWaves.some(wave => wave.weightColumn === trimmedColumnId);
@@ -1910,12 +1923,13 @@ document.addEventListener('DOMContentLoaded', ()=>{
                     return String(v);
                 }
                 return match;
-        });
+            };
+            return str.replace(/\*\*([^*]+)\*\*/g, replacer).replace(/@([^@]+)@/g, replacer);
     }
 
     function applySequencePlaceholder(str, sequenceIndex){
         if(!str || typeof str !== 'string') return str;
-        return str.replace(/\*\*sequence\*\*/g, String(sequenceIndex));
+        return str.replace(/\*\*sequence\*\*/g, String(sequenceIndex)).replace(/@sequence@/g, String(sequenceIndex));
     }
 
     // Helper function to set text content with regex formatting
@@ -2048,9 +2062,9 @@ document.addEventListener('DOMContentLoaded', ()=>{
             const originalPrefix = prefix;
             const originalSuffix = suffix;
             
-            // For text fields, check if **column** syntax is used ONLY in the text itself (not prefix/suffix)
-            // Prefix and suffix can have **column** syntax independently
-            const hasColumnSyntaxInText = text.includes('**') || text.includes('$$');
+            // For text fields, check if **column** or @column@ syntax is used in the text itself (not prefix/suffix)
+            // Prefix and suffix can have column syntax independently
+            const hasColumnSyntaxInText = text.includes('**') || text.includes('@') || text.includes('$$');
             
             // Handle boundColumn with waveContext support
             // If waveContext is provided and element has boundColumn that matches a wave weight column, use waveContext.weightColumn
@@ -2072,9 +2086,9 @@ document.addEventListener('DOMContentLoaded', ()=>{
                 
                 // If both prefix and suffix contain math delimiters, combine them with boundColumn and process
                 if(prefixHasMath && suffixHasMath){
-                    // Build the combined expression: prefix + **boundColumn** + suffix
+                    // Build the combined expression: prefix + @boundColumn@ + suffix
                     // This allows the boundColumn value to be used in math expressions while preserving any text outside $$
-                    const combinedExpression = originalPrefix + '**' + boundColumnToUse + '**' + originalSuffix;
+                    const combinedExpression = originalPrefix + '@' + boundColumnToUse + '@' + originalSuffix;
                     
                     // Process the combined expression completely (math expressions first, then column syntax)
                     // This will process $$...$$ or $$...$number$ expressions and leave other text unchanged
@@ -2530,30 +2544,30 @@ document.addEventListener('DOMContentLoaded', ()=>{
             let h = `<div class="prop-grid"><label>X</label><input type="number" step="0.01" data-prop="x" value="${(Number(el.x)||0).toFixed(2)}"><label>Y</label><input type="number" step="0.01" data-prop="y" value="${(Number(el.y)||0).toFixed(2)}"></div>`;
             h += `<div class="prop-grid"><label>Width</label><input type="number" step="0.01" data-prop="width" value="${(Number(el.width)||0).toFixed(2)}"><label>Height</label><input type="number" step="0.01" data-prop="height" value="${(Number(el.height)||0).toFixed(2)}"></div><hr>`;
 
-        if(el.type==='text') h += `<label>Text</label><textarea data-prop="props.text">${escapeHtml(el.props.text||'')}</textarea>`;
+        if(el.type==='text') h += `<label>Text</label><textarea data-prop="props.text" class="column-mention-input" data-column-mention="1">${escapeHtml(el.props.text||'')}</textarea>`;
 
             if(el.type==='data' || el.type==='qr' || el.type==='barcode' || el.type==='image'){
             h += `<label>Bound Column</label>${bindHtml}`;
         }
 
         if(el.type==='data'){
-                h += `<label>Prefix</label><textarea data-prop="props.prefix" rows="2">${escapeHtml(el.props.prefix||'')}</textarea>`;
-                h += `<label>Suffix</label><textarea data-prop="props.suffix" rows="2">${escapeHtml(el.props.suffix||'')}</textarea>`;
+                h += `<label>Prefix</label><textarea data-prop="props.prefix" rows="2" class="column-mention-input" data-column-mention="1">${escapeHtml(el.props.prefix||'')}</textarea>`;
+                h += `<label>Suffix</label><textarea data-prop="props.suffix" rows="2" class="column-mention-input" data-column-mention="1">${escapeHtml(el.props.suffix||'')}</textarea>`;
             h += `<hr><div class="prop-grid"><label>Decimals</label><input type="number" step="1" data-prop="props.decimals" value="${el.props.decimals!==undefined?el.props.decimals:2}" min="0" max="10"><label>As Percent</label><input type="checkbox" data-prop="props.asPercent" ${el.props.asPercent?'checked':''}></div>`;
         }
 
         if(el.type==='qr' || el.type==='barcode'){
-            h += `<label>Fallback Text</label><input type="text" data-prop="props.text" value="${escapeHtml(el.props.text||'')}">`;
+            h += `<label>Fallback Text</label><input type="text" data-prop="props.text" class="column-mention-input" data-column-mention="1" value="${escapeHtml(el.props.text||'')}">`;
         }
 
         if(el.type==='qr'){
-            h += `<label>Prefix</label><textarea data-prop="props.prefix" rows="2">${escapeHtml(el.props.prefix||'')}</textarea>`;
-            h += `<label>Suffix</label><textarea data-prop="props.suffix" rows="2">${escapeHtml(el.props.suffix||'')}</textarea>`;
+            h += `<label>Prefix</label><textarea data-prop="props.prefix" rows="2" class="column-mention-input" data-column-mention="1">${escapeHtml(el.props.prefix||'')}</textarea>`;
+            h += `<label>Suffix</label><textarea data-prop="props.suffix" rows="2" class="column-mention-input" data-column-mention="1">${escapeHtml(el.props.suffix||'')}</textarea>`;
         }
 
         if(el.type==='barcode'){
-            h += `<label>Prefix</label><textarea data-prop="props.prefix" rows="2">${escapeHtml(el.props.prefix||'')}</textarea>`;
-            h += `<label>Suffix</label><textarea data-prop="props.suffix" rows="2">${escapeHtml(el.props.suffix||'')}</textarea>`;
+            h += `<label>Prefix</label><textarea data-prop="props.prefix" rows="2" class="column-mention-input" data-column-mention="1">${escapeHtml(el.props.prefix||'')}</textarea>`;
+            h += `<label>Suffix</label><textarea data-prop="props.suffix" rows="2" class="column-mention-input" data-column-mention="1">${escapeHtml(el.props.suffix||'')}</textarea>`;
             h += `<label>Format</label><select data-prop="props.format"><option value="CODE128" ${el.props.format==='CODE128'?'selected':''}>CODE128</option><option value="CODE39" ${el.props.format==='CODE39'?'selected':''}>CODE39</option><option value="EAN13" ${el.props.format==='EAN13'?'selected':''}>EAN13</option><option value="UPC" ${el.props.format==='UPC'?'selected':''}>UPC</option></select><label>Show Text</label><input type="checkbox" data-prop="props.displayValue" ${el.props.displayValue!==false?'checked':''}>`;
         }
 
@@ -7321,6 +7335,122 @@ document.addEventListener('DOMContentLoaded', ()=>{
                 e.stopPropagation();
             }
         }, true);
+
+        // ---------- @ column mention autocomplete ----------
+        (function(){
+            const dropdown = document.createElement('div');
+            dropdown.className = 'column-mention-dropdown';
+            dropdown.id = 'column-mention-dropdown';
+            document.body.appendChild(dropdown);
+            let columnMentionInput = null;
+            let columnMentionSelectedIndex = 0;
+            let columnMentionLastAt = -1;
+
+            function hideColumnMentionDropdown(){
+                dropdown.classList.remove('column-mention-dropdown-visible');
+                dropdown.innerHTML = '';
+                columnMentionInput = null;
+            }
+
+            function showColumnMentionDropdown(inputEl, query){
+                if(!C || !C.length){ hideColumnMentionDropdown(); return; }
+                const results = searchColumns(query || '', C);
+                const list = results.map(r => r.col);
+                if(list.length === 0){ hideColumnMentionDropdown(); return; }
+                columnMentionInput = inputEl;
+                columnMentionSelectedIndex = 0;
+                dropdown.innerHTML = list.map((col, i) => `<div class="column-mention-dropdown-item" data-col="${escapeHtml(col)}" data-index="${i}">${escapeHtml(col)}</div>`).join('');
+                dropdown.querySelectorAll('.column-mention-dropdown-item').forEach((item, i) => {
+                    item.addEventListener('click', () => {
+                        const col = item.getAttribute('data-col');
+                        if(columnMentionInput && col != null){
+                            const val = columnMentionInput.value;
+                            const start = columnMentionInput.selectionStart;
+                            const from = val.lastIndexOf('@', start - 1);
+                            if(from !== -1){
+                                const insert = '@' + col + '@';
+                                const newVal = val.substring(0, from) + insert + val.substring(start);
+                                columnMentionInput.value = newVal;
+                                columnMentionInput.selectionStart = columnMentionInput.selectionEnd = from + insert.length;
+                                columnMentionInput.dispatchEvent(new Event('input', { bubbles: true }));
+                            }
+                        }
+                        hideColumnMentionDropdown();
+                    });
+                });
+                const rect = inputEl.getBoundingClientRect();
+                dropdown.style.left = rect.left + 'px';
+                dropdown.style.top = (rect.bottom + 2) + 'px';
+                dropdown.style.minWidth = Math.max(rect.width, 160) + 'px';
+                dropdown.classList.add('column-mention-dropdown-visible');
+                dropdown.querySelector('.column-mention-dropdown-item').classList.add('column-mention-dropdown-item-selected');
+            }
+
+            function updateColumnMentionSelection(){
+                dropdown.querySelectorAll('.column-mention-dropdown-item').forEach((item, i) => {
+                    item.classList.toggle('column-mention-dropdown-item-selected', i === columnMentionSelectedIndex);
+                });
+            }
+
+            pp.addEventListener('input', (e) => {
+                const el = e.target;
+                if(!el.matches || !el.matches('.column-mention-input')) return;
+                const val = el.value || '';
+                const pos = el.selectionStart;
+                const lastAt = val.lastIndexOf('@', pos - 1);
+                if(lastAt === -1){ hideColumnMentionDropdown(); return; }
+                const nextAt = val.indexOf('@', lastAt + 1);
+                if(nextAt !== -1 && nextAt < pos){ hideColumnMentionDropdown(); return; }
+                const query = val.substring(lastAt + 1, pos).trim();
+                columnMentionLastAt = lastAt;
+                showColumnMentionDropdown(el, query);
+            }, true);
+
+            pp.addEventListener('keydown', (e) => {
+                const el = e.target;
+                if(!el.matches || !el.matches('.column-mention-input')) return;
+                if(!dropdown.classList.contains('column-mention-dropdown-visible')) return;
+                const items = dropdown.querySelectorAll('.column-mention-dropdown-item');
+                if(e.key === 'ArrowDown'){
+                    e.preventDefault();
+                    columnMentionSelectedIndex = Math.min(columnMentionSelectedIndex + 1, items.length - 1);
+                    updateColumnMentionSelection();
+                    items[columnMentionSelectedIndex] && items[columnMentionSelectedIndex].scrollIntoView({ block: 'nearest' });
+                } else if(e.key === 'ArrowUp'){
+                    e.preventDefault();
+                    columnMentionSelectedIndex = Math.max(columnMentionSelectedIndex - 1, 0);
+                    updateColumnMentionSelection();
+                    items[columnMentionSelectedIndex] && items[columnMentionSelectedIndex].scrollIntoView({ block: 'nearest' });
+                } else if(e.key === 'Enter'){
+                    e.preventDefault();
+                    const item = items[columnMentionSelectedIndex];
+                    if(item && columnMentionInput){
+                        const col = item.getAttribute('data-col');
+                        if(col != null){
+                            const val = columnMentionInput.value;
+                            const start = columnMentionInput.selectionStart;
+                            const from = val.lastIndexOf('@', start - 1);
+                            if(from !== -1){
+                                const insert = '@' + col + '@';
+                                const newVal = val.substring(0, from) + insert + val.substring(start);
+                                columnMentionInput.value = newVal;
+                                columnMentionInput.selectionStart = columnMentionInput.selectionEnd = from + insert.length;
+                                columnMentionInput.dispatchEvent(new Event('input', { bubbles: true }));
+                            }
+                        }
+                    }
+                    hideColumnMentionDropdown();
+                } else if(e.key === 'Escape'){
+                    e.preventDefault();
+                    hideColumnMentionDropdown();
+                }
+            }, true);
+
+            document.addEventListener('click', (e) => {
+                if(dropdown.classList.contains('column-mention-dropdown-visible') && !dropdown.contains(e.target) && e.target !== columnMentionInput && !(e.target.matches && e.target.matches('.column-mention-input')))
+                    hideColumnMentionDropdown();
+            });
+        })();
         
         // Prevent canvas clicks from stealing focus from textarea
         lc.addEventListener('mousedown', (e)=>{
