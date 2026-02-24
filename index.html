@@ -6,6 +6,7 @@
     <title>Grist Label Designer — Marquee Fix</title>
     <script src="https://docs.getgrist.com/grist-plugin-api.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/jsbarcode@3.11.5/dist/JsBarcode.all.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/gh/davidshimjs/qrcodejs@gh-pages/qrcode.min.js"></script>
         <link rel="preconnect" href="https://fonts.googleapis.com">
         <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
             <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@100;200;300;400;500;600;700;800;900&family=Oswald:wght@200;300;400;500;600;700&family=Roboto+Condensed:wght@300;400;700&family=Sofia+Sans+Extra+Condensed:wght@100;200;300;400;500;600;700;800;900&display=swap" rel="stylesheet">
@@ -63,6 +64,7 @@
         .column-mention-dropdown-item{padding:8px 12px;cursor:pointer;font-size:14px;border-bottom:1px solid #f0f0f0}
         .column-mention-dropdown-item:last-child{border-bottom:none}
         .column-mention-dropdown-item:hover,.column-mention-dropdown-item.column-mention-dropdown-item-selected{background:#e8f0fe;color:#1967d2}
+        @media print{ img.qr-code-img{image-rendering:pixelated!important;-webkit-optimize-contrast:pixelated} }
     </style>
 </head>
 <body>
@@ -365,6 +367,33 @@ document.addEventListener('DOMContentLoaded', ()=>{
             const pixels = valueCm * PIXELS_PER_CM;
             const roundedPixels = Math.round(pixels);
             return roundedPixels / PIXELS_PER_CM;
+        }
+
+        function generateQRDataURL(qrValue, sizePx, options){
+            const colorDark = (options && options.colorDark) || '#000000';
+            const colorLight = (options && options.colorLight) || '#ffffff';
+            const level = (options && options.errorCorrectLevel) || 'M';
+            if(typeof qrValue !== 'string') qrValue = '';
+            if(sizePx <= 0) return '';
+            if(typeof window.QRCode === 'undefined') return '';
+            try {
+                const scale = 2;
+                const renderPx = Math.max(Math.round(sizePx * scale), 200);
+                const div = document.createElement('div');
+                div.style.position = 'absolute';
+                div.style.left = '-9999px';
+                div.style.top = '0';
+                document.body.appendChild(div);
+                const correctLevel = window.QRCode.CorrectLevel && window.QRCode.CorrectLevel[level] != null ? window.QRCode.CorrectLevel[level] : window.QRCode.CorrectLevel.M;
+                new window.QRCode(div, { text: qrValue || ' ', width: renderPx, height: renderPx, colorDark: colorDark, colorLight: colorLight, correctLevel: correctLevel });
+                const child = div.firstElementChild || div.firstChild;
+                let dataURL = '';
+                if(child && child.tagName === 'CANVAS') dataURL = child.toDataURL('image/png');
+                document.body.removeChild(div);
+                return dataURL;
+            } catch(e) {
+                return '';
+            }
         }
 
         // Calculate bounding box for rotated element
@@ -1204,16 +1233,17 @@ document.addEventListener('DOMContentLoaded', ()=>{
                     
                     // Set whiteSpace and width based on textOverflow mode
                     const overflowMode = el.props.textOverflow || 'clip';
-                    if(overflowMode === 'squeeze'){
-                        span.style.whiteSpace = 'nowrap'; // No wrapping for squeeze
-                        span.style.width = 'auto'; // Allow natural text width for squeeze
-                        span.style.overflow = 'visible'; // Don't clip compressed text
+                    if(overflowMode === 'squeeze' || overflowMode === 'auto-scale'){
+                        span.style.whiteSpace = 'nowrap'; // No wrapping: scale/squeeze to fit
+                        span.style.width = 'auto';
+                        span.style.overflow = 'visible';
+                        span.style.wordWrap = 'normal';
                     } else {
                         span.style.width = '100%';
                         span.style.overflow = 'hidden';
-                        span.style.whiteSpace = 'pre-wrap'; // Allow wrapping for clip and auto-scale
+                        span.style.whiteSpace = 'pre-wrap';
+                        span.style.wordWrap = 'break-word';
                     }
-                    span.style.wordWrap='break-word';
                     
                         setTextWithRegexFormatting(span, getData(el, sequenceIndex, waveContext), el.props.regexRules);
                     // Copy font styles to span for overflow calculation
@@ -1245,16 +1275,17 @@ document.addEventListener('DOMContentLoaded', ()=>{
                     
                     // Set whiteSpace and width based on textOverflow mode
                     const overflowMode = el.props.textOverflow || 'clip';
-                    if(overflowMode === 'squeeze'){
-                        span.style.whiteSpace = 'nowrap'; // No wrapping for squeeze
-                        span.style.width = 'auto'; // Allow natural text width for squeeze
-                        span.style.overflow = 'visible'; // Don't clip compressed text
+                    if(overflowMode === 'squeeze' || overflowMode === 'auto-scale'){
+                        span.style.whiteSpace = 'nowrap'; // No wrapping: scale/squeeze to fit
+                        span.style.width = 'auto';
+                        span.style.overflow = 'visible';
+                        span.style.wordWrap = 'normal';
                     } else {
                         span.style.width = '100%';
                         span.style.overflow = 'hidden';
-                        span.style.whiteSpace = 'pre-wrap'; // Allow wrapping for clip and auto-scale
+                        span.style.whiteSpace = 'pre-wrap';
+                        span.style.wordWrap = 'break-word';
                     }
-                    span.style.wordWrap='break-word';
                     
                     setTextWithRegexFormatting(span, getData(el, sequenceIndex, waveContext), el.props.regexRules);
                     // Copy font styles to span for overflow calculation
@@ -1311,20 +1342,25 @@ document.addEventListener('DOMContentLoaded', ()=>{
                     suffix = applySequencePlaceholder(suffix, effectiveSequenceIndex);
                     
                     // Combine prefix + code + suffix into the QR code value
-                    const qrValue = prefix + String(c) + suffix;
-                    
-                    const q = document.createElement('img');
-                    const dpi = 37.795276;
-                    const qs = Math.min(el.width, el.height) * dpi;
-                    q.src = `https://api.qrserver.com/v1/create-qr-code/?size=${Math.round(qs)}x${Math.round(qs)}&data=${encodeURIComponent(qrValue)}`;
-                    q.style.pointerEvents='none';
-                    q.style.width='100%';
-                    q.style.height='100%';
-                    q.style.objectFit='contain';
-                    d.appendChild(q);
-                    break;
-                }
-                case 'barcode': {
+                            const qrValue = prefix + String(c) + suffix;
+
+                            const q = document.createElement('img');
+                            const dpi = 37.795276;
+                            const qs = Math.min(el.width, el.height) * dpi;
+                            const qrOpts = { colorDark: el.props.qrColorDark || '#000000', colorLight: el.props.qrColorLight || '#ffffff', errorCorrectLevel: el.props.qrErrorCorrectLevel || 'M' };
+                            q.src = generateQRDataURL(qrValue, Math.round(qs), qrOpts) || '';
+                            q.alt = 'QR';
+                            q.className = 'qr-code-img';
+                            q.style.pointerEvents='none';
+                            q.style.width='100%';
+                            q.style.height='100%';
+                            q.style.objectFit='contain';
+                            q.style.imageRendering='pixelated';
+                            q.style.webkitImageRendering='pixelated';
+                            d.appendChild(q);
+                            break;
+                        }
+                        case 'barcode': {
                     const effectiveSequenceIndex = waveContext && waveContext.waveSequenceIndex !== undefined ? waveContext.waveSequenceIndex : sequenceIndex;
                     const c = getData(el, sequenceIndex, waveContext) || '';
                     let prefix = el.props.prefix || '';
@@ -1659,95 +1695,90 @@ document.addEventListener('DOMContentLoaded', ()=>{
                 return;
             }
             
-            // For auto-scale: check bottom overflow and reduce font size
-            // Calculate available height (accounting for padding and borders)
+            // For auto-scale: scale text uniformly to fit in width and height (no wrapping)
             const safetyMargin = 2;
+            let availableWidth;
             let availableHeight;
-            
-            // Calculate padding and borders in pixels
-            const paddingTop = (Number(el.props.paddingTop) || 0) * PIXELS_PER_CM;
-            const paddingBottom = (Number(el.props.paddingBottom) || 0) * PIXELS_PER_CM;
-            const borderWidth = (el.props.showBorder && el.props.borderWidth) ? Number(el.props.borderWidth) : 0;
-            const borderTop = (el.props.borderTop !== false) ? borderWidth : 0;
-            const borderBottom = (el.props.borderBottom !== false) ? borderWidth : 0;
-            
-            // In print mode, padding is applied to container via CSS (in cm)
-            // containerHeight is the total element height in pixels
-            // The span is inside the container, so available height = containerHeight - padding - border
-            availableHeight = containerHeight - paddingTop - paddingBottom - borderTop - borderBottom - safetyMargin;
-            
-            if(availableHeight <= 0) return; // No space available
-            
-            // Function to apply auto-scale
+            if(isPrintMode){
+                const paddingLeft = (Number(el.props.paddingLeft) || 0) * PIXELS_PER_CM;
+                const paddingRight = (Number(el.props.paddingRight) || 0) * PIXELS_PER_CM;
+                const paddingTop = (Number(el.props.paddingTop) || 0) * PIXELS_PER_CM;
+                const paddingBottom = (Number(el.props.paddingBottom) || 0) * PIXELS_PER_CM;
+                const borderWidth = (el.props.showBorder && el.props.borderWidth) ? Number(el.props.borderWidth) : 0;
+                const borderLeft = (el.props.borderLeft !== false) ? borderWidth : 0;
+                const borderRight = (el.props.borderRight !== false) ? borderWidth : 0;
+                const borderTop = (el.props.borderTop !== false) ? borderWidth : 0;
+                const borderBottom = (el.props.borderBottom !== false) ? borderWidth : 0;
+                availableWidth = containerWidth - paddingLeft - paddingRight - borderLeft - borderRight - safetyMargin;
+                availableHeight = containerHeight - paddingTop - paddingBottom - borderTop - borderBottom - safetyMargin;
+            } else {
+                const paddingLeft = (Number(el.props.paddingLeft) || 0) * PIXELS_PER_CM;
+                const paddingRight = (Number(el.props.paddingRight) || 0) * PIXELS_PER_CM;
+                const paddingTop = (Number(el.props.paddingTop) || 0) * PIXELS_PER_CM;
+                const paddingBottom = (Number(el.props.paddingBottom) || 0) * PIXELS_PER_CM;
+                const borderWidth = (el.props.showBorder && el.props.borderWidth) ? Number(el.props.borderWidth) : 0;
+                const borderLeft = (el.props.borderLeft !== false) ? borderWidth : 0;
+                const borderRight = (el.props.borderRight !== false) ? borderWidth : 0;
+                const borderTop = (el.props.borderTop !== false) ? borderWidth : 0;
+                const borderBottom = (el.props.borderBottom !== false) ? borderWidth : 0;
+                availableWidth = containerWidth - paddingLeft - paddingRight - borderLeft - borderRight - safetyMargin;
+                availableHeight = containerHeight - paddingTop - paddingBottom - borderTop - borderBottom - safetyMargin;
+            }
+            if(availableWidth <= 0 || availableHeight <= 0) return;
+
             const executeAutoScale = () => {
-                // Get the span width
-                let spanWidth;
-                if(isPrintMode){
-                    // In print mode, calculate from containerWidth minus padding/border
-                    const paddingLeft = (Number(el.props.paddingLeft) || 0) * PIXELS_PER_CM;
-                    const paddingRight = (Number(el.props.paddingRight) || 0) * PIXELS_PER_CM;
-                    const borderLeft = (el.props.borderLeft !== false) ? borderWidth : 0;
-                    const borderRight = (el.props.borderRight !== false) ? borderWidth : 0;
-                    spanWidth = containerWidth - paddingLeft - paddingRight - borderLeft - borderRight;
-                } else {
-                    spanWidth = span.offsetWidth || containerWidth;
-                }
-                
-                if(spanWidth <= 0) return;
-                
-                // Get the actual height of the span
-                const spanHeight = span.scrollHeight || 0;
-                const spanClientHeight = span.clientHeight || span.offsetHeight || 0;
-                
-                // Check if there's bottom overflow
-                const hasBottomOverflow = spanHeight > spanClientHeight || spanHeight > availableHeight;
-                
-                if(!hasBottomOverflow) return; // No overflow, keep default behavior
-                
-                // Text overflows at bottom - reduce font size
-                let fontSize = Number(el.props.fontSize) || 16;
-                const minFontSize = 6;
-                
-                // Create a measurement div with same styles and wrapping
                 const measureDiv = document.createElement('div');
                 measureDiv.textContent = span.textContent;
                 measureDiv.style.position = 'absolute';
                 measureDiv.style.visibility = 'hidden';
-                measureDiv.style.width = spanWidth + 'px';
+                measureDiv.style.whiteSpace = 'nowrap';
+                measureDiv.style.width = 'auto';
                 measureDiv.style.height = 'auto';
                 measureDiv.style.overflow = 'visible';
-                measureDiv.style.maxHeight = 'none';
                 measureDiv.style.padding = '0';
                 measureDiv.style.margin = '0';
                 measureDiv.style.border = 'none';
-                // Copy all relevant styles from span
                 measureDiv.style.fontFamily = span.style.fontFamily || el.props.fontFamily || 'Arial, sans-serif';
+                measureDiv.style.fontSize = span.style.fontSize || (el.props.fontSize || 16) + 'px';
                 measureDiv.style.fontWeight = span.style.fontWeight || el.props.fontWeight || 'normal';
                 measureDiv.style.lineHeight = span.style.lineHeight || el.props.lineHeight || '1.2';
-                measureDiv.style.whiteSpace = span.style.whiteSpace || 'pre-wrap';
-                measureDiv.style.wordWrap = span.style.wordWrap || 'break-word';
+                measureDiv.style.letterSpacing = span.style.letterSpacing || 'normal';
                 document.body.appendChild(measureDiv);
-                
-                // Reduce font size until text fits within available height
-                while(measureDiv.scrollHeight > availableHeight && fontSize > minFontSize){
-                    fontSize -= 0.5;
-                    measureDiv.style.fontSize = fontSize + 'px';
-                }
-                
-                // Apply the calculated font size
-                span.style.fontSize = fontSize + 'px';
+                const textWidth = Math.max(measureDiv.scrollWidth, measureDiv.offsetWidth);
+                const lineHeight = measureDiv.offsetHeight || 1;
                 document.body.removeChild(measureDiv);
+
+                const scaleX = availableWidth / textWidth;
+                const scaleY = availableHeight / lineHeight;
+                const scale = Math.min(scaleX, scaleY, 1);
+                const finalScale = Math.max(0.1, scale);
+
+                if(finalScale < 1){
+                    const textAlign = el.props.textAlign || 'left';
+                    const valign = el.props.valign || 'top';
+                    let originX = 'left';
+                    if(textAlign === 'center') originX = 'center';
+                    else if(textAlign === 'right') originX = 'right';
+                    let originY = 'top';
+                    if(valign === 'middle') originY = 'center';
+                    else if(valign === 'bottom') originY = 'bottom';
+                    span.style.transform = `scale(${finalScale})`;
+                    span.style.transformOrigin = `${originX} ${originY}`;
+                    span.style.width = 'auto';
+                    span.style.overflow = 'visible';
+                    span.style.maxWidth = 'none';
+                    span.style.wordWrap = 'normal';
+                    if(container) container.style.overflow = 'visible';
+                } else {
+                    span.style.transform = '';
+                    span.style.transformOrigin = '';
+                }
             };
-            
-            // Check if text overflows at the bottom (after natural wrapping)
+
             if(isPrintMode){
-                // For print mode, execute immediately
                 executeAutoScale();
             } else {
-                // Use requestAnimationFrame for normal rendering
-                requestAnimationFrame(() => {
-                    requestAnimationFrame(executeAutoScale);
-                });
+                requestAnimationFrame(() => requestAnimationFrame(executeAutoScale));
             }
         }
         
@@ -2563,6 +2594,10 @@ document.addEventListener('DOMContentLoaded', ()=>{
         if(el.type==='qr'){
             h += `<label>Prefix</label><textarea data-prop="props.prefix" rows="2" class="column-mention-input" data-column-mention="1">${escapeHtml(el.props.prefix||'')}</textarea>`;
             h += `<label>Suffix</label><textarea data-prop="props.suffix" rows="2" class="column-mention-input" data-column-mention="1">${escapeHtml(el.props.suffix||'')}</textarea>`;
+            const qrLevel = el.props.qrErrorCorrectLevel || 'M';
+            h += `<label>Error correction</label><select data-prop="props.qrErrorCorrectLevel"><option value="L" ${qrLevel==='L'?'selected':''}>Low (7%)</option><option value="M" ${qrLevel==='M'?'selected':''}>Medium (15%)</option><option value="Q" ${qrLevel==='Q'?'selected':''}>High (25%)</option><option value="H" ${qrLevel==='H'?'selected':''}>Highest (30%)</option></select>`;
+            h += `<label>Colore moduli</label><input type="color" data-prop="props.qrColorDark" value="${el.props.qrColorDark||'#000000'}">`;
+            h += `<label>Colore sfondo</label><input type="color" data-prop="props.qrColorLight" value="${el.props.qrColorLight||'#ffffff'}">`;
         }
 
         if(el.type==='barcode'){
@@ -3282,7 +3317,7 @@ document.addEventListener('DOMContentLoaded', ()=>{
                     lineHeight:1.2,objectFit:'contain'
             }
         };
-        if(type==='qr'){ n.width=1;n.height=1 }
+        if(type==='qr'){ n.width=1;n.height=1; n.props.qrErrorCorrectLevel='M'; n.props.qrColorDark='#000000'; n.props.qrColorLight='#ffffff'; }
         if(type==='barcode'){ n.width=2;n.height=.8 }
         if(type==='line'){ n.height=.02;n.width=2 }
         if(type==='box'){ n.width=1.5;n.height=1 }
@@ -4825,18 +4860,18 @@ document.addEventListener('DOMContentLoaded', ()=>{
                             
                             // Set whiteSpace and width based on textOverflow mode
                             const overflowMode = el.props.textOverflow || 'clip';
-                            if(overflowMode === 'squeeze'){
-                                span.style.whiteSpace = 'nowrap'; // No wrapping for squeeze
-                                span.style.width = 'auto'; // Allow natural text width for squeeze
-                                span.style.overflow = 'visible'; // Don't clip compressed text
-                                span.style.wordWrap = 'normal'; // Disable word wrapping for squeeze
+                            if(overflowMode === 'squeeze' || overflowMode === 'auto-scale'){
+                                span.style.whiteSpace = 'nowrap';
+                                span.style.width = 'auto';
+                                span.style.overflow = 'visible';
+                                span.style.wordWrap = 'normal';
                             } else {
                                 span.style.width = '100%';
                                 span.style.overflow = 'hidden';
-                                span.style.whiteSpace = 'pre-wrap'; // Allow wrapping for clip and auto-scale
-                                span.style.wordWrap='break-word';
+                                span.style.whiteSpace = 'pre-wrap';
+                                span.style.wordWrap = 'break-word';
                             }
-                            
+
                             setTextWithRegexFormatting(span, getData(el, sequenceIndex, waveContext), el.props.regexRules);
                             // Copy font styles to span for overflow calculation
                             span.style.fontFamily = el.props.fontFamily || 'Arial, sans-serif';
@@ -4860,18 +4895,18 @@ document.addEventListener('DOMContentLoaded', ()=>{
                             
                             // Set whiteSpace and width based on textOverflow mode
                             const overflowMode = el.props.textOverflow || 'clip';
-                            if(overflowMode === 'squeeze'){
-                                span.style.whiteSpace = 'nowrap'; // No wrapping for squeeze
-                                span.style.width = 'auto'; // Allow natural text width for squeeze
-                                span.style.overflow = 'visible'; // Don't clip compressed text
-                                span.style.wordWrap = 'normal'; // Disable word wrapping for squeeze
+                            if(overflowMode === 'squeeze' || overflowMode === 'auto-scale'){
+                                span.style.whiteSpace = 'nowrap';
+                                span.style.width = 'auto';
+                                span.style.overflow = 'visible';
+                                span.style.wordWrap = 'normal';
                             } else {
                                 span.style.width = '100%';
                                 span.style.overflow = 'hidden';
-                                span.style.whiteSpace = 'pre-wrap'; // Allow wrapping for clip and auto-scale
-                                span.style.wordWrap='break-word';
+                                span.style.whiteSpace = 'pre-wrap';
+                                span.style.wordWrap = 'break-word';
                             }
-                            
+
                             setTextWithRegexFormatting(span, getData(el, sequenceIndex, waveContext), el.props.regexRules);
                             // Copy font styles to span for overflow calculation
                             span.style.fontFamily = el.props.fontFamily || 'Arial, sans-serif';
@@ -4938,15 +4973,20 @@ document.addEventListener('DOMContentLoaded', ()=>{
                             
                             // Combine prefix + code + suffix into the QR code value
                             const qrValue = prefix + String(c) + suffix;
-                            
+
                             const q = document.createElement('img');
-                            const dpi = 37.795276;
+                            const dpi = 118.11;
                             const qs = Math.min(el.width, el.height) * dpi;
-                            q.src = `https://api.qrserver.com/v1/create-qr-code/?size=${Math.round(qs)}x${Math.round(qs)}&data=${encodeURIComponent(qrValue)}`;
+                            const qrOpts = { colorDark: el.props.qrColorDark || '#000000', colorLight: el.props.qrColorLight || '#ffffff', errorCorrectLevel: el.props.qrErrorCorrectLevel || 'M' };
+                            q.src = generateQRDataURL(qrValue, Math.round(qs), qrOpts) || '';
+                            q.alt = 'QR';
+                            q.className = 'qr-code-img';
                             q.style.pointerEvents='none';
                             q.style.width='100%';
                             q.style.height='100%';
                             q.style.objectFit='contain';
+                            q.style.imageRendering='pixelated';
+                            q.style.webkitImageRendering='pixelated';
                             d.appendChild(q);
                             break;
                         }
@@ -5473,18 +5513,18 @@ document.addEventListener('DOMContentLoaded', ()=>{
                             
                             // Set whiteSpace and width based on textOverflow mode
                             const overflowMode = el.props.textOverflow || 'clip';
-                            if(overflowMode === 'squeeze'){
-                                span.style.whiteSpace = 'nowrap'; // No wrapping for squeeze
-                                span.style.width = 'auto'; // Allow natural text width for squeeze
-                                span.style.overflow = 'visible'; // Don't clip compressed text
-                                span.style.wordWrap = 'normal'; // Disable word wrapping for squeeze
+                            if(overflowMode === 'squeeze' || overflowMode === 'auto-scale'){
+                                span.style.whiteSpace = 'nowrap';
+                                span.style.width = 'auto';
+                                span.style.overflow = 'visible';
+                                span.style.wordWrap = 'normal';
                             } else {
                                 span.style.width = '100%';
                                 span.style.overflow = 'hidden';
-                                span.style.whiteSpace = 'pre-wrap'; // Allow wrapping for clip and auto-scale
-                                span.style.wordWrap='break-word';
+                                span.style.whiteSpace = 'pre-wrap';
+                                span.style.wordWrap = 'break-word';
                             }
-                            
+
                             setTextWithRegexFormatting(span, getData(el, sequenceIndex, waveContext), el.props.regexRules);
                             // Copy font styles to span for overflow calculation
                             span.style.fontFamily = el.props.fontFamily || 'Arial, sans-serif';
@@ -5508,18 +5548,18 @@ document.addEventListener('DOMContentLoaded', ()=>{
                             
                             // Set whiteSpace and width based on textOverflow mode
                             const overflowMode = el.props.textOverflow || 'clip';
-                            if(overflowMode === 'squeeze'){
-                                span.style.whiteSpace = 'nowrap'; // No wrapping for squeeze
-                                span.style.width = 'auto'; // Allow natural text width for squeeze
-                                span.style.overflow = 'visible'; // Don't clip compressed text
-                                span.style.wordWrap = 'normal'; // Disable word wrapping for squeeze
+                            if(overflowMode === 'squeeze' || overflowMode === 'auto-scale'){
+                                span.style.whiteSpace = 'nowrap';
+                                span.style.width = 'auto';
+                                span.style.overflow = 'visible';
+                                span.style.wordWrap = 'normal';
                             } else {
                                 span.style.width = '100%';
                                 span.style.overflow = 'hidden';
-                                span.style.whiteSpace = 'pre-wrap'; // Allow wrapping for clip and auto-scale
-                                span.style.wordWrap='break-word';
+                                span.style.whiteSpace = 'pre-wrap';
+                                span.style.wordWrap = 'break-word';
                             }
-                            
+
                             setTextWithRegexFormatting(span, getData(el, sequenceIndex, waveContext), el.props.regexRules);
                             // Copy font styles to span for overflow calculation
                             span.style.fontFamily = el.props.fontFamily || 'Arial, sans-serif';
@@ -5586,15 +5626,20 @@ document.addEventListener('DOMContentLoaded', ()=>{
                             
                             // Combine prefix + code + suffix into the QR code value
                             const qrValue = prefix + String(c) + suffix;
-                            
+
                             const q = document.createElement('img');
-                            const dpi = 37.795276;
+                            const dpi = 118.11;
                             const qs = Math.min(el.width, el.height) * dpi;
-                            q.src = `https://api.qrserver.com/v1/create-qr-code/?size=${Math.round(qs)}x${Math.round(qs)}&data=${encodeURIComponent(qrValue)}`;
+                            const qrOpts = { colorDark: el.props.qrColorDark || '#000000', colorLight: el.props.qrColorLight || '#ffffff', errorCorrectLevel: el.props.qrErrorCorrectLevel || 'M' };
+                            q.src = generateQRDataURL(qrValue, Math.round(qs), qrOpts) || '';
+                            q.alt = 'QR';
+                            q.className = 'qr-code-img';
                             q.style.pointerEvents='none';
                             q.style.width='100%';
                             q.style.height='100%';
                             q.style.objectFit='contain';
+                            q.style.imageRendering='pixelated';
+                            q.style.webkitImageRendering='pixelated';
                             d.appendChild(q);
                             break;
                         }
@@ -6093,18 +6138,18 @@ document.addEventListener('DOMContentLoaded', ()=>{
                         
                         // Set whiteSpace and width based on textOverflow mode
                         const overflowMode = el.props.textOverflow || 'clip';
-                        if(overflowMode === 'squeeze'){
-                            span.style.whiteSpace = 'nowrap'; // No wrapping for squeeze
-                            span.style.width = 'auto'; // Allow natural text width for squeeze
-                            span.style.overflow = 'visible'; // Don't clip compressed text
-                            span.style.wordWrap = 'normal'; // Disable word wrapping for squeeze
+                        if(overflowMode === 'squeeze' || overflowMode === 'auto-scale'){
+                            span.style.whiteSpace = 'nowrap';
+                            span.style.width = 'auto';
+                            span.style.overflow = 'visible';
+                            span.style.wordWrap = 'normal';
                         } else {
                             span.style.width = '100%';
                             span.style.overflow = 'hidden';
-                            span.style.whiteSpace = 'pre-wrap'; // Allow wrapping for clip and auto-scale
-                            span.style.wordWrap='break-word';
+                            span.style.whiteSpace = 'pre-wrap';
+                            span.style.wordWrap = 'break-word';
                         }
-                        
+
                         setTextWithRegexFormatting(span, getData(el, sequenceIndex, waveContext), el.props.regexRules);
                         span.style.fontFamily = el.props.fontFamily || 'Arial, sans-serif';
                         span.style.fontSize = (el.props.fontSize || 16) + 'px';
@@ -6119,18 +6164,18 @@ document.addEventListener('DOMContentLoaded', ()=>{
                         
                         // Set whiteSpace and width based on textOverflow mode
                         const overflowMode = el.props.textOverflow || 'clip';
-                        if(overflowMode === 'squeeze'){
-                            span.style.whiteSpace = 'nowrap'; // No wrapping for squeeze
-                            span.style.width = 'auto'; // Allow natural text width for squeeze
-                            span.style.overflow = 'visible'; // Don't clip compressed text
-                            span.style.wordWrap = 'normal'; // Disable word wrapping for squeeze
+                        if(overflowMode === 'squeeze' || overflowMode === 'auto-scale'){
+                            span.style.whiteSpace = 'nowrap';
+                            span.style.width = 'auto';
+                            span.style.overflow = 'visible';
+                            span.style.wordWrap = 'normal';
                         } else {
                             span.style.width = '100%';
                             span.style.overflow = 'hidden';
-                            span.style.whiteSpace = 'pre-wrap'; // Allow wrapping for clip and auto-scale
-                            span.style.wordWrap='break-word';
+                            span.style.whiteSpace = 'pre-wrap';
+                            span.style.wordWrap = 'break-word';
                         }
-                        
+
                         setTextWithRegexFormatting(span, getData(el, sequenceIndex, waveContext), el.props.regexRules);
                         span.style.fontFamily = el.props.fontFamily || 'Arial, sans-serif';
                         span.style.fontSize = (el.props.fontSize || 16) + 'px';
@@ -6166,20 +6211,25 @@ document.addEventListener('DOMContentLoaded', ()=>{
                         suffix = applySequencePlaceholder(suffix, effectiveSequenceIndex);
                         
                         // Combine prefix + code + suffix into the QR code value
-                        const qrValue = prefix + String(c) + suffix;
-                        
-                        const q = document.createElement('img');
-                        const dpi = 37.795276;
-                        const qs = Math.min(el.width, el.height) * dpi;
-                        q.src = `https://api.qrserver.com/v1/create-qr-code/?size=${Math.round(qs)}x${Math.round(qs)}&data=${encodeURIComponent(qrValue)}`;
-                        q.style.pointerEvents='none';
-                        q.style.width='100%';
-                        q.style.height='100%';
-                        q.style.objectFit='contain';
-                        d.appendChild(q);
-                        break;
-                    }
-                    case 'barcode': {
+                            const qrValue = prefix + String(c) + suffix;
+
+                            const q = document.createElement('img');
+                            const dpi = 118.11;
+                            const qs = Math.min(el.width, el.height) * dpi;
+                            const qrOpts = { colorDark: el.props.qrColorDark || '#000000', colorLight: el.props.qrColorLight || '#ffffff', errorCorrectLevel: el.props.qrErrorCorrectLevel || 'M' };
+                            q.src = generateQRDataURL(qrValue, Math.round(qs), qrOpts) || '';
+                            q.alt = 'QR';
+                            q.className = 'qr-code-img';
+                            q.style.pointerEvents='none';
+                            q.style.width='100%';
+                            q.style.height='100%';
+                            q.style.objectFit='contain';
+                            q.style.imageRendering='pixelated';
+                            q.style.webkitImageRendering='pixelated';
+                            d.appendChild(q);
+                            break;
+                        }
+                        case 'barcode': {
                         const effectiveSequenceIndex = waveContext && waveContext.waveSequenceIndex !== undefined ? waveContext.waveSequenceIndex : sequenceIndex;
                         const c = getData(el, sequenceIndex, waveContext) || '';
                         let prefix = el.props.prefix || '';
