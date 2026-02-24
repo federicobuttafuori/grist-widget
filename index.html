@@ -1609,22 +1609,14 @@ document.addEventListener('DOMContentLoaded', ()=>{
                 // Calculate available width (accounting for padding and borders)
                 const safetyMargin = 2;
                 let availableWidth;
-                if(isPrintMode){
-                    // In print mode, convert padding from cm to pixels
-                    const paddingLeft = (Number(el.props.paddingLeft) || 0) * PIXELS_PER_CM;
-                    const paddingRight = (Number(el.props.paddingRight) || 0) * PIXELS_PER_CM;
-                    const borderWidth = (el.props.showBorder && el.props.borderWidth) ? Number(el.props.borderWidth) : 0;
-                    const borderLeft = (el.props.borderLeft !== false) ? borderWidth : 0;
-                    const borderRight = (el.props.borderRight !== false) ? borderWidth : 0;
-                    availableWidth = containerWidth - paddingLeft - paddingRight - borderLeft - borderRight - safetyMargin;
-                } else {
-                    const paddingLeft = Number(el.props.paddingLeft) || 0;
-                    const paddingRight = Number(el.props.paddingRight) || 0;
-                    const borderWidth = (el.props.showBorder && el.props.borderWidth) ? Number(el.props.borderWidth) : 0;
-                    const borderLeft = (el.props.borderLeft !== false) ? borderWidth : 0;
-                    const borderRight = (el.props.borderRight !== false) ? borderWidth : 0;
-                    availableWidth = containerWidth - paddingLeft - paddingRight - borderLeft - borderRight - safetyMargin;
-                }
+                // Convert padding (cm) to pixels using same scale as container (so canvas and print match)
+                const borderWidth = (el.props.showBorder && el.props.borderWidth) ? Number(el.props.borderWidth) : 0;
+                const borderLeft = (el.props.borderLeft !== false) ? borderWidth : 0;
+                const borderRight = (el.props.borderRight !== false) ? borderWidth : 0;
+                const pxPerCm = (el.width > 0) ? (containerWidth / el.width) : PIXELS_PER_CM;
+                const paddingLeft = (Number(el.props.paddingLeft) || 0) * pxPerCm;
+                const paddingRight = (Number(el.props.paddingRight) || 0) * pxPerCm;
+                availableWidth = containerWidth - paddingLeft - paddingRight - borderLeft - borderRight - safetyMargin;
                 
                 if(availableWidth <= 0) return;
                 
