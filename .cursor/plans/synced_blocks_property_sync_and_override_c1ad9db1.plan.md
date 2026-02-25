@@ -12,7 +12,7 @@ isProject: false
 - **Default**: come oggi, solo il contenuto (boundColumn, prefix, suffix, text, fallbackLink) è sincronizzato; tutte le altre proprietà restano indipendenti.
 - **Sync opzionale**: pulsante a destra di ogni proprietà nel pannello. Primo click = la proprietà viene sincronizzata per tutti gli elementi del thread (nome proprietà in **verde**).
 - **Override (eccezione)**: secondo click sullo stesso pulsante = quella proprietà diventa **indipendente** per l’elemento corrente (nome in **blu**), senza influire sul “main” thread né sugli altri blocchi.
-- Ciclo pulsante: non synced → synced (verde) → override (blu) → synced (verde).
+- **Ciclo pulsante**: non synced → synced (verde) → override (blu) → **non synced** (un altro click = di nuovo synced).
 
 ## Modello dati
 
@@ -65,9 +65,9 @@ Applica il valore al singolo elemento (equivalente a `applyPropToElement(el, pro
 - **isPropOverridden(el, propKey)**  
 `el.syncedOverrides && el.syncedOverrides.includes(propKey)`.
 - **toggleSyncState(threadId, propKey, el)**  
-  - Se prop non in `thread.syncedProps`: aggiungere a `syncedProps`, impostare `thread.data[propKey] = getElementPropValue(el, propKey)`, propagare a tutti gli elementi del thread (e rimuovere `propKey` da eventuali `syncedOverrides` dove presente), poi render/updateProps/save.
-  - Se prop in `thread.syncedProps` e non in `el.syncedOverrides`: aggiungere `propKey` a `el.syncedOverrides` (stato blu).
-  - Se prop in `thread.syncedOverrides`: rimuovere da `el.syncedOverrides` (torna verde).
+  - Se prop **non** in `thread.syncedProps`: aggiungere a `syncedProps`, impostare `thread.data[propKey] = getElementPropValue(el, propKey)`, propagare a tutti gli elementi del thread (e rimuovere `propKey` da eventuali `syncedOverrides` dove presente), poi render/updateProps/save (stato **verde**).
+  - Se prop in `thread.syncedProps` e **non** in `el.syncedOverrides`: aggiungere `propKey` a `el.syncedOverrides` (stato **blu**).
+  - Se prop in `el.syncedOverrides` (stato blu): **terzo click** → rimuovere la proprietà dalla sincronizzazione del thread (rimuovere da `thread.syncedProps`, eliminare `thread.data[propKey]`), e rimuovere `propKey` da tutti gli `syncedOverrides` degli elementi del thread; la proprietà torna **non synced** (quarto click = di nuovo synced).
 
 ### 3. Pannello proprietà (single element con masterThreadId)
 

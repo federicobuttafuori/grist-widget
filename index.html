@@ -6,6 +6,7 @@
     <title>Grist Label Designer — Marquee Fix</title>
     <script src="https://docs.getgrist.com/grist-plugin-api.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/jsbarcode@3.11.5/dist/JsBarcode.all.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/gh/davidshimjs/qrcodejs@gh-pages/qrcode.min.js"></script>
         <link rel="preconnect" href="https://fonts.googleapis.com">
         <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
             <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@100;200;300;400;500;600;700;800;900&family=Oswald:wght@200;300;400;500;600;700&family=Roboto+Condensed:wght@300;400;700&family=Sofia+Sans+Extra+Condensed:wght@100;200;300;400;500;600;700;800;900&display=swap" rel="stylesheet">
@@ -24,16 +25,50 @@
         #toolbar .divider{width:1px;height:24px;background:#e0e0e0;margin:0 4px}
         #main-content{display:flex;flex-grow:1;overflow:hidden}
         #sidebar{width:320px;flex-shrink:0;background:#fdfdfd;border-right:1px solid #e0e0e0;padding:12px;overflow-y:auto;display:flex;flex-direction:column;gap:16px}
-            .profile-section{background:#f5f5f5;padding:10px;border-radius:6px;border:1px solid #e0e0e0}
-            .profile-section select{margin-bottom:8px}
-            .profile-section .button-row{display:flex;gap:4px;margin-top:8px}
-            .profile-section .button-row button{flex:1;font-size:12px;padding:4px 8px}
         #sidebar h3{font-size:16px;font-weight:600;border-bottom:1px solid #eee;padding-bottom:6px;margin-bottom:4px}
         .sidebar-section{display:flex;flex-direction:column;gap:8px}
+        .sidebar-section .sidebar-actions{display:flex;gap:8px;flex-wrap:wrap}
+        .sidebar-section .sidebar-actions-stack{display:flex;flex-direction:column;gap:8px}
+        .sidebar-section .sidebar-list{display:flex;flex-direction:column;gap:4px;max-height:200px;overflow-y:auto}
+        .sidebar-section .sidebar-stack{display:flex;flex-direction:column;gap:8px}
+        .sidebar-section .sidebar-hint{color:#666;font-size:11px;margin-top:4px;display:block}
+        .sidebar-section .sidebar-design-row{display:flex;gap:4px;align-items:center}
+        .sidebar-section .sidebar-design-row select{flex:1;min-width:0}
+        .sidebar-section .sidebar-icon-btn{padding:0;width:32px;height:32px;flex-shrink:0;display:flex;align-items:center;justify-content:center;font-size:14px;border:1px solid #ccc;border-radius:4px;box-sizing:border-box}
+        .sidebar-section .sidebar-btn-row{display:flex;gap:4px;margin-top:8px}
+        .sidebar-section .sidebar-btn-row button{flex:1;font-size:12px;padding:4px 8px}
+        .sidebar-section .sidebar-btn-block{width:100%;padding:6px;border:none;border-radius:4px;cursor:pointer;font-size:12px}
+        .sidebar-section .sidebar-btn-block.sidebar-btn-sync{background:#4CAF50;color:#fff}
+        .sidebar-section .sidebar-btn-block.sidebar-btn-warning{background:#ff9800;color:#fff}
+        .sidebar-section .sidebar-btn-block.sidebar-btn-info{background:#007aff;color:#fff}
+        .sidebar-section .sidebar-btn-danger{background:#fbebeb;border-color:#d9a0a0;color:#c00}
+        .sidebar-section .sidebar-btn-danger:hover{background:#f7dada}
+        .profile-section{background:#f5f5f5;padding:10px;border-radius:6px;border:1px solid #e0e0e0}
+        .profile-section select{margin-bottom:8px}
         .sidebar-section .add-buttons{display:grid;grid-template-columns:1fr 1fr;gap:8px}
         .prop-grid{display:grid;grid-template-columns:90px 1fr;gap:8px;align-items:center}
+        .prop-grid.prop-grid-sync{grid-template-columns:90px 1fr 26px}
+        .prop-grid.prop-grid-sync-1{grid-template-columns:90px 1fr 26px}
         .prop-grid label{font-size:14px;font-weight:500}
+        .prop-label-synced{color:#2e7d32}
+        .prop-label-override{color:#1565c0}
+        .prop-sync-btn{width:22px;height:22px;padding:0;border:1px solid #ccc;border-radius:4px;cursor:pointer;font-size:12px;display:inline-flex;align-items:center;justify-content:center;background:#f5f5f5;flex-shrink:0}
+        .prop-sync-btn:hover{background:#e8e8e8}
+        .prop-sync-btn.synced{color:#2e7d32;border-color:#2e7d32}
+        .prop-sync-btn.override{color:#1565c0;border-color:#1565c0}
         #properties-panel{font-size:14px}
+        .prop-border-sides{display:grid;grid-template-columns:1fr 26px 1fr 26px;gap:8px;align-items:center;margin-top:8px}
+        .prop-border-sides label{font-size:12px;font-weight:normal;display:flex;align-items:center;gap:4px;min-width:0}
+        .prop-border-radius-grid{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:8px;min-width:0}
+        .prop-border-radius-cell{display:flex;flex-direction:column;gap:4px}
+        .prop-border-radius-cell label{font-size:11px;font-weight:normal}
+        .prop-border-radius-cell input{font-size:12px;padding:4px;min-width:0;box-sizing:border-box}
+        .prop-border-radius-cell .prop-sync-btn{align-self:flex-start}
+        .prop-stack{display:flex;flex-direction:column;gap:6px;min-width:0}
+        .prop-stack label{font-size:14px;font-weight:500;display:block}
+        .prop-stack .prop-stack-row{display:flex;gap:8px;align-items:flex-start;min-width:0}
+        .prop-stack .prop-stack-row .column-mention-input,.prop-stack .prop-stack-row input[type="text"]{flex:1;min-width:0}
+        .add-regex-rule-btn{width:100%;padding:6px;margin-top:8px;background:#007aff;color:#fff;border:none;border-radius:4px;cursor:pointer;font-size:12px}
         #btn-delete{background:#fbebeb;border-color:#d9a0a0;color:#c00;margin-top:12px}
         #btn-delete:hover{background:#f7dada}
         .button-group{display:flex;gap:4px}
@@ -96,40 +131,40 @@
 
     <div id="main-content">
         <div id="sidebar">
-                <div class="sidebar-section profile-section">
-                    <h3>Label Profile</h3>
-                    <label>Size:</label>
-                    <select id="profile-selector">
-                        <option value="8x5">8 × 5 cm</option>
-                    </select>
+            <div class="sidebar-section profile-section">
+                <h3>Label Profile</h3>
+                <label>Size:</label>
+                <select id="profile-selector">
+                    <option value="8x5">8 × 5 cm</option>
+                </select>
                 <label>Design:</label>
-                <div style="display:flex;gap:4px;align-items:center">
-                    <select id="design-selector" style="flex:1">
+                <div class="sidebar-design-row">
+                    <select id="design-selector">
                         <option value="default">Default</option>
                     </select>
-                    <button id="btn-rename-design" title="Rename Design" style="padding:0;width:32px;font-size:14px;flex-shrink:0;display:flex;align-items:center;justify-content:center;box-sizing:border-box;line-height:1;margin:0;border:1px solid #ccc;border-radius:4px">✏️</button>
-                    <button id="btn-clone-design" title="Clone Design" style="padding:0;width:32px;font-size:14px;flex-shrink:0;display:flex;align-items:center;justify-content:center;box-sizing:border-box;line-height:1;margin:0;border:1px solid #ccc;border-radius:4px">📋</button>
+                    <button type="button" id="btn-rename-design" class="sidebar-icon-btn" title="Rename Design">✏️</button>
+                    <button type="button" id="btn-clone-design" class="sidebar-icon-btn" title="Clone Design">📋</button>
                 </div>
-                    <div class="button-row">
-                        <button id="btn-add-profile">➕ Add Size</button>
-                        <button id="btn-add-design">➕ Add Design</button>
-                    </div>
-                    <div class="button-row">
-                        <button id="btn-remove-profile" style="background:#fbebeb;border-color:#d9a0a0;color:#c00">🗑️ Remove Size</button>
-                        <button id="btn-remove-design" style="background:#fbebeb;border-color:#d9a0a0;color:#c00">🗑️ Remove Design</button>
-                    </div>
+                <div class="sidebar-btn-row">
+                    <button type="button" id="btn-add-profile">➕ Add Size</button>
+                    <button type="button" id="btn-add-design">➕ Add Design</button>
                 </div>
-                <hr>
+                <div class="sidebar-btn-row">
+                    <button type="button" id="btn-remove-profile" class="sidebar-btn-danger">🗑️ Remove Size</button>
+                    <button type="button" id="btn-remove-design" class="sidebar-btn-danger">🗑️ Remove Design</button>
+                </div>
+            </div>
+            <hr>
             <div class="sidebar-section">
                 <h3>Add Element</h3>
                 <div class="add-buttons">
-                    <button class="add-element" data-type="text">📝 Text</button>
-                    <button class="add-element" data-type="data">🔗 Data Field</button>
-                        <button class="add-element" data-type="image">🖼️ Image</button>
-                    <button class="add-element" data-type="qr">📱 QR Code</button>
-                    <button class="add-element" data-type="barcode">📊 Barcode</button>
-                    <button class="add-element" data-type="line">➖ Line</button>
-                    <button class="add-element" data-type="box">⬜ Box</button>
+                    <button type="button" class="add-element" data-type="text">📝 Text</button>
+                    <button type="button" class="add-element" data-type="data">🔗 Data Field</button>
+                    <button type="button" class="add-element" data-type="image">🖼️ Image</button>
+                    <button type="button" class="add-element" data-type="qr">📱 QR Code</button>
+                    <button type="button" class="add-element" data-type="barcode">📊 Barcode</button>
+                    <button type="button" class="add-element" data-type="line">➖ Line</button>
+                    <button type="button" class="add-element" data-type="box">⬜ Box</button>
                 </div>
             </div>
             <hr>
@@ -140,34 +175,32 @@
             <hr>
             <div class="sidebar-section">
                 <h3>Synchronized Blocks</h3>
-                <div style="display:flex;gap:8px;flex-direction:column;margin-bottom:12px">
-                    <button id="btn-synchronize" style="width:100%;padding:6px;background:#4CAF50;color:#fff;border:none;border-radius:4px;cursor:pointer;font-size:12px">🔗 Synchronize Selected</button>
-                    <button id="btn-desynchronize" style="width:100%;padding:6px;background:#ff9800;color:#fff;border:none;border-radius:4px;cursor:pointer;font-size:12px">🔓 Desynchronize Selected</button>
+                <div class="sidebar-actions-stack">
+                    <button type="button" id="btn-synchronize" class="sidebar-btn-block sidebar-btn-sync">🔗 Synchronize Selected</button>
+                    <button type="button" id="btn-desynchronize" class="sidebar-btn-block sidebar-btn-warning">🔓 Desynchronize Selected</button>
                 </div>
-                <div id="synchronized-threads-list" style="display:flex;flex-direction:column;gap:4px;max-height:200px;overflow-y:auto">
-                </div>
-                <small style="color:#666;font-size:11px;margin-top:4px;display:block">Sync content (boundColumn, prefix, suffix, text) across elements. Style and layout remain independent.</small>
+                <div id="synchronized-threads-list" class="sidebar-list"></div>
+                <small class="sidebar-hint">Sync content (boundColumn, prefix, suffix, text) across elements. Style and layout remain independent.</small>
             </div>
             <hr>
             <div class="sidebar-section">
                 <h3>Import/Export</h3>
-                <div style="display:flex;gap:8px">
-                    <button id="btn-export">⬇️ Export</button>
-                    <button id="btn-import">⬆️ Import</button>
+                <div class="sidebar-actions">
+                    <button type="button" id="btn-export">⬇️ Export</button>
+                    <button type="button" id="btn-import">⬆️ Import</button>
                 </div>
-                <div style="display:flex;gap:8px;margin-top:8px">
-                    <button id="btn-export-snapshot">⬇️ Export Snapshot</button>
-                    <button id="btn-import-snapshot">⬆️ Import Snapshot</button>
+                <div class="sidebar-actions">
+                    <button type="button" id="btn-export-snapshot">⬇️ Export Snapshot</button>
+                    <button type="button" id="btn-import-snapshot">⬆️ Import Snapshot</button>
                 </div>
-                <small>Tip: Ctrl/Cmd+E exports layout. Ctrl/Cmd+Z = undo, Ctrl/Cmd+Shift+Z = redo</small>
+                <small class="sidebar-hint">Tip: Ctrl/Cmd+E exports layout. Ctrl/Cmd+Z = undo, Ctrl/Cmd+Shift+Z = redo</small>
             </div>
             <hr>
             <div class="sidebar-section">
                 <h3>Global Regex Rules</h3>
-                <div style="margin-bottom:8px"><small style="color:#666">Rules applied to all text elements</small></div>
-                <div id="global-regex-rules-container" style="display:flex;flex-direction:column;gap:8px">
-                </div>
-                <button type="button" class="add-global-regex-rule-btn" style="width:100%;padding:6px;margin-top:8px;background:#007aff;color:#fff;border:none;border-radius:4px;cursor:pointer;font-size:12px">+ Add Global Rule</button>
+                <small class="sidebar-hint">Rules applied to all text elements</small>
+                <div id="global-regex-rules-container" class="sidebar-stack"></div>
+                <button type="button" class="add-global-regex-rule-btn sidebar-btn-block sidebar-btn-info">+ Add Global Rule</button>
             </div>
         </div>
 
@@ -397,6 +430,34 @@ document.addEventListener('DOMContentLoaded', ()=>{
             };
         }
 
+        // Generate QR code as data URL (same logic as working Untitled-1 / CDN qrcodejs)
+        function generateQRDataURL(qrValue, sizePx, options){
+            const colorDark = (options && options.colorDark) || '#000000';
+            const colorLight = (options && options.colorLight) || '#ffffff';
+            const level = (options && options.errorCorrectLevel) || 'M';
+            if(typeof qrValue !== 'string') qrValue = '';
+            if(sizePx <= 0) return '';
+            if(typeof window.QRCode === 'undefined') return '';
+            try {
+                const scale = 2;
+                const renderPx = Math.max(Math.round(sizePx * scale), 200);
+                const div = document.createElement('div');
+                div.style.position = 'absolute';
+                div.style.left = '-9999px';
+                div.style.top = '0';
+                document.body.appendChild(div);
+                const correctLevel = window.QRCode.CorrectLevel && window.QRCode.CorrectLevel[level] != null ? window.QRCode.CorrectLevel[level] : window.QRCode.CorrectLevel.M;
+                new window.QRCode(div, { text: qrValue || ' ', width: renderPx, height: renderPx, colorDark: colorDark, colorLight: colorLight, correctLevel: correctLevel });
+                const child = div.firstElementChild || div.firstChild;
+                let dataURL = '';
+                if(child && child.tagName === 'CANVAS') dataURL = child.toDataURL('image/png');
+                document.body.removeChild(div);
+                return dataURL;
+            } catch(e) {
+                return '';
+            }
+        }
+
     function deepCopy(obj){ return JSON.parse(JSON.stringify(obj)); }
 
         // ---------- Profile Management ----------
@@ -440,6 +501,7 @@ document.addEventListener('DOMContentLoaded', ()=>{
                         .label-element.selected{border:1px solid transparent!important;box-shadow:none!important}
                         .resize-handle{display:none!important}
                             .label-element[style*="border"]{-webkit-print-color-adjust:exact!important;print-color-adjust:exact!important}
+                        img.qr-code-img{image-rendering:pixelated!important;-webkit-image-rendering:pixelated!important}
                     }
                 `;
             }
@@ -594,17 +656,13 @@ document.addEventListener('DOMContentLoaded', ()=>{
             } else {
                 currentCanvas = 1; // Default to canvas 1
             }
-            // Load the new design
             loadCurrentDesign();
-            // Clear canvas before updating size to prevent showing old content
             lc.innerHTML = '';
             updateCanvasSize();
             updateDesignSelector();
             updateCanvasControls();
-            // Render immediately
             render();
             updateProps();
-            // Force a reflow and fit after DOM update
             requestAnimationFrame(() => {
                 void lc.offsetHeight;
                 void cc.offsetHeight;
@@ -773,6 +831,9 @@ document.addEventListener('DOMContentLoaded', ()=>{
                     }
                 }
             });
+
+            // Lazy sync: apply thread data to this design's elements when loading (so synced values show without having pushed to all designs)
+            applyThreadDataToElements(S);
             
             selectedIds = [];
             // Reset history when switching design/profile/canvas
@@ -1018,13 +1079,16 @@ document.addEventListener('DOMContentLoaded', ()=>{
                 paddingTop: 0, paddingRight: 0, paddingBottom: 0, paddingLeft: 0,
                 thickness:2, format:'CODE128', displayValue:true,
                     fillColor:'#ffffff', decimals:2, asPercent:false,
-                    lineHeight: 1.2, textOverflow: 'clip'
+                    lineHeight: 1.2, textOverflow: 'clip',
+                qrErrorCorrectLevel: 'M', qrColorDark: '#000000', qrColorLight: '#ffffff'
             }
         };
 
         // Merge top-level / props
         const base = Object.assign({}, defaults, el);
         base.props = Object.assign({}, defaults.props, el && el.props ? el.props : {});
+
+        if(!Array.isArray(base.syncedOverrides)) base.syncedOverrides = [];
 
         // If old single padding exists (legacy data), convert to sides
         if(base.props.padding !== undefined && !isNaN(Number(base.props.padding))){
@@ -1315,8 +1379,13 @@ document.addEventListener('DOMContentLoaded', ()=>{
                     
                     const q = document.createElement('img');
                     const dpi = 37.795276;
-                    const qs = Math.min(el.width, el.height) * dpi;
-                    q.src = `https://api.qrserver.com/v1/create-qr-code/?size=${Math.round(qs)}x${Math.round(qs)}&data=${encodeURIComponent(qrValue)}`;
+                    const qs = Math.max(50, Math.min(el.width, el.height) * dpi);
+                    const qrOpts = { colorDark: el.props.qrColorDark || '#000000', colorLight: el.props.qrColorLight || '#ffffff', errorCorrectLevel: el.props.qrErrorCorrectLevel || 'M' };
+                    q.src = generateQRDataURL(qrValue, qs, qrOpts) || '';
+                    q.alt = 'QR code';
+                    q.className = 'qr-code-img';
+                    q.style.imageRendering = 'pixelated';
+                    q.style.webkitImageRendering = 'pixelated';
                     q.style.pointerEvents='none';
                     q.style.width='100%';
                     q.style.height='100%';
@@ -2533,42 +2602,72 @@ document.addEventListener('DOMContentLoaded', ()=>{
 
     // ---------- Properties Panels ----------
     function singlePropsPanel(el){
-        // bound column: render search input + select
+        const thread = el.masterThreadId ? getMasterThread(el.masterThreadId) : null;
+        function valueFor(pk){
+            if(!thread) return getElementPropValue(el, pk);
+            if(!isPropSynced(thread, pk) || isPropOverridden(el, pk)) return getElementPropValue(el, pk);
+            if(thread.data && thread.data[pk] !== undefined) return thread.data[pk];
+            return getElementPropValue(el, pk);
+        }
+        function labelClass(pk){
+            if(!thread) return '';
+            if(!isPropSynced(thread, pk)) return '';
+            return isPropOverridden(el, pk) ? 'prop-label-override' : 'prop-label-synced';
+        }
+        function syncBtn(pk){
+            if(!thread) return '';
+            const synced = isPropSynced(thread, pk);
+            const overridden = isPropOverridden(el, pk);
+            const title = !synced ? 'Sync property' : overridden ? 'Unsync (remove from thread)' : 'Override for this element';
+            const btnCls = 'prop-sync-btn' + (synced ? (overridden ? ' override' : ' synced') : '');
+            return `<button type="button" class="${btnCls}" data-prop-key="${escapeHtml(pk)}" title="${escapeHtml(title)}">\u21BB</button>`;
+        }
+
         let bindHtml = '';
         if(C && C.length){
-            bindHtml = `<div style="display:flex;gap:8px;margin-bottom:8px"><input type="text" placeholder="Search columns..." data-prop="bind_search" style="flex:1"><select data-prop="props.boundColumn" style="flex:1"><option value="">-- Select Column --</option>${C.map(col=>`<option value="${col}" ${el.props.boundColumn===col?'selected':''}>${col}</option>`).join('')}</select></div>`;
+            const boundVal = valueFor('props.boundColumn');
+            bindHtml = `<div style="display:flex;gap:8px;margin-bottom:8px"><input type="text" placeholder="Search columns..." data-prop="bind_search" style="flex:1"><select data-prop="props.boundColumn" style="flex:1"><option value="">-- Select Column --</option>${C.map(col=>`<option value="${col}" ${boundVal===col?'selected':''}>${col}</option>`).join('')}</select></div>`;
         } else {
             bindHtml = `<select data-prop="props.boundColumn"><option value="">-- No columns --</option></select>`;
         }
 
-            let h = `<div class="prop-grid"><label>X</label><input type="number" step="0.01" data-prop="x" value="${(Number(el.x)||0).toFixed(2)}"><label>Y</label><input type="number" step="0.01" data-prop="y" value="${(Number(el.y)||0).toFixed(2)}"></div>`;
-            h += `<div class="prop-grid"><label>Width</label><input type="number" step="0.01" data-prop="width" value="${(Number(el.width)||0).toFixed(2)}"><label>Height</label><input type="number" step="0.01" data-prop="height" value="${(Number(el.height)||0).toFixed(2)}"></div><hr>`;
+        const grid1Cls = thread ? 'prop-grid prop-grid-sync-1' : 'prop-grid';
+        let h = `<div class="${grid1Cls}"><label class="${labelClass('x')}">X</label><input type="number" step="0.01" data-prop="x" value="${(Number(valueFor('x'))||0).toFixed(2)}">${syncBtn('x')}</div>`;
+        h += `<div class="${grid1Cls}"><label class="${labelClass('y')}">Y</label><input type="number" step="0.01" data-prop="y" value="${(Number(valueFor('y'))||0).toFixed(2)}">${syncBtn('y')}</div>`;
+        h += `<div class="${grid1Cls}"><label class="${labelClass('width')}">Width</label><input type="number" step="0.01" data-prop="width" value="${(Number(valueFor('width'))||0).toFixed(2)}">${syncBtn('width')}</div>`;
+        h += `<div class="${grid1Cls}"><label class="${labelClass('height')}">Height</label><input type="number" step="0.01" data-prop="height" value="${(Number(valueFor('height'))||0).toFixed(2)}">${syncBtn('height')}</div><hr>`;
 
-        if(el.type==='text') h += `<label>Text</label><textarea data-prop="props.text" class="column-mention-input" data-column-mention="1">${escapeHtml(el.props.text||'')}</textarea>`;
+        if(el.type==='text') h += `<div class="${grid1Cls}"><label class="${labelClass('props.text')}">Text</label><textarea data-prop="props.text" class="column-mention-input" data-column-mention="1">${escapeHtml(String(valueFor('props.text')||''))}</textarea>${syncBtn('props.text')}</div>`;
 
             if(el.type==='data' || el.type==='qr' || el.type==='barcode' || el.type==='image'){
-            h += `<label>Bound Column</label>${bindHtml}`;
+            h += `<div class="${grid1Cls}"><label class="${labelClass('props.boundColumn')}">Bound Column</label>${bindHtml}${syncBtn('props.boundColumn')}</div>`;
         }
 
         if(el.type==='data'){
-                h += `<label>Prefix</label><textarea data-prop="props.prefix" rows="2" class="column-mention-input" data-column-mention="1">${escapeHtml(el.props.prefix||'')}</textarea>`;
-                h += `<label>Suffix</label><textarea data-prop="props.suffix" rows="2" class="column-mention-input" data-column-mention="1">${escapeHtml(el.props.suffix||'')}</textarea>`;
-            h += `<hr><div class="prop-grid"><label>Decimals</label><input type="number" step="1" data-prop="props.decimals" value="${el.props.decimals!==undefined?el.props.decimals:2}" min="0" max="10"><label>As Percent</label><input type="checkbox" data-prop="props.asPercent" ${el.props.asPercent?'checked':''}></div>`;
+                h += `<div class="prop-stack"><label class="${labelClass('props.prefix')}">Prefix</label><div class="prop-stack-row"><textarea data-prop="props.prefix" rows="2" class="column-mention-input" data-column-mention="1">${escapeHtml(String(valueFor('props.prefix')||''))}</textarea>${syncBtn('props.prefix')}</div></div>`;
+                h += `<div class="prop-stack"><label class="${labelClass('props.suffix')}">Suffix</label><div class="prop-stack-row"><textarea data-prop="props.suffix" rows="2" class="column-mention-input" data-column-mention="1">${escapeHtml(String(valueFor('props.suffix')||''))}</textarea>${syncBtn('props.suffix')}</div></div>`;
+            const decVal = valueFor('props.decimals'); const asPctVal = valueFor('props.asPercent');
+            h += `<hr><div class="${grid1Cls}"><label class="${labelClass('props.decimals')}">Decimals</label><input type="number" step="1" data-prop="props.decimals" value="${decVal!==undefined?decVal:2}" min="0" max="10">${syncBtn('props.decimals')}</div>`;
+            h += `<div class="${grid1Cls}"><label class="${labelClass('props.asPercent')}">As Percent</label><input type="checkbox" data-prop="props.asPercent" ${asPctVal?'checked':''}>${syncBtn('props.asPercent')}</div>`;
         }
 
         if(el.type==='qr' || el.type==='barcode'){
-            h += `<label>Fallback Text</label><input type="text" data-prop="props.text" class="column-mention-input" data-column-mention="1" value="${escapeHtml(el.props.text||'')}">`;
+            h += `<div class="${grid1Cls}"><label class="${labelClass('props.text')}">Fallback Text</label><input type="text" data-prop="props.text" class="column-mention-input" data-column-mention="1" value="${escapeHtml(String(valueFor('props.text')||''))}">${syncBtn('props.text')}</div>`;
         }
 
         if(el.type==='qr'){
-            h += `<label>Prefix</label><textarea data-prop="props.prefix" rows="2" class="column-mention-input" data-column-mention="1">${escapeHtml(el.props.prefix||'')}</textarea>`;
-            h += `<label>Suffix</label><textarea data-prop="props.suffix" rows="2" class="column-mention-input" data-column-mention="1">${escapeHtml(el.props.suffix||'')}</textarea>`;
+            h += `<div class="prop-stack"><label class="${labelClass('props.prefix')}">Prefix</label><div class="prop-stack-row"><textarea data-prop="props.prefix" rows="2" class="column-mention-input" data-column-mention="1">${escapeHtml(String(valueFor('props.prefix')||''))}</textarea>${syncBtn('props.prefix')}</div></div>`;
+            h += `<div class="prop-stack"><label class="${labelClass('props.suffix')}">Suffix</label><div class="prop-stack-row"><textarea data-prop="props.suffix" rows="2" class="column-mention-input" data-column-mention="1">${escapeHtml(String(valueFor('props.suffix')||''))}</textarea>${syncBtn('props.suffix')}</div></div>`;
+            const qrErrVal = valueFor('props.qrErrorCorrectLevel') || 'M';
+            h += `<div class="${grid1Cls}"><label class="${labelClass('props.qrErrorCorrectLevel')}">Error correction</label><select data-prop="props.qrErrorCorrectLevel"><option value="L" ${qrErrVal==='L'?'selected':''}>L — Low (7%)</option><option value="M" ${qrErrVal==='M'?'selected':''}>M — Medium (15%)</option><option value="Q" ${qrErrVal==='Q'?'selected':''}>Q — High (25%)</option><option value="H" ${qrErrVal==='H'?'selected':''}>H — Highest (30%)</option></select>${syncBtn('props.qrErrorCorrectLevel')}</div>`;
         }
 
         if(el.type==='barcode'){
-            h += `<label>Prefix</label><textarea data-prop="props.prefix" rows="2" class="column-mention-input" data-column-mention="1">${escapeHtml(el.props.prefix||'')}</textarea>`;
-            h += `<label>Suffix</label><textarea data-prop="props.suffix" rows="2" class="column-mention-input" data-column-mention="1">${escapeHtml(el.props.suffix||'')}</textarea>`;
-            h += `<label>Format</label><select data-prop="props.format"><option value="CODE128" ${el.props.format==='CODE128'?'selected':''}>CODE128</option><option value="CODE39" ${el.props.format==='CODE39'?'selected':''}>CODE39</option><option value="EAN13" ${el.props.format==='EAN13'?'selected':''}>EAN13</option><option value="UPC" ${el.props.format==='UPC'?'selected':''}>UPC</option></select><label>Show Text</label><input type="checkbox" data-prop="props.displayValue" ${el.props.displayValue!==false?'checked':''}>`;
+            h += `<div class="prop-stack"><label class="${labelClass('props.prefix')}">Prefix</label><div class="prop-stack-row"><textarea data-prop="props.prefix" rows="2" class="column-mention-input" data-column-mention="1">${escapeHtml(String(valueFor('props.prefix')||''))}</textarea>${syncBtn('props.prefix')}</div></div>`;
+            h += `<div class="prop-stack"><label class="${labelClass('props.suffix')}">Suffix</label><div class="prop-stack-row"><textarea data-prop="props.suffix" rows="2" class="column-mention-input" data-column-mention="1">${escapeHtml(String(valueFor('props.suffix')||''))}</textarea>${syncBtn('props.suffix')}</div></div>`;
+            const fmtVal = valueFor('props.format'); const dispVal = valueFor('props.displayValue');
+            h += `<div class="${grid1Cls}"><label class="${labelClass('props.format')}">Format</label><select data-prop="props.format"><option value="CODE128" ${fmtVal==='CODE128'?'selected':''}>CODE128</option><option value="CODE39" ${fmtVal==='CODE39'?'selected':''}>CODE39</option><option value="EAN13" ${fmtVal==='EAN13'?'selected':''}>EAN13</option><option value="UPC" ${fmtVal==='UPC'?'selected':''}>UPC</option></select>${syncBtn('props.format')}</div>`;
+            h += `<div class="${grid1Cls}"><label class="${labelClass('props.displayValue')}">Show Text</label><input type="checkbox" data-prop="props.displayValue" ${dispVal!==false?'checked':''}>${syncBtn('props.displayValue')}</div>`;
         }
 
         if(el.type==='line'){
@@ -2579,22 +2678,32 @@ document.addEventListener('DOMContentLoaded', ()=>{
         if(el.type==='box'){
             h += `<label>Border (px)</label><input type="number" step="1" data-prop="props.thickness" value="${el.props.thickness!==undefined?el.props.thickness:2}" min="0"><label>Fill Color</label><input type="color" data-prop="props.fillColor" value="${el.props.fillColor||'#ffffff'}">`;
                 // Add border radius control for box elements
-                h += `<hr><div style="margin-top:8px"><label style="font-size:12px;display:block;margin-bottom:6px">Border Radius (px):</label><div style="display:grid;grid-template-columns:1fr 1fr;gap:6px;max-width:200px"><div style="display:flex;flex-direction:column;gap:2px"><label style="font-size:11px;font-weight:normal;text-align:center">↖ Top Left</label><input type="number" data-prop="props.borderRadiusTopLeft" value="${Number(el.props.borderRadiusTopLeft||0)}" min="0" step="0.1" style="font-size:12px;padding:4px;text-align:center"></div><div style="display:flex;flex-direction:column;gap:2px"><label style="font-size:11px;font-weight:normal;text-align:center">↗ Top Right</label><input type="number" data-prop="props.borderRadiusTopRight" value="${Number(el.props.borderRadiusTopRight||0)}" min="0" step="0.1" style="font-size:12px;padding:4px;text-align:center"></div><div style="display:flex;flex-direction:column;gap:2px"><label style="font-size:11px;font-weight:normal;text-align:center">↙ Bottom Left</label><input type="number" data-prop="props.borderRadiusBottomLeft" value="${Number(el.props.borderRadiusBottomLeft||0)}" min="0" step="0.1" style="font-size:12px;padding:4px;text-align:center"></div><div style="display:flex;flex-direction:column;gap:2px"><label style="font-size:11px;font-weight:normal;text-align:center">↘ Bottom Right</label><input type="number" data-prop="props.borderRadiusBottomRight" value="${Number(el.props.borderRadiusBottomRight||0)}" min="0" step="0.1" style="font-size:12px;padding:4px;text-align:center"></div></div></div>`;
+                h += `<hr><div style="margin-top:8px"><label style="font-size:12px;display:block;margin-bottom:6px">Border Radius (px):</label><div class="prop-border-radius-grid"><div class="prop-border-radius-cell"><label>↖ Top Left</label><input type="number" data-prop="props.borderRadiusTopLeft" value="${Number(el.props.borderRadiusTopLeft||0)}" min="0" step="0.1"></div><div class="prop-border-radius-cell"><label>↗ Top Right</label><input type="number" data-prop="props.borderRadiusTopRight" value="${Number(el.props.borderRadiusTopRight||0)}" min="0" step="0.1"></div><div class="prop-border-radius-cell"><label>↙ Bottom Left</label><input type="number" data-prop="props.borderRadiusBottomLeft" value="${Number(el.props.borderRadiusBottomLeft||0)}" min="0" step="0.1"></div><div class="prop-border-radius-cell"><label>↘ Bottom Right</label><input type="number" data-prop="props.borderRadiusBottomRight" value="${Number(el.props.borderRadiusBottomRight||0)}" min="0" step="0.1"></div></div></div>`;
         }
 
             if(el.type==='image'){
-                h += `<hr><label>Object Fit</label><select data-prop="props.objectFit"><option value="contain" ${(el.props.objectFit||'contain')==='contain'?'selected':''}>Contain</option><option value="cover" ${el.props.objectFit==='cover'?'selected':''}>Cover</option><option value="fill" ${el.props.objectFit==='fill'?'selected':''}>Fill</option><option value="none" ${el.props.objectFit==='none'?'selected':''}>None</option><option value="scale-down" ${el.props.objectFit==='scale-down'?'selected':''}>Scale Down</option></select>`;
-                h += `<label>Fallback Link</label><input type="text" data-prop="props.fallbackLink" placeholder="https://..." value="${escapeHtml(el.props.fallbackLink||'')}">`;
+                const objFitVal = valueFor('props.objectFit'); const fallbackVal = valueFor('props.fallbackLink');
+                h += `<hr><div class="${grid1Cls}"><label class="${labelClass('props.objectFit')}">Object Fit</label><select data-prop="props.objectFit"><option value="contain" ${(objFitVal||'contain')==='contain'?'selected':''}>Contain</option><option value="cover" ${objFitVal==='cover'?'selected':''}>Cover</option><option value="fill" ${objFitVal==='fill'?'selected':''}>Fill</option><option value="none" ${objFitVal==='none'?'selected':''}>None</option><option value="scale-down" ${objFitVal==='scale-down'?'selected':''}>Scale Down</option></select>${syncBtn('props.objectFit')}</div>`;
+                h += `<div class="${grid1Cls}"><label class="${labelClass('props.fallbackLink')}">Fallback Link</label><input type="text" data-prop="props.fallbackLink" placeholder="https://..." value="${escapeHtml(String(fallbackVal||''))}">${syncBtn('props.fallbackLink')}</div>`;
             }
 
             if(el.type==='text' || el.type==='data'){
-                const currentFontFamily = el.props.fontFamily || 'Arial, sans-serif';
-                h += `<hr><div class="prop-grid"><label>Font Size</label><input type="number" step="1" data-prop="props.fontSize" value="${el.props.fontSize||16}" min="6" max="200"><label>Font Family</label><div style="display:flex;gap:4px;align-items:center"><select data-prop="props.fontFamily" id="font-family-select-${el.id}" style="flex:1">${generateFontOptions(currentFontFamily)}</select><button type="button" id="font-favorite-btn-${el.id}" style="padding:4px 8px;font-size:16px;background:transparent;border:1px solid #ccc;border-radius:4px;cursor:pointer;flex-shrink:0" title="${fontFavorites.includes(currentFontFamily) ? 'Remove from favorites' : 'Add to favorites'}">${fontFavorites.includes(currentFontFamily) ? '⭐' : '☆'}</button></div></div>`;
-                h += `<div class="prop-grid"><label>Weight</label><select data-prop="props.fontWeight" id="font-weight-select-${el.id}">${generateWeightOptions(currentFontFamily, el.props.fontWeight)}</select><label>Line Height</label><input type="number" step="0.1" data-prop="props.lineHeight" value="${el.props.lineHeight!==undefined?el.props.lineHeight:1.2}" min="0.5" max="3"></div>`;
-                h += `<div class="prop-grid"><label>H. Align</label><select data-prop="props.textAlign"><option value="left" ${el.props.textAlign==='left'?'selected':''}>Left</option><option value="center" ${el.props.textAlign==='center'?'selected':''}>Center</option><option value="right" ${el.props.textAlign==='right'?'selected':''}>Right</option></select><label>V. Align</label><select data-prop="props.valign"><option value="top" ${el.props.valign==='top'?'selected':''}>Top</option><option value="middle" ${el.props.valign==='middle'?'selected':''}>Middle</option><option value="bottom" ${el.props.valign==='bottom'?'selected':''}>Bottom</option></select></div>`;
-                h += `<div class="prop-grid"><label>Overflow</label><select data-prop="props.textOverflow"><option value="clip" ${(el.props.textOverflow||'clip')==='clip'?'selected':''}>Clip (default)</option><option value="auto-scale" ${el.props.textOverflow==='auto-scale'?'selected':''}>Auto-scale to fit</option><option value="squeeze" ${el.props.textOverflow==='squeeze'?'selected':''}>Horizontal squeeze</option></select><label>Rotation°</label><input type="number" step="1" data-prop="props.rotation" value="${el.props.rotation||0}"></div>`;
-                h += `<hr><div class="prop-grid"><label>Padding Top</label><input type="number" step="0.01" data-prop="props.paddingTop" value="${Number(el.props.paddingTop||0).toFixed(2)}" min="0"><label>Padding Right</label><input type="number" step="0.01" data-prop="props.paddingRight" value="${Number(el.props.paddingRight||0).toFixed(2)}" min="0"></div>`;
-                h += `<div class="prop-grid"><label>Padding Bottom</label><input type="number" step="0.01" data-prop="props.paddingBottom" value="${Number(el.props.paddingBottom||0).toFixed(2)}" min="0"><label>Padding Left</label><input type="number" step="0.01" data-prop="props.paddingLeft" value="${Number(el.props.paddingLeft||0).toFixed(2)}" min="0"></div>`;
+                const currentFontFamily = valueFor('props.fontFamily') || 'Arial, sans-serif';
+                const fontSizeVal = valueFor('props.fontSize'); const lineHVal = valueFor('props.lineHeight'); const weightVal = valueFor('props.fontWeight');
+                h += `<hr><div class="${grid1Cls}"><label class="${labelClass('props.fontSize')}">Font Size</label><input type="number" step="1" data-prop="props.fontSize" value="${fontSizeVal!==undefined?fontSizeVal:16}" min="6" max="200">${syncBtn('props.fontSize')}</div>`;
+                h += `<div class="${grid1Cls}"><label class="${labelClass('props.fontFamily')}">Font Family</label><div style="display:flex;gap:4px;align-items:center;min-width:0"><select data-prop="props.fontFamily" id="font-family-select-${el.id}" style="flex:1;min-width:0">${generateFontOptions(currentFontFamily)}</select><button type="button" id="font-favorite-btn-${el.id}" style="padding:4px 8px;font-size:16px;background:transparent;border:1px solid #ccc;border-radius:4px;cursor:pointer;flex-shrink:0" title="${fontFavorites.includes(currentFontFamily) ? 'Remove from favorites' : 'Add to favorites'}">${fontFavorites.includes(currentFontFamily) ? '⭐' : '☆'}</button></div>${syncBtn('props.fontFamily')}</div>`;
+                h += `<div class="${grid1Cls}"><label class="${labelClass('props.fontWeight')}">Weight</label><select data-prop="props.fontWeight" id="font-weight-select-${el.id}">${generateWeightOptions(currentFontFamily, weightVal)}</select>${syncBtn('props.fontWeight')}</div>`;
+                h += `<div class="${grid1Cls}"><label class="${labelClass('props.lineHeight')}">Line Height</label><input type="number" step="0.1" data-prop="props.lineHeight" value="${lineHVal!==undefined?lineHVal:1.2}" min="0.5" max="3">${syncBtn('props.lineHeight')}</div>`;
+                const taVal = valueFor('props.textAlign'); const vaVal = valueFor('props.valign'); const overflowVal = valueFor('props.textOverflow'); const rotVal = valueFor('props.rotation');
+                h += `<div class="${grid1Cls}"><label class="${labelClass('props.textAlign')}">H. Align</label><select data-prop="props.textAlign"><option value="left" ${taVal==='left'?'selected':''}>Left</option><option value="center" ${taVal==='center'?'selected':''}>Center</option><option value="right" ${taVal==='right'?'selected':''}>Right</option></select>${syncBtn('props.textAlign')}</div>`;
+                h += `<div class="${grid1Cls}"><label class="${labelClass('props.valign')}">V. Align</label><select data-prop="props.valign"><option value="top" ${vaVal==='top'?'selected':''}>Top</option><option value="middle" ${vaVal==='middle'?'selected':''}>Middle</option><option value="bottom" ${vaVal==='bottom'?'selected':''}>Bottom</option></select>${syncBtn('props.valign')}</div>`;
+                h += `<div class="${grid1Cls}"><label class="${labelClass('props.textOverflow')}">Overflow</label><select data-prop="props.textOverflow"><option value="clip" ${(overflowVal||'clip')==='clip'?'selected':''}>Clip (default)</option><option value="auto-scale" ${overflowVal==='auto-scale'?'selected':''}>Auto-scale to fit</option><option value="squeeze" ${overflowVal==='squeeze'?'selected':''}>Horizontal squeeze</option></select>${syncBtn('props.textOverflow')}</div>`;
+                h += `<div class="${grid1Cls}"><label class="${labelClass('props.rotation')}">Rotation°</label><input type="number" step="1" data-prop="props.rotation" value="${rotVal||0}">${syncBtn('props.rotation')}</div>`;
+                const ptVal = valueFor('props.paddingTop'); const prVal = valueFor('props.paddingRight'); const pbVal = valueFor('props.paddingBottom'); const plVal = valueFor('props.paddingLeft');
+                h += `<hr><div class="${grid1Cls}"><label class="${labelClass('props.paddingTop')}">Padding Top</label><input type="number" step="0.01" data-prop="props.paddingTop" value="${Number(ptVal||0).toFixed(2)}" min="0">${syncBtn('props.paddingTop')}</div>`;
+                h += `<div class="${grid1Cls}"><label class="${labelClass('props.paddingRight')}">Padding Right</label><input type="number" step="0.01" data-prop="props.paddingRight" value="${Number(prVal||0).toFixed(2)}" min="0">${syncBtn('props.paddingRight')}</div>`;
+                h += `<div class="${grid1Cls}"><label class="${labelClass('props.paddingBottom')}">Padding Bottom</label><input type="number" step="0.01" data-prop="props.paddingBottom" value="${Number(pbVal||0).toFixed(2)}" min="0">${syncBtn('props.paddingBottom')}</div>`;
+                h += `<div class="${grid1Cls}"><label class="${labelClass('props.paddingLeft')}">Padding Left</label><input type="number" step="0.01" data-prop="props.paddingLeft" value="${Number(plVal||0).toFixed(2)}" min="0">${syncBtn('props.paddingLeft')}</div>`;
                 
                 // Regex formatting rules section
                 if(!el.props.regexRules) el.props.regexRules = [];
@@ -2634,18 +2743,30 @@ document.addEventListener('DOMContentLoaded', ()=>{
                     h += `</div>`;
                 });
                 h += `</div>`;
-                h += `<button type="button" class="add-regex-rule-btn" style="width:100%;padding:6px;margin-top:8px;background:#007aff;color:#fff;border:none;border-radius:4px;cursor:pointer;font-size:12px">+ Add Regex Rule</button>`;
+                h += `<button type="button" class="add-regex-rule-btn">+ Add Regex Rule</button>`;
                 h += `</div>`;
             }
 
             // border
-        h += `<hr><div class="prop-grid"><label>Show Border</label><input type="checkbox" data-prop="props.showBorder" ${el.props.showBorder?'checked':''}><label>Border Color</label><input type="color" data-prop="props.borderColor" value="${el.props.borderColor||'#000000'}"></div>`;
-            h += `<div class="prop-grid"><label>Border Width</label><input type="number" data-prop="props.borderWidth" value="${el.props.borderWidth||1}" min="0"><label></label></div>`;
-            if(el.props.showBorder){
-                h += `<div class="prop-grid" style="margin-top:8px"><label style="font-size:12px">Border Sides:</label><div style="display:grid;grid-template-columns:1fr 1fr;gap:4px"><label style="font-size:12px;font-weight:normal;display:flex;align-items:center;gap:4px"><input type="checkbox" data-prop="props.borderTop" ${el.props.borderTop!==false?'checked':''}>Top</label><label style="font-size:12px;font-weight:normal;display:flex;align-items:center;gap:4px"><input type="checkbox" data-prop="props.borderRight" ${el.props.borderRight!==false?'checked':''}>Right</label><label style="font-size:12px;font-weight:normal;display:flex;align-items:center;gap:4px"><input type="checkbox" data-prop="props.borderBottom" ${el.props.borderBottom!==false?'checked':''}>Bottom</label><label style="font-size:12px;font-weight:normal;display:flex;align-items:center;gap:4px"><input type="checkbox" data-prop="props.borderLeft" ${el.props.borderLeft!==false?'checked':''}>Left</label></div></div>`;
-                h += `<div style="margin-top:8px"><label style="font-size:12px;display:block;margin-bottom:6px">Border Radius (px):</label><div style="display:grid;grid-template-columns:1fr 1fr;gap:6px;max-width:200px"><div style="display:flex;flex-direction:column;gap:2px"><label style="font-size:11px;font-weight:normal;text-align:center">↖ Top Left</label><input type="number" data-prop="props.borderRadiusTopLeft" value="${Number(el.props.borderRadiusTopLeft||0)}" min="0" step="0.1" style="font-size:12px;padding:4px;text-align:center"></div><div style="display:flex;flex-direction:column;gap:2px"><label style="font-size:11px;font-weight:normal;text-align:center">↗ Top Right</label><input type="number" data-prop="props.borderRadiusTopRight" value="${Number(el.props.borderRadiusTopRight||0)}" min="0" step="0.1" style="font-size:12px;padding:4px;text-align:center"></div><div style="display:flex;flex-direction:column;gap:2px"><label style="font-size:11px;font-weight:normal;text-align:center">↙ Bottom Left</label><input type="number" data-prop="props.borderRadiusBottomLeft" value="${Number(el.props.borderRadiusBottomLeft||0)}" min="0" step="0.1" style="font-size:12px;padding:4px;text-align:center"></div><div style="display:flex;flex-direction:column;gap:2px"><label style="font-size:11px;font-weight:normal;text-align:center">↘ Bottom Right</label><input type="number" data-prop="props.borderRadiusBottomRight" value="${Number(el.props.borderRadiusBottomRight||0)}" min="0" step="0.1" style="font-size:12px;padding:4px;text-align:center"></div></div></div>`;
+        const showBorderVal = valueFor('props.showBorder'); const borderColorVal = valueFor('props.borderColor'); const borderWidthVal = valueFor('props.borderWidth');
+        h += `<hr><div class="${grid1Cls}"><label class="${labelClass('props.showBorder')}">Show Border</label><input type="checkbox" data-prop="props.showBorder" ${showBorderVal?'checked':''}>${syncBtn('props.showBorder')}</div>`;
+        h += `<div class="${grid1Cls}"><label class="${labelClass('props.borderColor')}">Border Color</label><input type="color" data-prop="props.borderColor" value="${borderColorVal||'#000000'}">${syncBtn('props.borderColor')}</div>`;
+        h += `<div class="${grid1Cls}"><label class="${labelClass('props.borderWidth')}">Border Width</label><input type="number" data-prop="props.borderWidth" value="${borderWidthVal!==undefined?borderWidthVal:1}" min="0">${syncBtn('props.borderWidth')}</div>`;
+            if(showBorderVal){
+                const btVal = valueFor('props.borderTop'); const brVal = valueFor('props.borderRight'); const bbVal = valueFor('props.borderBottom'); const blVal = valueFor('props.borderLeft');
+                h += `<div style="margin-top:8px"><label style="font-size:12px;font-weight:600;display:block;margin-bottom:6px">Border Sides:</label><div class="prop-border-sides">`;
+                h += `<label class="${labelClass('props.borderTop')}"><input type="checkbox" data-prop="props.borderTop" ${btVal!==false?'checked':''}> Top</label>${syncBtn('props.borderTop')}<label class="${labelClass('props.borderRight')}"><input type="checkbox" data-prop="props.borderRight" ${brVal!==false?'checked':''}> Right</label>${syncBtn('props.borderRight')}`;
+                h += `<label class="${labelClass('props.borderBottom')}"><input type="checkbox" data-prop="props.borderBottom" ${bbVal!==false?'checked':''}> Bottom</label>${syncBtn('props.borderBottom')}<label class="${labelClass('props.borderLeft')}"><input type="checkbox" data-prop="props.borderLeft" ${blVal!==false?'checked':''}> Left</label>${syncBtn('props.borderLeft')}`;
+                h += `</div></div>`;
+                const brTL = valueFor('props.borderRadiusTopLeft'); const brTR = valueFor('props.borderRadiusTopRight'); const brBL = valueFor('props.borderRadiusBottomLeft'); const brBR = valueFor('props.borderRadiusBottomRight');
+                h += `<div style="margin-top:8px"><label style="font-size:12px;font-weight:600;display:block;margin-bottom:6px">Border Radius (px):</label><div class="prop-border-radius-grid">`;
+                h += `<div class="prop-border-radius-cell"><label class="${labelClass('props.borderRadiusTopLeft')}">↖ Top Left</label><input type="number" data-prop="props.borderRadiusTopLeft" value="${Number(brTL||0)}" min="0" step="0.1">${syncBtn('props.borderRadiusTopLeft')}</div>`;
+                h += `<div class="prop-border-radius-cell"><label class="${labelClass('props.borderRadiusTopRight')}">↗ Top Right</label><input type="number" data-prop="props.borderRadiusTopRight" value="${Number(brTR||0)}" min="0" step="0.1">${syncBtn('props.borderRadiusTopRight')}</div>`;
+                h += `<div class="prop-border-radius-cell"><label class="${labelClass('props.borderRadiusBottomLeft')}">↙ Bottom Left</label><input type="number" data-prop="props.borderRadiusBottomLeft" value="${Number(brBL||0)}" min="0" step="0.1">${syncBtn('props.borderRadiusBottomLeft')}</div>`;
+                h += `<div class="prop-border-radius-cell"><label class="${labelClass('props.borderRadiusBottomRight')}">↘ Bottom Right</label><input type="number" data-prop="props.borderRadiusBottomRight" value="${Number(brBR||0)}" min="0" step="0.1">${syncBtn('props.borderRadiusBottomRight')}</div>`;
+                h += `</div></div>`;
             }
-        if(el.type!=='box') h += `<hr><label>Color</label><input type="color" data-prop="props.color" value="${el.props.color||'#000000'}">`;
+        if(el.type!=='box') h += `<hr><div class="${grid1Cls}"><label class="${labelClass('props.color')}">Color</label><input type="color" data-prop="props.color" value="${valueFor('props.color')||'#000000'}">${syncBtn('props.color')}</div>`;
         h += `<hr><button id="btn-delete">Delete Element</button>`;
         pp.innerHTML = h;
             
@@ -2874,7 +2995,7 @@ document.addEventListener('DOMContentLoaded', ()=>{
             h += `<div class="prop-grid"><label>Border Color</label><input type="color" data-prop="multi.props.borderColor" value="${common('props.borderColor')||'#000000'}"><label>Border Width</label><input type="number" step="1" data-prop="multi.props.borderWidth" value="${common('props.borderWidth')}" min="0"></div>`;
             if(common('props.showBorder')){
                 h += `<div class="prop-grid" style="margin-top:8px"><label style="font-size:12px">Border Sides:</label><div style="display:grid;grid-template-columns:1fr 1fr;gap:4px"><label style="font-size:12px;font-weight:normal;display:flex;align-items:center;gap:4px"><input type="checkbox" data-prop="multi.props.borderTop" ${common('props.borderTop')!==false?'checked':''}>Top</label><label style="font-size:12px;font-weight:normal;display:flex;align-items:center;gap:4px"><input type="checkbox" data-prop="multi.props.borderRight" ${common('props.borderRight')!==false?'checked':''}>Right</label><label style="font-size:12px;font-weight:normal;display:flex;align-items:center;gap:4px"><input type="checkbox" data-prop="multi.props.borderBottom" ${common('props.borderBottom')!==false?'checked':''}>Bottom</label><label style="font-size:12px;font-weight:normal;display:flex;align-items:center;gap:4px"><input type="checkbox" data-prop="multi.props.borderLeft" ${common('props.borderLeft')!==false?'checked':''}>Left</label></div></div>`;
-                h += `<div style="margin-top:8px"><label style="font-size:12px;display:block;margin-bottom:6px">Border Radius (px):</label><div style="display:grid;grid-template-columns:1fr 1fr;gap:6px;max-width:200px"><div style="display:flex;flex-direction:column;gap:2px"><label style="font-size:11px;font-weight:normal;text-align:center">↖ Top Left</label><input type="number" data-prop="multi.props.borderRadiusTopLeft" value="${common('props.borderRadiusTopLeft')||0}" min="0" step="0.1" style="font-size:12px;padding:4px;text-align:center"></div><div style="display:flex;flex-direction:column;gap:2px"><label style="font-size:11px;font-weight:normal;text-align:center">↗ Top Right</label><input type="number" data-prop="multi.props.borderRadiusTopRight" value="${common('props.borderRadiusTopRight')||0}" min="0" step="0.1" style="font-size:12px;padding:4px;text-align:center"></div><div style="display:flex;flex-direction:column;gap:2px"><label style="font-size:11px;font-weight:normal;text-align:center">↙ Bottom Left</label><input type="number" data-prop="multi.props.borderRadiusBottomLeft" value="${common('props.borderRadiusBottomLeft')||0}" min="0" step="0.1" style="font-size:12px;padding:4px;text-align:center"></div><div style="display:flex;flex-direction:column;gap:2px"><label style="font-size:11px;font-weight:normal;text-align:center">↘ Bottom Right</label><input type="number" data-prop="multi.props.borderRadiusBottomRight" value="${common('props.borderRadiusBottomRight')||0}" min="0" step="0.1" style="font-size:12px;padding:4px;text-align:center"></div></div></div>`;
+                h += `<div style="margin-top:8px"><label style="font-size:12px;display:block;margin-bottom:6px">Border Radius (px):</label><div class="prop-border-radius-grid"><div class="prop-border-radius-cell"><label>↖ Top Left</label><input type="number" data-prop="multi.props.borderRadiusTopLeft" value="${common('props.borderRadiusTopLeft')||0}" min="0" step="0.1"></div><div class="prop-border-radius-cell"><label>↗ Top Right</label><input type="number" data-prop="multi.props.borderRadiusTopRight" value="${common('props.borderRadiusTopRight')||0}" min="0" step="0.1"></div><div class="prop-border-radius-cell"><label>↙ Bottom Left</label><input type="number" data-prop="multi.props.borderRadiusBottomLeft" value="${common('props.borderRadiusBottomLeft')||0}" min="0" step="0.1"></div><div class="prop-border-radius-cell"><label>↘ Bottom Right</label><input type="number" data-prop="multi.props.borderRadiusBottomRight" value="${common('props.borderRadiusBottomRight')||0}" min="0" step="0.1"></div></div></div>`;
             }
             // Show general color only if not all elements are boxes (boxes have their own color controls)
             const allBoxes = elems.every(el => el.type === 'box');
@@ -3282,7 +3403,7 @@ document.addEventListener('DOMContentLoaded', ()=>{
                     lineHeight:1.2,objectFit:'contain'
             }
         };
-        if(type==='qr'){ n.width=1;n.height=1 }
+        if(type==='qr'){ n.width=1;n.height=1; n.props.qrErrorCorrectLevel='M'; n.props.qrColorDark='#000000'; n.props.qrColorLight='#ffffff'; }
         if(type==='barcode'){ n.width=2;n.height=.8 }
         if(type==='line'){ n.height=.02;n.width=2 }
         if(type==='box'){ n.width=1.5;n.height=1 }
@@ -3694,6 +3815,24 @@ document.addEventListener('DOMContentLoaded', ()=>{
             return getMasterThread(el.masterThreadId);
         }
 
+        function ensureLegacyMasterThreadsSyncedProps(){
+            const defaultSyncedProps = ['props.boundColumn','props.prefix','props.suffix','props.text','props.fallbackLink'];
+            masterDataThreads.forEach(thread => {
+                if(!Array.isArray(thread.syncedProps)){
+                    thread.syncedProps = defaultSyncedProps.slice();
+                    const d = thread.data || {};
+                    if(!d['props.boundColumn'] && d.boundColumn !== undefined) d['props.boundColumn'] = d.boundColumn;
+                    if(!d['props.prefix'] && d.prefix !== undefined) d['props.prefix'] = d.prefix;
+                    if(!d['props.suffix'] && d.suffix !== undefined) d['props.suffix'] = d.suffix;
+                    if(!d['props.text'] && d.text !== undefined) d['props.text'] = d.text;
+                    if(!d['props.fallbackLink'] && d.fallbackLink !== undefined) d['props.fallbackLink'] = d.fallbackLink;
+                    thread.data = d;
+                }
+            });
+        }
+
+        const DEFAULT_SYNCED_PROPS_LIST = ['props.boundColumn', 'props.prefix', 'props.suffix', 'props.text', 'props.fallbackLink'];
+
         function createMasterThread(name, templateElement = null){
             if(!name || name.trim() === ''){
                 name = `Thread ${masterDataThreads.length + 1}`;
@@ -3708,6 +3847,7 @@ document.addEventListener('DOMContentLoaded', ()=>{
                     text: '',
                     fallbackLink: ''
                 },
+                syncedProps: [...DEFAULT_SYNCED_PROPS_LIST],
                 template: null
             };
             
@@ -3836,26 +3976,13 @@ document.addEventListener('DOMContentLoaded', ()=>{
                 };
             }
             
-            // Link element to thread
             el.masterThreadId = threadId;
-            
-            // Copy values from thread to element (based on type)
-            if(el.type === 'text'){
-                el.props.text = thread.data.text || '';
-            } else if(el.type === 'data'){
-                el.props.boundColumn = thread.data.boundColumn || '';
-                el.props.prefix = thread.data.prefix || '';
-                el.props.suffix = thread.data.suffix || '';
-            } else if(el.type === 'qr'){
-                el.props.boundColumn = thread.data.boundColumn || '';
-                el.props.text = thread.data.text || '';
-                el.props.prefix = thread.data.prefix || '';
-                el.props.suffix = thread.data.suffix || '';
-            } else if(el.type === 'image'){
-                el.props.boundColumn = thread.data.boundColumn || '';
-                el.props.fallbackLink = thread.data.fallbackLink || '';
-            }
-            
+            if(!Array.isArray(el.syncedOverrides)) el.syncedOverrides = [];
+            (thread.syncedProps || []).forEach(propKey => {
+                const v = thread.data && thread.data[propKey];
+                if(v !== undefined) setElementPropFromThread(el, propKey, v);
+            });
+
             saveCurrentDesign();
             render();
             updateProps();
@@ -3874,84 +4001,142 @@ document.addEventListener('DOMContentLoaded', ()=>{
             return true;
         }
 
-        function syncPropertyToThread(threadId, property, value){
+        function getElementPropValue(el, propKey){
+            if(!el) return undefined;
+            if(propKey === 'props.regexRules'){
+                return (el.props && el.props.regexRules) ? deepCopy(el.props.regexRules) : [];
+            }
+            if(propKey.includes('.')){
+                const [o, k] = propKey.split('.');
+                if(o === 'props' && el.props) return el.props[k];
+                return el[o] ? el[o][k] : undefined;
+            }
+            return el[propKey];
+        }
+
+        function setElementPropFromThread(el, propKey, value){
+            if(!el) return;
+            if(propKey === 'props.regexRules'){
+                el.props = el.props || {};
+                el.props.regexRules = (value && (Array.isArray(value) || typeof value === 'object')) ? deepCopy(value) : (value || []);
+                return;
+            }
+            applyPropToElement(el, propKey, value);
+        }
+
+        function isPropSynced(thread, propKey){
+            return thread && Array.isArray(thread.syncedProps) && thread.syncedProps.includes(propKey);
+        }
+
+        function isPropOverridden(el, propKey){
+            return el && Array.isArray(el.syncedOverrides) && el.syncedOverrides.includes(propKey);
+        }
+
+        /** Apply thread synced data to a list of elements (lazy sync: only current design is updated in syncPropertyToThread; other designs get values when loaded) */
+        function applyThreadDataToElements(elements){
+            if(!elements || !elements.length) return;
+            elements.forEach(el => {
+                if(!el.masterThreadId) return;
+                const thread = getMasterThread(el.masterThreadId);
+                if(!thread || !thread.syncedProps || !Array.isArray(thread.syncedProps)) return;
+                thread.syncedProps.forEach(propKey => {
+                    if(isPropOverridden(el, propKey)) return;
+                    let val = thread.data[propKey];
+                    if(val === undefined && thread.data){
+                        const legacyKey = propKey.replace('props.', '');
+                        if(thread.data[legacyKey] !== undefined) val = thread.data[legacyKey];
+                    }
+                    if(val !== undefined) setElementPropFromThread(el, propKey, (typeof val === 'object' && val !== null) ? deepCopy(val) : val);
+                });
+            });
+        }
+
+        function syncPropertyToThread(threadId, propKey, value){
             const thread = getMasterThread(threadId);
             if(!thread) return;
-            
-            // Ensure value is a string for text properties
-            const stringValue = String(value || '');
-            
+            const normalizedKey = ['boundColumn','prefix','suffix','text','fallbackLink'].includes(propKey) ? 'props.' + propKey : propKey;
+            if(!thread.syncedProps || !thread.syncedProps.includes(normalizedKey)) return;
+
             pushBeforeChange();
-            
-            // Update thread data
-            if(property === 'boundColumn'){
-                thread.data.boundColumn = stringValue;
-            } else if(property === 'prefix'){
-                thread.data.prefix = stringValue;
-            } else if(property === 'suffix'){
-                thread.data.suffix = stringValue;
-            } else if(property === 'text'){
-                thread.data.text = stringValue;
-            } else if(property === 'fallbackLink'){
-                thread.data.fallbackLink = stringValue;
-            }
-            
-            // Update current S array
+
+            const storeValue = (typeof value === 'object' && value !== null) ? deepCopy(value) : value;
+            if(!thread.data) thread.data = {};
+            thread.data[normalizedKey] = storeValue;
+
             S.forEach(el => {
-                if(el.masterThreadId === threadId){
-                    if(el.type === 'text' && property === 'text'){
-                        el.props.text = stringValue;
-                    } else if(el.type === 'data'){
-                        if(property === 'boundColumn') el.props.boundColumn = stringValue;
-                        if(property === 'prefix') el.props.prefix = stringValue;
-                        if(property === 'suffix') el.props.suffix = stringValue;
-                    } else if(el.type === 'qr'){
-                        if(property === 'boundColumn') el.props.boundColumn = stringValue;
-                        if(property === 'text') el.props.text = stringValue;
-                        if(property === 'prefix') el.props.prefix = stringValue;
-                        if(property === 'suffix') el.props.suffix = stringValue;
-                    } else if(el.type === 'image'){
-                        if(property === 'boundColumn') el.props.boundColumn = stringValue;
-                        if(property === 'fallbackLink') el.props.fallbackLink = stringValue;
-                    }
+                if(el.masterThreadId === threadId && !isPropOverridden(el, normalizedKey)){
+                    setElementPropFromThread(el, normalizedKey, storeValue);
                 }
             });
-            
-            // Propagate to all elements with this threadId across all designs
-            Object.keys(profiles).forEach(profileKey => {
-                const profile = profiles[profileKey];
-                if(profile && profile.designs){
+
+            saveCurrentDesign();
+            render();
+            updateProps();
+        }
+
+        function toggleSyncState(threadId, propKey, el){
+            const thread = getMasterThread(threadId);
+            if(!thread) return;
+            pushBeforeChange();
+            if(!Array.isArray(thread.syncedProps)) thread.syncedProps = [];
+            if(!Array.isArray(el.syncedOverrides)) el.syncedOverrides = [];
+
+            if(el.syncedOverrides.includes(propKey)){
+                thread.syncedProps = thread.syncedProps.filter(p => p !== propKey);
+                if(thread.data) delete thread.data[propKey];
+                Object.keys(profiles).forEach(profileKey => {
+                    const profile = profiles[profileKey];
+                    if(!profile || !profile.designs) return;
                     Object.keys(profile.designs).forEach(designKey => {
                         const design = profile.designs[designKey];
-                        if(design){
-                            ['canvas1', 'canvas2'].forEach(canvasKey => {
-                                const canvasData = design[canvasKey] || [];
-                                canvasData.forEach(el => {
-                                    if(el.masterThreadId === threadId){
-                                        // Update only relevant properties based on element type
-                                        if(el.type === 'text' && property === 'text'){
-                                            el.props.text = stringValue;
-                                        } else if(el.type === 'data'){
-                                            if(property === 'boundColumn') el.props.boundColumn = stringValue;
-                                            if(property === 'prefix') el.props.prefix = stringValue;
-                                            if(property === 'suffix') el.props.suffix = stringValue;
-                                        } else if(el.type === 'qr'){
-                                            if(property === 'boundColumn') el.props.boundColumn = stringValue;
-                                            if(property === 'text') el.props.text = stringValue;
-                                            if(property === 'prefix') el.props.prefix = stringValue;
-                                            if(property === 'suffix') el.props.suffix = stringValue;
-                                        } else if(el.type === 'image'){
-                                            if(property === 'boundColumn') el.props.boundColumn = stringValue;
-                                            if(property === 'fallbackLink') el.props.fallbackLink = stringValue;
-                                        }
-                                    }
-                                });
+                        if(!design) return;
+                        ['canvas1', 'canvas2'].forEach(canvasKey => {
+                            (design[canvasKey] || []).forEach(e => {
+                                if(e.masterThreadId === threadId && Array.isArray(e.syncedOverrides)){
+                                    e.syncedOverrides = e.syncedOverrides.filter(p => p !== propKey);
+                                }
                             });
-                        }
+                        });
                     });
-                }
-            });
-            
+                });
+                S.forEach(e => {
+                    if(e.masterThreadId === threadId && Array.isArray(e.syncedOverrides)){
+                        e.syncedOverrides = e.syncedOverrides.filter(p => p !== propKey);
+                    }
+                });
+            } else if(thread.syncedProps.includes(propKey)){
+                el.syncedOverrides = el.syncedOverrides.slice();
+                if(!el.syncedOverrides.includes(propKey)) el.syncedOverrides.push(propKey);
+            } else {
+                thread.syncedProps = thread.syncedProps.slice();
+                thread.syncedProps.push(propKey);
+                const val = getElementPropValue(el, propKey);
+                if(!thread.data) thread.data = {};
+                if(thread.data[propKey] === undefined) thread.data[propKey] = val;
+                else thread.data[propKey] = (typeof val === 'object' && val !== null) ? deepCopy(val) : val;
+                syncPropertyToThread(threadId, propKey, thread.data[propKey]);
+                Object.keys(profiles).forEach(profileKey => {
+                    const profile = profiles[profileKey];
+                    if(!profile || !profile.designs) return;
+                    Object.keys(profile.designs).forEach(designKey => {
+                        const design = profile.designs[designKey];
+                        if(!design) return;
+                        ['canvas1', 'canvas2'].forEach(canvasKey => {
+                            (design[canvasKey] || []).forEach(e => {
+                                if(e.masterThreadId === threadId && Array.isArray(e.syncedOverrides)){
+                                    e.syncedOverrides = e.syncedOverrides.filter(p => p !== propKey);
+                                }
+                            });
+                        });
+                    });
+                });
+                S.forEach(e => {
+                    if(e.masterThreadId === threadId && Array.isArray(e.syncedOverrides)){
+                        e.syncedOverrides = e.syncedOverrides.filter(p => p !== propKey);
+                    }
+                });
+            }
+
             saveCurrentDesign();
             render();
             updateProps();
@@ -4016,26 +4201,12 @@ document.addEventListener('DOMContentLoaded', ()=>{
             const firstElement = S.find(e => e.id === selectedIds[0]);
             if(!firstElement) return;
             
-            // Create new thread with template from first element
             const thread = createMasterThread(threadName || undefined, firstElement);
-            
-            // Initialize thread data with values from first selected element (so content is preserved)
-            if(firstElement.type === 'text'){
-                thread.data.text = firstElement.props.text || '';
-            } else if(firstElement.type === 'data'){
-                thread.data.boundColumn = firstElement.props.boundColumn || '';
-                thread.data.prefix = firstElement.props.prefix || '';
-                thread.data.suffix = firstElement.props.suffix || '';
-            } else if(firstElement.type === 'qr'){
-                thread.data.boundColumn = firstElement.props.boundColumn || '';
-                thread.data.text = firstElement.props.text || '';
-                thread.data.prefix = firstElement.props.prefix || '';
-                thread.data.suffix = firstElement.props.suffix || '';
-            } else if(firstElement.type === 'image'){
-                thread.data.boundColumn = firstElement.props.boundColumn || '';
-                thread.data.fallbackLink = firstElement.props.fallbackLink || '';
-            }
-            
+            ['props.boundColumn','props.prefix','props.suffix','props.text','props.fallbackLink'].forEach(propKey => {
+                const v = getElementPropValue(firstElement, propKey);
+                if(v !== undefined) thread.data[propKey] = v;
+            });
+
             // Sync all selected elements to the thread (now with initialized values)
             selectedIds.forEach(id => {
                 syncElementToThread(id, thread.id);
@@ -4080,36 +4251,23 @@ document.addEventListener('DOMContentLoaded', ()=>{
             const template = thread.template;
             const mz = S.length > 0 ? Math.max(...S.map(e => e.zIndex || 0)) : 0;
             
-            // Create new element based on template
             const newEl = {
                 id: `el_${Date.now()}`,
                 type: template.type,
-                x: W / 2 - template.width / 2, // Center horizontally
-                y: H / 2 - template.height / 2, // Center vertically
+                x: W / 2 - template.width / 2,
+                y: H / 2 - template.height / 2,
                 width: template.width,
                 height: template.height,
                 zIndex: mz + 1,
                 masterThreadId: threadId,
+                syncedOverrides: [],
                 props: deepCopy(template.props)
             };
-            
-            // Copy synchronized data from thread based on type
-            if(newEl.type === 'text'){
-                newEl.props.text = thread.data.text || '';
-            } else if(newEl.type === 'data'){
-                newEl.props.boundColumn = thread.data.boundColumn || '';
-                newEl.props.prefix = thread.data.prefix || '';
-                newEl.props.suffix = thread.data.suffix || '';
-            } else if(newEl.type === 'qr'){
-                newEl.props.boundColumn = thread.data.boundColumn || '';
-                newEl.props.text = thread.data.text || '';
-                newEl.props.prefix = thread.data.prefix || '';
-                newEl.props.suffix = thread.data.suffix || '';
-            } else if(newEl.type === 'image'){
-                newEl.props.boundColumn = thread.data.boundColumn || '';
-                newEl.props.fallbackLink = thread.data.fallbackLink || '';
-            }
-            
+            (thread.syncedProps || []).forEach(propKey => {
+                const v = thread.data && thread.data[propKey];
+                if(v !== undefined) setElementPropFromThread(newEl, propKey, v);
+            });
+
             // Ensure element stays within canvas bounds
             newEl.x = Math.max(0, Math.min(newEl.x, W - newEl.width));
             newEl.y = Math.max(0, Math.min(newEl.y, H - newEl.height));
@@ -4433,6 +4591,7 @@ document.addEventListener('DOMContentLoaded', ()=>{
                 packWaves = Array.isArray(parsed.packWaves) ? deepCopy(parsed.packWaves) : [];
                 globalRegexRules = Array.isArray(parsed.globalRegexRules) ? deepCopy(parsed.globalRegexRules) : [];
                 masterDataThreads = Array.isArray(parsed.masterDataThreads) ? deepCopy(parsed.masterDataThreads) : [];
+                ensureLegacyMasterThreadsSyncedProps();
 
                 if(Array.isArray(parsed.fontFavorites)){
                     fontFavorites = deepCopy(parsed.fontFavorites);
@@ -4940,9 +5099,13 @@ document.addEventListener('DOMContentLoaded', ()=>{
                             const qrValue = prefix + String(c) + suffix;
                             
                             const q = document.createElement('img');
-                            const dpi = 37.795276;
-                            const qs = Math.min(el.width, el.height) * dpi;
-                            q.src = `https://api.qrserver.com/v1/create-qr-code/?size=${Math.round(qs)}x${Math.round(qs)}&data=${encodeURIComponent(qrValue)}`;
+                            const dpiPrint = 118.11;
+                            const qsPrint = Math.max(50, Math.min(el.width, el.height) * dpiPrint);
+                            const qrOpts = { colorDark: el.props.qrColorDark || '#000000', colorLight: el.props.qrColorLight || '#ffffff', errorCorrectLevel: el.props.qrErrorCorrectLevel || 'M' };
+                            q.src = generateQRDataURL(qrValue, qsPrint, qrOpts) || '';
+                            q.className = 'qr-code-img';
+                            q.style.imageRendering = 'pixelated';
+                            q.style.webkitImageRendering = 'pixelated';
                             q.style.pointerEvents='none';
                             q.style.width='100%';
                             q.style.height='100%';
@@ -5588,9 +5751,13 @@ document.addEventListener('DOMContentLoaded', ()=>{
                             const qrValue = prefix + String(c) + suffix;
                             
                             const q = document.createElement('img');
-                            const dpi = 37.795276;
-                            const qs = Math.min(el.width, el.height) * dpi;
-                            q.src = `https://api.qrserver.com/v1/create-qr-code/?size=${Math.round(qs)}x${Math.round(qs)}&data=${encodeURIComponent(qrValue)}`;
+                            const dpiPrint = 118.11;
+                            const qsPrint = Math.max(50, Math.min(el.width, el.height) * dpiPrint);
+                            const qrOpts = { colorDark: el.props.qrColorDark || '#000000', colorLight: el.props.qrColorLight || '#ffffff', errorCorrectLevel: el.props.qrErrorCorrectLevel || 'M' };
+                            q.src = generateQRDataURL(qrValue, qsPrint, qrOpts) || '';
+                            q.className = 'qr-code-img';
+                            q.style.imageRendering = 'pixelated';
+                            q.style.webkitImageRendering = 'pixelated';
                             q.style.pointerEvents='none';
                             q.style.width='100%';
                             q.style.height='100%';
@@ -6169,9 +6336,13 @@ document.addEventListener('DOMContentLoaded', ()=>{
                         const qrValue = prefix + String(c) + suffix;
                         
                         const q = document.createElement('img');
-                        const dpi = 37.795276;
-                        const qs = Math.min(el.width, el.height) * dpi;
-                        q.src = `https://api.qrserver.com/v1/create-qr-code/?size=${Math.round(qs)}x${Math.round(qs)}&data=${encodeURIComponent(qrValue)}`;
+                        const dpiPrint = 118.11;
+                        const qsPrint = Math.max(50, Math.min(el.width, el.height) * dpiPrint);
+                        const qrOpts = { colorDark: el.props.qrColorDark || '#000000', colorLight: el.props.qrColorLight || '#ffffff', errorCorrectLevel: el.props.qrErrorCorrectLevel || 'M' };
+                        q.src = generateQRDataURL(qrValue, qsPrint, qrOpts) || '';
+                        q.className = 'qr-code-img';
+                        q.style.imageRendering = 'pixelated';
+                        q.style.webkitImageRendering = 'pixelated';
                         q.style.pointerEvents='none';
                         q.style.width='100%';
                         q.style.height='100%';
@@ -7231,18 +7402,10 @@ document.addEventListener('DOMContentLoaded', ()=>{
             const el = S.find(s=>s.id===id);
             if(el) {
                 applyPropToElement(el, prop, parsedValue);
-                
-                // Check if element is synchronized and property is syncable
-                // For textarea, defer sync to avoid losing focus
                 if(el.masterThreadId && !isTextarea){
-                    const syncProps = ['props.boundColumn', 'props.prefix', 'props.suffix', 'props.text', 'props.fallbackLink'];
-                    if(syncProps.includes(prop)){
-                        // Map prop to thread property name
-                        let threadProp = prop.replace('props.', '');
-                        if(threadProp === 'fallbackLink') threadProp = 'fallbackLink';
-                        // Use string value for text properties
-                        const stringValue = String(parsedValue || '');
-                        syncPropertyToThread(el.masterThreadId, threadProp, stringValue);
+                    const thread = getMasterThread(el.masterThreadId);
+                    if(thread && isPropSynced(thread, prop) && !isPropOverridden(el, prop)){
+                        syncPropertyToThread(el.masterThreadId, prop, parsedValue);
                     }
                 }
             }
@@ -7271,18 +7434,11 @@ document.addEventListener('DOMContentLoaded', ()=>{
         const id = selectedIds[0];
         const el = S.find(s=>s.id===id);
         if(el) {
-            // Update the value
             applyPropToElement(el, prop, target.value);
-            
-            // Check if element is synchronized and property is syncable
             if(el.masterThreadId){
-                const syncProps = ['props.boundColumn', 'props.prefix', 'props.suffix', 'props.text', 'props.fallbackLink'];
-                if(syncProps.includes(prop)){
-                    // Map prop to thread property name
-                    let threadProp = prop.replace('props.', '');
-                    if(threadProp === 'fallbackLink') threadProp = 'fallbackLink';
-                    const stringValue = String(target.value || '');
-                    syncPropertyToThread(el.masterThreadId, threadProp, stringValue);
+                const thread = getMasterThread(el.masterThreadId);
+                if(thread && isPropSynced(thread, prop) && !isPropOverridden(el, prop)){
+                    syncPropertyToThread(el.masterThreadId, prop, String(target.value || ''));
                 } else {
                     render();
                     saveCurrentDesign();
@@ -7304,18 +7460,15 @@ document.addEventListener('DOMContentLoaded', ()=>{
         // Skip if it's a textarea (handled by blur)
         if(target.tagName === 'TEXTAREA') return;
         
-        // Handle synchronized blocks for select changes (e.g., boundColumn)
         if(selectedIds.length === 1){
             const id = selectedIds[0];
             const el = S.find(s=>s.id===id);
             if(el && el.masterThreadId){
-                const syncProps = ['props.boundColumn'];
-                if(syncProps.includes(prop)){
+                const thread = getMasterThread(el.masterThreadId);
+                if(thread && isPropSynced(thread, prop) && !isPropOverridden(el, prop)){
                     const value = target.value || '';
-                    el.props.boundColumn = value;
-                    
-                    // Sync to thread and propagate
-                    syncPropertyToThread(el.masterThreadId, 'boundColumn', value);
+                    applyPropToElement(el, prop, value);
+                    syncPropertyToThread(el.masterThreadId, prop, value);
                 }
             }
         }
@@ -7324,6 +7477,14 @@ document.addEventListener('DOMContentLoaded', ()=>{
     pp.addEventListener('click', (e)=>{
         if(e.target && e.target.id === 'btn-delete'){
             deleteSelected();
+            return;
+        }
+        if(e.target && e.target.classList && e.target.classList.contains('prop-sync-btn')){
+            const propKey = e.target.dataset.propKey;
+            if(!propKey || selectedIds.length !== 1) return;
+            const el = S.find(s=>s.id===selectedIds[0]);
+            if(!el || !el.masterThreadId) return;
+            toggleSyncState(el.masterThreadId, propKey, el);
         }
     });
 
@@ -8003,6 +8164,7 @@ document.addEventListener('DOMContentLoaded', ()=>{
                     } else {
                         masterDataThreads = [];
                     }
+                    ensureLegacyMasterThreadsSyncedProps();
                     // Restore current profile, design and canvas if saved
                     if(parsed.currentProfile && profiles[parsed.currentProfile]){
                         currentProfile = parsed.currentProfile;
