@@ -97,18 +97,14 @@ Applica il valore al singolo elemento (equivalente a `applyPropToElement(el, pro
 
 ### 7. Aggiunta elemento da thread (“Add from thread”)
 
-- In `addElementFromThread` (~4110): dopo aver copiato i dati contenuto dal thread, applicare anche tutte le proprietà in `thread.syncedProps` i cui valori sono presenti in `thread.data` al nuovo elemento (e non impostare override di default), così il nuovo elemento rispetta subito le proprietà sincronizzate.  
-  
-  
-
+- In `addElementFromThread` (~4110): dopo aver copiato i dati contenuto dal thread, applicare anche tutte le proprietà in `thread.syncedProps` i cui valori sono presenti in `thread.data` al nuovo elemento (e non impostare override di default), così il nuovo elemento rispetta subito le proprietà sincronizzate.
 
 ## **Comportamento attuale**
 
 In syncPropertyToThread (circa 4046–4079) quando aggiorni una proprietà sincronizzata:
 
 1. Si aggiorna [thread.data](http://thread.data)[prop].
-
-1. Si applica subito il valore a **tutti** gli elementi del thread in **tutti** i design (oltre a S), iterando su profiles → designs → canvas1/canvas2.
+2. Si applica subito il valore a **tutti** gli elementi del thread in **tutti** i design (oltre a S), iterando su profiles → designs → canvas1/canvas2.
 
 Quindi nel momento in cui attivi il sync (anche per sbaglio), il valore dell’elemento corrente diventa la baseline e viene scritto ovunque. Se poi togli il sync (terzo click), togli solo syncedProps e [thread.data](http://thread.data), ma i dati negli altri design sono già stati sovrascritti e non c’è nessun “ripristino”.
 
@@ -117,9 +113,7 @@ Quindi nel momento in cui attivi il sync (anche per sbaglio), il valore dell’e
 ## **Soluzione 1: sync “lazy” (applicare solo quando apri il design)**
 
 - **Idea**: non iterare sugli altri design dentro syncPropertyToThread. Aggiorni solo [thread.data](http://thread.data) e gli elementi del design **corrente** (S). Quando l’utente **apre** un altro design, in quel momento applichi [thread.data](http://thread.data) agli elementi di quel design (solo per le prop in syncedProps e non in override).
-
 - **Pro**: nessuna scrittura immediata negli altri design; puoi sbagliare e togliere il sync senza aver mai “sporcato” i design che non hai riaperto.
-
 - **Contro**: se dopo il sync per sbaglio apri un altro design, quel design riceve comunque il valore sbagliato. Tornando a “non synced” non si ripristina nulla: il danno è già fatto. Quindi la lazy da sola **non** risolve il caso “ho già aperto l’altro design”.
 
 ## Riepilogo implementazione
@@ -142,4 +136,3 @@ Quindi nel momento in cui attivi il sync (anche per sbaglio), il valore dell’e
 - **Tipi**: in `syncPropertyToThread` e in `thread.data` gestire number, boolean, string e oggetti/array (regexRules) in modo che `applyPropToElement` / setter ricevano il tipo corretto.
 - Il pulsante può essere un’icona piccola (es. “⟳” o “link”) con title/tooltip: “Sync property” / “Override for this element” / “Follow thread again” in base allo stato.
 
-  
