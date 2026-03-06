@@ -1552,10 +1552,10 @@ document.addEventListener('DOMContentLoaded', ()=>{
                     d.innerText = el.props.text || '';
             }
 
-            // Background color: box uses fillColor (default transparent); other elements use backgroundColor (default transparent)
+            // Background: only box (fillColor) and text/data (backgroundColor); line/image/qr/barcode have no background option
             if(el.type === 'box'){
                 d.style.backgroundColor = el.props.fillColor || 'transparent';
-            } else {
+            } else if(el.type === 'text' || el.type === 'data'){
                 const bg = el.props.backgroundColor;
                 d.style.backgroundColor = (bg && bg !== 'transparent') ? bg : 'transparent';
             }
@@ -2777,8 +2777,8 @@ document.addEventListener('DOMContentLoaded', ()=>{
                 h += `</div></div>`;
             }
         if(el.type!=='box') h += `<hr><div class="${grid1Cls}"><label class="${labelClass('props.color')}">Color</label><input type="color" data-prop="props.color" value="${valueFor('props.color')||'#000000'}">${syncBtn('props.color')}</div>`;
-            // Background color for non-box elements (default transparent)
-            if(el.type!=='box'){
+            // Background color only for text and data (line, image, qr, barcode have no background option)
+            if(el.type==='text' || el.type==='data'){
                 const hasBg = el.props.backgroundColor && el.props.backgroundColor!=='transparent';
                 h += `<hr><div class="${grid1Cls}"><label>Background</label><div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap"><label style="font-weight:normal;display:flex;align-items:center;gap:4px"><input type="checkbox" class="no-background-cb" ${!hasBg?'checked':''}> No background</label><input type="color" class="background-color-input" data-prop="props.backgroundColor" value="${hasBg?el.props.backgroundColor:'#ffffff'}" ${!hasBg?'disabled':''}></div></div>`;
             }
@@ -2989,8 +2989,8 @@ document.addEventListener('DOMContentLoaded', ()=>{
                     });
                 });
             }
-            // Background color (non-box): "No background" = transparent
-            if(el.type !== 'box'){
+            // Background color (text/data only): "No background" = transparent
+            if(el.type === 'text' || el.type === 'data'){
                 const noBgCb = pp.querySelector('.no-background-cb');
                 const bgInput = pp.querySelector('.background-color-input');
                 if(noBgCb && bgInput){
@@ -5358,8 +5358,8 @@ document.addEventListener('DOMContentLoaded', ()=>{
                             break;
                         }
                     }
-                    // Background for non-box (box already set in case 'box')
-                    if(el.type !== 'box'){
+                    // Background only for text/data (box set in case 'box'; line/image/qr/barcode have no background)
+                    if(el.type === 'text' || el.type === 'data'){
                         const bg = el.props.backgroundColor;
                         d.style.backgroundColor = (bg && bg !== 'transparent') ? bg : 'transparent';
                         if(bg && bg !== 'transparent'){
@@ -6022,8 +6022,8 @@ document.addEventListener('DOMContentLoaded', ()=>{
                             break;
                         }
                     }
-                    // Background for non-box (box already set in case 'box')
-                    if(el.type !== 'box'){
+                    // Background only for text/data (box set in case 'box'; line/image/qr/barcode have no background)
+                    if(el.type === 'text' || el.type === 'data'){
                         const bg = el.props.backgroundColor;
                         d.style.backgroundColor = (bg && bg !== 'transparent') ? bg : 'transparent';
                         if(bg && bg !== 'transparent'){
@@ -6575,8 +6575,8 @@ document.addEventListener('DOMContentLoaded', ()=>{
                         break;
                     }
                 }
-                // Background for non-box (box already set in case 'box')
-                if(el.type !== 'box'){
+                // Background only for text/data (box set in case 'box'; line/image/qr/barcode have no background)
+                if(el.type === 'text' || el.type === 'data'){
                     const bg = el.props.backgroundColor;
                     d.style.backgroundColor = (bg && bg !== 'transparent') ? bg : 'transparent';
                     if(bg && bg !== 'transparent'){
