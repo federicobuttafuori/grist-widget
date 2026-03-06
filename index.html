@@ -7,6 +7,7 @@
     <script src="https://docs.getgrist.com/grist-plugin-api.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/jsbarcode@3.11.5/dist/JsBarcode.all.min.js"></script>
     <script src="https://cdn.jsdelivr.net/gh/davidshimjs/qrcodejs@gh-pages/qrcode.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
         <link rel="preconnect" href="https://fonts.googleapis.com">
         <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
             <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@100;200;300;400;500;600;700;800;900&family=Oswald:wght@200;300;400;500;600;700&family=Roboto+Condensed:wght@300;400;700&family=Sofia+Sans+Extra+Condensed:wght@100;200;300;400;500;600;700;800;900&display=swap" rel="stylesheet">
@@ -100,6 +101,9 @@
         .column-mention-dropdown-item{padding:8px 12px;cursor:pointer;font-size:14px;border-bottom:1px solid #f0f0f0}
         .column-mention-dropdown-item:last-child{border-bottom:none}
         .column-mention-dropdown-item:hover,.column-mention-dropdown-item.column-mention-dropdown-item-selected{background:#e8f0fe;color:#1967d2}
+        #canvas-wrapper{position:relative}
+        #bw-preview-overlay{position:absolute;left:0;top:0;pointer-events:none;display:none;z-index:1}
+        #bw-preview-overlay.bw-preview-visible{display:block}
     </style>
 </head>
 <body>
@@ -204,11 +208,50 @@
                 <div id="global-regex-rules-container" class="sidebar-stack"></div>
                 <button type="button" class="add-global-regex-rule-btn sidebar-btn-block sidebar-btn-info">+ Add Global Rule</button>
             </div>
+            <hr>
+            <div class="sidebar-section" id="bw-preview-section">
+                <h3>Anteprima termica (B&amp;N)</h3>
+                <label style="display:flex;align-items:center;gap:8px;margin-bottom:8px">
+                    <input type="checkbox" id="bw-mode-toggle">
+                    <span>Attiva anteprima B&amp;N</span>
+                </label>
+                <div class="bw-controls" style="display:flex;flex-direction:column;gap:8px">
+                    <div class="prop-grid" style="grid-template-columns:1fr auto">
+                        <label>Gamma</label>
+                        <span><input type="range" id="bw-gamma" min="0.5" max="2.5" step="0.1" value="1" style="width:80px;vertical-align:middle"><span id="bw-gamma-val">1</span></span>
+                    </div>
+                    <div class="prop-grid" style="grid-template-columns:1fr auto">
+                        <label>Threshold</label>
+                        <span><input type="range" id="bw-threshold" min="0" max="100" value="50" style="width:80px;vertical-align:middle"><span id="bw-threshold-val">50%</span></span>
+                    </div>
+                    <div class="prop-grid" style="grid-template-columns:1fr auto">
+                        <label>Contrast</label>
+                        <span><input type="range" id="bw-contrast" min="0.5" max="2" step="0.1" value="1" style="width:80px;vertical-align:middle"><span id="bw-contrast-val">1</span></span>
+                    </div>
+                    <div class="prop-grid" style="grid-template-columns:1fr auto">
+                        <label>Dot gain</label>
+                        <span><input type="range" id="bw-dotgain" min="0" max="30" value="0" style="width:80px;vertical-align:middle"><span id="bw-dotgain-val">0%</span></span>
+                    </div>
+                    <div class="prop-grid" style="grid-template-columns:1fr 1fr">
+                        <label>Dithering</label>
+                        <select id="bw-dithering">
+                            <option value="none">Nessuno</option>
+                            <option value="floyd-steinberg">Floyd-Steinberg</option>
+                            <option value="ordered bayer">Ordered Bayer</option>
+                        </select>
+                    </div>
+                    <div class="prop-grid" style="grid-template-columns:1fr auto">
+                        <label>Preview DPI</label>
+                        <input type="number" id="bw-preview-dpi" min="72" max="300" value="203" style="width:70px">
+                    </div>
+                </div>
+            </div>
         </div>
 
         <div id="canvas-container">
             <div id="canvas-wrapper">
                 <div id="label-canvas"></div>
+                <canvas id="bw-preview-overlay"></canvas>
             </div>
             <div id="marquee"></div>
         </div>
@@ -236,6 +279,14 @@ document.addEventListener('DOMContentLoaded', ()=>{
         let clipboard = []; // Clipboard for copy/paste across designs
         let masterDataThreads = []; // Master Data Threads: [{id: 'thread_xxx', name: 'Nome Thread', data: {boundColumn: '', prefix: '', suffix: '', text: '', fallbackLink: ''}}]
         const KEY = 'grist_label_layout_v2'; // Updated version for profiles
+        // B&W thermal preview state
+        let bwModeEnabled = false;
+        let bwGamma = 1;
+        let bwThreshold = 0.5;
+        let bwContrast = 1;
+        let bwDotGain = 0;
+        let bwDithering = 'none'; // 'none' | 'floyd-steinberg' | 'ordered bayer'
+        let bwPreviewDpi = 203;
         const FONT_FAVORITES_KEY = 'grist_label_font_favorites'; // Key for font favorites
     const MAX_HISTORY = 100;
 
@@ -1552,10 +1603,10 @@ document.addEventListener('DOMContentLoaded', ()=>{
                     d.innerText = el.props.text || '';
             }
 
-            // Background: only box (fillColor) and text/data (backgroundColor); line/image/qr/barcode have no background option
+            // Background: box (fillColor); text/data/image (backgroundColor); line/qr/barcode have no background option
             if(el.type === 'box'){
                 d.style.backgroundColor = el.props.fillColor || 'transparent';
-            } else if(el.type === 'text' || el.type === 'data'){
+            } else if(el.type === 'text' || el.type === 'data' || el.type === 'image'){
                 const bg = el.props.backgroundColor;
                 d.style.backgroundColor = (bg && bg !== 'transparent') ? bg : 'transparent';
             }
@@ -1636,7 +1687,107 @@ document.addEventListener('DOMContentLoaded', ()=>{
         renderElementsForCanvas(S, 1, 0);
         // Reset container height to single label height
         lc.style.height = `${H}cm`;
+        if(bwModeEnabled) scheduleBwPreviewUpdate();
     }
+
+        // ---------- B&W thermal preview ----------
+        let bwPreviewDebounceTimer = null;
+        function scheduleBwPreviewUpdate(){
+            if(bwPreviewDebounceTimer) clearTimeout(bwPreviewDebounceTimer);
+            bwPreviewDebounceTimer = setTimeout(updateBwPreview, 200);
+        }
+        function updateBwPreview(){
+            bwPreviewDebounceTimer = null;
+            if(!bwModeEnabled || typeof html2canvas === 'undefined') return;
+            const overlay = document.getElementById('bw-preview-overlay');
+            if(!overlay) return;
+            const scale = bwPreviewDpi / 96;
+            html2canvas(lc, { scale: scale, useCORS: true, allowTaint: true, backgroundColor: '#ffffff' }).then(canvas => {
+                const w = canvas.width;
+                const h = canvas.height;
+                const ctx = canvas.getContext('2d');
+                let imageData = ctx.getImageData(0, 0, w, h);
+                imageData = applyBwPipeline(imageData, w, h);
+                overlay.width = w;
+                overlay.height = h;
+                overlay.style.width = `${W}cm`;
+                overlay.style.height = `${H}cm`;
+                const octx = overlay.getContext('2d');
+                octx.putImageData(imageData, 0, 0);
+                overlay.classList.add('bw-preview-visible');
+            }).catch(() => { overlay.classList.remove('bw-preview-visible'); });
+        }
+        function applyBwPipeline(imageData, width, height){
+            const data = imageData.data;
+            const len = data.length;
+            for(let i = 0; i < len; i += 4){
+                let r = data[i], g = data[i+1], b = data[i+2];
+                let y = 0.299 * r + 0.587 * g + 0.114 * b;
+                data[i] = data[i+1] = data[i+2] = Math.round(y);
+            }
+            const gamma = Math.max(0.1, bwGamma);
+            for(let i = 0; i < len; i += 4){
+                let v = data[i];
+                v = Math.pow(v / 255, gamma) * 255;
+                data[i] = data[i+1] = data[i+2] = Math.round(Math.max(0, Math.min(255, v)));
+            }
+            const mid = 128;
+            const c = bwContrast;
+            for(let i = 0; i < len; i += 4){
+                let v = data[i];
+                v = (v - mid) * c + mid;
+                v = Math.round(Math.max(0, Math.min(255, v)));
+                data[i] = data[i+1] = data[i+2] = v;
+            }
+            const dg = bwDotGain / 100;
+            if(dg > 0){
+                for(let i = 0; i < len; i += 4){
+                    let v = data[i] / 255;
+                    v = 1 - Math.pow(1 - v, 1 / (1 + dg));
+                    v = Math.round(Math.max(0, Math.min(255, v * 255)));
+                    data[i] = data[i+1] = data[i+2] = v;
+                }
+            }
+            const thresh = (bwThreshold / 100) * 255;
+            if(bwDithering === 'none'){
+                for(let i = 0; i < len; i += 4){
+                    const v = data[i] >= thresh ? 255 : 0;
+                    data[i] = data[i+1] = data[i+2] = v;
+                }
+            } else if(bwDithering === 'floyd-steinberg'){
+                const buf = new Float64Array(width * height);
+                for(let i = 0; i < len; i += 4) buf[i/4] = data[i];
+                for(let y = 0; y < height; y++){
+                    for(let x = 0; x < width; x++){
+                        const idx = y * width + x;
+                        const i = idx * 4;
+                        const old = buf[idx];
+                        const newVal = old >= thresh ? 255 : 0;
+                        data[i] = data[i+1] = data[i+2] = newVal;
+                        const e = old - newVal;
+                        if(x + 1 < width) buf[idx + 1] += e * 7/16;
+                        if(y + 1 < height){
+                            if(x > 0) buf[idx + width - 1] += e * 3/16;
+                            buf[idx + width] += e * 5/16;
+                            if(x + 1 < width) buf[idx + width + 1] += e * 1/16;
+                        }
+                    }
+                }
+            } else if(bwDithering === 'ordered bayer'){
+                const bayer4 = [0,8,2,10,12,4,14,6,3,11,1,9,15,7,13,5].map(x => (x+0.5)/16);
+                for(let y = 0; y < height; y++){
+                    for(let x = 0; x < width; x++){
+                        const i = (y * width + x) * 4;
+                        const v = data[i];
+                        const bx = x % 4, by = y % 4;
+                        const threshold = bayer4[by * 4 + bx] * 255;
+                        const out = v >= threshold ? 255 : 0;
+                        data[i] = data[i+1] = data[i+2] = out;
+                    }
+                }
+            }
+            return imageData;
+        }
 
         // Helper function to apply text overflow handling
         function applyTextOverflow(span, el, containerWidth, containerHeight, isPrintMode){
@@ -2777,8 +2928,8 @@ document.addEventListener('DOMContentLoaded', ()=>{
                 h += `</div></div>`;
             }
         if(el.type!=='box') h += `<hr><div class="${grid1Cls}"><label class="${labelClass('props.color')}">Color</label><input type="color" data-prop="props.color" value="${valueFor('props.color')||'#000000'}">${syncBtn('props.color')}</div>`;
-            // Background color only for text and data (line, image, qr, barcode have no background option)
-            if(el.type==='text' || el.type==='data'){
+            // Background color for text, data and image (line, qr, barcode have no background option)
+            if(el.type==='text' || el.type==='data' || el.type==='image'){
                 const hasBg = el.props.backgroundColor && el.props.backgroundColor!=='transparent';
                 h += `<hr><div class="${grid1Cls}"><label>Background</label><div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap"><label style="font-weight:normal;display:flex;align-items:center;gap:4px"><input type="checkbox" class="no-background-cb" ${!hasBg?'checked':''}> No background</label><input type="color" class="background-color-input" data-prop="props.backgroundColor" value="${hasBg?el.props.backgroundColor:'#ffffff'}" ${!hasBg?'disabled':''}></div></div>`;
             }
@@ -2989,8 +3140,8 @@ document.addEventListener('DOMContentLoaded', ()=>{
                     });
                 });
             }
-            // Background color (text/data only): "No background" = transparent
-            if(el.type === 'text' || el.type === 'data'){
+            // Background color (text/data/image): "No background" = transparent
+            if(el.type === 'text' || el.type === 'data' || el.type === 'image'){
                 const noBgCb = pp.querySelector('.no-background-cb');
                 const bgInput = pp.querySelector('.background-color-input');
                 if(noBgCb && bgInput){
@@ -5358,8 +5509,8 @@ document.addEventListener('DOMContentLoaded', ()=>{
                             break;
                         }
                     }
-                    // Background only for text/data (box set in case 'box'; line/image/qr/barcode have no background)
-                    if(el.type === 'text' || el.type === 'data'){
+                    // Background only for text/data/image (box set in case 'box'; line/qr/barcode have no background)
+                    if(el.type === 'text' || el.type === 'data' || el.type === 'image'){
                         const bg = el.props.backgroundColor;
                         d.style.backgroundColor = (bg && bg !== 'transparent') ? bg : 'transparent';
                         if(bg && bg !== 'transparent'){
@@ -6022,8 +6173,8 @@ document.addEventListener('DOMContentLoaded', ()=>{
                             break;
                         }
                     }
-                    // Background only for text/data (box set in case 'box'; line/image/qr/barcode have no background)
-                    if(el.type === 'text' || el.type === 'data'){
+                    // Background only for text/data/image (box set in case 'box'; line/qr/barcode have no background)
+                    if(el.type === 'text' || el.type === 'data' || el.type === 'image'){
                         const bg = el.props.backgroundColor;
                         d.style.backgroundColor = (bg && bg !== 'transparent') ? bg : 'transparent';
                         if(bg && bg !== 'transparent'){
@@ -6575,8 +6726,8 @@ document.addEventListener('DOMContentLoaded', ()=>{
                         break;
                     }
                 }
-                // Background only for text/data (box set in case 'box'; line/image/qr/barcode have no background)
-                if(el.type === 'text' || el.type === 'data'){
+                // Background only for text/data/image (box set in case 'box'; line/qr/barcode have no background)
+                if(el.type === 'text' || el.type === 'data' || el.type === 'image'){
                     const bg = el.props.backgroundColor;
                     d.style.backgroundColor = (bg && bg !== 'transparent') ? bg : 'transparent';
                     if(bg && bg !== 'transparent'){
@@ -7986,6 +8137,67 @@ document.addEventListener('DOMContentLoaded', ()=>{
         canvas2Checkbox.addEventListener('change', (e)=>{
             toggleCanvas2(e.target.checked);
     });
+
+        // B&W thermal preview UI
+        const bwToggle = document.getElementById('bw-mode-toggle');
+        const bwOverlay = document.getElementById('bw-preview-overlay');
+        if(bwToggle){
+            bwToggle.checked = bwModeEnabled;
+            bwToggle.addEventListener('change', (e)=>{
+                bwModeEnabled = e.target.checked;
+                if(!bwModeEnabled && bwOverlay) bwOverlay.classList.remove('bw-preview-visible');
+                else if(bwModeEnabled) scheduleBwPreviewUpdate();
+            });
+        }
+        function syncBwControlsFromState(){
+            const g = document.getElementById('bw-gamma');
+            const t = document.getElementById('bw-threshold');
+            const c = document.getElementById('bw-contrast');
+            const d = document.getElementById('bw-dotgain');
+            const sel = document.getElementById('bw-dithering');
+            const dpi = document.getElementById('bw-preview-dpi');
+            if(g){ g.value = bwGamma; document.getElementById('bw-gamma-val').textContent = bwGamma; }
+            if(t){ t.value = Math.round(bwThreshold); document.getElementById('bw-threshold-val').textContent = Math.round(bwThreshold) + '%'; }
+            if(c){ c.value = bwContrast; document.getElementById('bw-contrast-val').textContent = bwContrast; }
+            if(d){ d.value = bwDotGain; document.getElementById('bw-dotgain-val').textContent = bwDotGain + '%'; }
+            if(sel) sel.value = bwDithering;
+            if(dpi) dpi.value = bwPreviewDpi;
+        }
+        function attachBwControl(id, getVal, setState, updateLabel){
+            const el = document.getElementById(id);
+            if(!el) return;
+            el.addEventListener('input', ()=>{
+                const v = getVal(el);
+                setState(v);
+                if(updateLabel){
+                    const labelId = id + '-val';
+                    const label = document.getElementById(labelId);
+                    if(label) label.textContent = updateLabel(v);
+                }
+                if(bwModeEnabled) scheduleBwPreviewUpdate();
+            });
+        }
+        attachBwControl('bw-gamma', el => parseFloat(el.value), v => { bwGamma = v; }, v => String(v));
+        attachBwControl('bw-threshold', el => parseFloat(el.value), v => { bwThreshold = v; }, v => Math.round(v) + '%');
+        attachBwControl('bw-contrast', el => parseFloat(el.value), v => { bwContrast = v; }, v => String(v));
+        attachBwControl('bw-dotgain', el => parseFloat(el.value), v => { bwDotGain = v; }, v => v + '%');
+        const bwDitheringSelect = document.getElementById('bw-dithering');
+        if(bwDitheringSelect){
+            bwDitheringSelect.value = bwDithering;
+            bwDitheringSelect.addEventListener('change', (e)=>{
+                bwDithering = e.target.value;
+                if(bwModeEnabled) scheduleBwPreviewUpdate();
+            });
+        }
+        const bwDpiInput = document.getElementById('bw-preview-dpi');
+        if(bwDpiInput){
+            bwDpiInput.value = bwPreviewDpi;
+            bwDpiInput.addEventListener('change', (e)=>{
+                const v = parseInt(e.target.value, 10);
+                if(!isNaN(v) && v >= 72 && v <= 300){ bwPreviewDpi = v; if(bwModeEnabled) scheduleBwPreviewUpdate(); }
+            });
+        }
+        syncBwControlsFromState();
 
         // Synchronized Blocks event listeners
         document.getElementById('btn-synchronize').addEventListener('click', ()=>{
