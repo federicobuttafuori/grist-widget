@@ -49,13 +49,15 @@
         .prop-grid{display:grid;grid-template-columns:90px 1fr;gap:8px;align-items:center}
         .prop-grid.prop-grid-sync{grid-template-columns:90px 1fr 26px}
         .prop-grid.prop-grid-sync-1{grid-template-columns:90px 1fr 26px}
+        .prop-grid-label-sync{display:grid;grid-template-columns:1fr 26px;gap:8px;align-items:center}
+        .prop-grid-label-sync label{font-size:14px;font-weight:600}
         .prop-grid label{font-size:14px;font-weight:500}
         .prop-label-synced{color:#2e7d32}
         .prop-label-override{color:#1565c0}
         .prop-sync-btn{width:22px;height:22px;padding:0;border:1px solid #ccc;border-radius:4px;cursor:pointer;font-size:12px;display:inline-flex;align-items:center;justify-content:center;background:#f5f5f5;flex-shrink:0}
         .prop-sync-btn:hover{background:#e8e8e8}
-        .prop-sync-btn.synced{color:#2e7d32;border-color:#2e7d32}
-        .prop-sync-btn.override{color:#1565c0;border-color:#1565c0}
+        .prop-sync-btn.synced{color:#2e7d32;border-color:#2e7d32;background:#e8f5e8;}
+        .prop-sync-btn.override{color:#1565c0;border-color:#1565c0;background:#e8f0fe;}
         #properties-panel{font-size:14px}
         .prop-border-sides{display:grid;grid-template-columns:1fr 26px 1fr 26px;gap:8px;align-items:center;margin-top:8px}
         .prop-border-sides label{font-size:12px;font-weight:normal;display:flex;align-items:center;gap:4px;min-width:0}
@@ -2707,7 +2709,7 @@ document.addEventListener('DOMContentLoaded', ()=>{
                 
                 // Regex formatting rules section
                 if(!el.props.regexRules) el.props.regexRules = [];
-                h += `<hr><div style="margin-top:8px"><label style="font-size:14px;font-weight:600;display:block;margin-bottom:8px">Regex Formatting Rules</label>`;
+                h += `<hr><div style="margin-top:8px"><div class="prop-grid-label-sync" style="margin-bottom:8px"><label>Regex Formatting Rules</label>${syncBtn('props.regexRules')}</div>`;
                 h += `<div id="regex-rules-container-${el.id}" style="display:flex;flex-direction:column;gap:8px">`;
                 el.props.regexRules.forEach((rule, index) => {
                     h += `<div class="regex-rule-item" data-rule-index="${index}" style="border:1px solid #ddd;border-radius:4px;padding:8px;background:#f9f9f9">`;
@@ -2878,6 +2880,10 @@ document.addEventListener('DOMContentLoaded', ()=>{
                         updateProps();
                         render();
                         saveCurrentDesign();
+                        if(el.masterThreadId){
+                            const t = getMasterThread(el.masterThreadId);
+                            if(t && isPropSynced(t, 'props.regexRules')) syncPropertyToThread(el.masterThreadId, 'props.regexRules', getElementPropValue(el, 'props.regexRules'));
+                        }
                     });
                 }
                 
@@ -2890,6 +2896,10 @@ document.addEventListener('DOMContentLoaded', ()=>{
                         updateProps();
                         render();
                         saveCurrentDesign();
+                        if(el.masterThreadId){
+                            const t = getMasterThread(el.masterThreadId);
+                            if(t && isPropSynced(t, 'props.regexRules')) syncPropertyToThread(el.masterThreadId, 'props.regexRules', getElementPropValue(el, 'props.regexRules'));
+                        }
                     });
                 });
                 
@@ -2901,6 +2911,11 @@ document.addEventListener('DOMContentLoaded', ()=>{
                         if(!el.props.regexRules[index]) return;
                         el.props.regexRules[index].pattern = this.value;
                         render();
+                        saveCurrentDesign();
+                        if(el.masterThreadId){
+                            const t = getMasterThread(el.masterThreadId);
+                            if(t && isPropSynced(t, 'props.regexRules')) syncPropertyToThread(el.masterThreadId, 'props.regexRules', getElementPropValue(el, 'props.regexRules'));
+                        }
                     });
                 });
                 
@@ -2912,6 +2927,10 @@ document.addEventListener('DOMContentLoaded', ()=>{
                         el.props.regexRules[index].fontWeight = this.value;
                         render();
                         saveCurrentDesign();
+                        if(el.masterThreadId){
+                            const t = getMasterThread(el.masterThreadId);
+                            if(t && isPropSynced(t, 'props.regexRules')) syncPropertyToThread(el.masterThreadId, 'props.regexRules', getElementPropValue(el, 'props.regexRules'));
+                        }
                     });
                 });
                 
@@ -2924,6 +2943,10 @@ document.addEventListener('DOMContentLoaded', ()=>{
                         el.props.regexRules[index].fontSize = val === '' ? '' : Number(val);
                         render();
                         saveCurrentDesign();
+                        if(el.masterThreadId){
+                            const t = getMasterThread(el.masterThreadId);
+                            if(t && isPropSynced(t, 'props.regexRules')) syncPropertyToThread(el.masterThreadId, 'props.regexRules', getElementPropValue(el, 'props.regexRules'));
+                        }
                     });
                 });
                 
@@ -2935,6 +2958,10 @@ document.addEventListener('DOMContentLoaded', ()=>{
                         el.props.regexRules[index].italic = this.checked;
                         render();
                         saveCurrentDesign();
+                        if(el.masterThreadId){
+                            const t = getMasterThread(el.masterThreadId);
+                            if(t && isPropSynced(t, 'props.regexRules')) syncPropertyToThread(el.masterThreadId, 'props.regexRules', getElementPropValue(el, 'props.regexRules'));
+                        }
                     });
                 });
                 
@@ -3831,7 +3858,7 @@ document.addEventListener('DOMContentLoaded', ()=>{
             });
         }
 
-        const DEFAULT_SYNCED_PROPS_LIST = ['props.boundColumn', 'props.prefix', 'props.suffix', 'props.text', 'props.fallbackLink'];
+        const DEFAULT_SYNCED_PROPS_LIST = ['props.boundColumn', 'props.prefix', 'props.suffix', 'props.text', 'props.fallbackLink', 'props.regexRules'];
 
         function createMasterThread(name, templateElement = null){
             if(!name || name.trim() === ''){
