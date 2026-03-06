@@ -1080,7 +1080,7 @@ document.addEventListener('DOMContentLoaded', ()=>{
                     borderRadiusTopLeft:0, borderRadiusTopRight:0, borderRadiusBottomRight:0, borderRadiusBottomLeft:0,
                 paddingTop: 0, paddingRight: 0, paddingBottom: 0, paddingLeft: 0,
                 thickness:2, format:'CODE128', displayValue:true,
-                    fillColor:'#ffffff', decimals:2, asPercent:false,
+                    fillColor:'transparent', decimals:2, asPercent:false,
                     lineHeight: 1.2, textOverflow: 'clip',
                 qrErrorCorrectLevel: 'M', qrColorDark: '#000000', qrColorLight: '#ffffff'
             }
@@ -1362,7 +1362,6 @@ document.addEventListener('DOMContentLoaded', ()=>{
                             d.style.borderStyle = 'none';
                             d.style.borderColor = 'transparent';
                         }
-                    d.style.backgroundColor = el.props.fillColor || '#ffffff';
                     break;
                 case 'qr': {
                     const effectiveSequenceIndex = waveContext && waveContext.waveSequenceIndex !== undefined ? waveContext.waveSequenceIndex : sequenceIndex;
@@ -1551,6 +1550,14 @@ document.addEventListener('DOMContentLoaded', ()=>{
                     }
                 default:
                     d.innerText = el.props.text || '';
+            }
+
+            // Background color: box uses fillColor (default transparent); other elements use backgroundColor (default transparent)
+            if(el.type === 'box'){
+                d.style.backgroundColor = el.props.fillColor || 'transparent';
+            } else {
+                const bg = el.props.backgroundColor;
+                d.style.backgroundColor = (bg && bg !== 'transparent') ? bg : 'transparent';
             }
 
             // selection visuals
@@ -2678,7 +2685,8 @@ document.addEventListener('DOMContentLoaded', ()=>{
         }
 
         if(el.type==='box'){
-            h += `<label>Border (px)</label><input type="number" step="1" data-prop="props.thickness" value="${el.props.thickness!==undefined?el.props.thickness:2}" min="0"><label>Fill Color</label><input type="color" data-prop="props.fillColor" value="${el.props.fillColor||'#ffffff'}">`;
+                const hasFill = el.props.fillColor && el.props.fillColor!=='transparent';
+                h += `<label>Border (px)</label><input type="number" step="1" data-prop="props.thickness" value="${el.props.thickness!==undefined?el.props.thickness:2}" min="0"><div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap"><label style="font-weight:normal;display:flex;align-items:center;gap:4px"><input type="checkbox" class="no-fill-cb" ${!hasFill?'checked':''}> No fill</label><label style="font-weight:500">Fill Color</label><input type="color" class="fill-color-input" data-prop="props.fillColor" value="${hasFill?el.props.fillColor:'#ffffff'}" ${!hasFill?'disabled':''}></div>`;
                 // Add border radius control for box elements
                 h += `<hr><div style="margin-top:8px"><label style="font-size:12px;display:block;margin-bottom:6px">Border Radius (px):</label><div class="prop-border-radius-grid"><div class="prop-border-radius-cell"><label>↖ Top Left</label><input type="number" data-prop="props.borderRadiusTopLeft" value="${Number(el.props.borderRadiusTopLeft||0)}" min="0" step="0.1"></div><div class="prop-border-radius-cell"><label>↗ Top Right</label><input type="number" data-prop="props.borderRadiusTopRight" value="${Number(el.props.borderRadiusTopRight||0)}" min="0" step="0.1"></div><div class="prop-border-radius-cell"><label>↙ Bottom Left</label><input type="number" data-prop="props.borderRadiusBottomLeft" value="${Number(el.props.borderRadiusBottomLeft||0)}" min="0" step="0.1"></div><div class="prop-border-radius-cell"><label>↘ Bottom Right</label><input type="number" data-prop="props.borderRadiusBottomRight" value="${Number(el.props.borderRadiusBottomRight||0)}" min="0" step="0.1"></div></div></div>`;
         }
@@ -2769,6 +2777,11 @@ document.addEventListener('DOMContentLoaded', ()=>{
                 h += `</div></div>`;
             }
         if(el.type!=='box') h += `<hr><div class="${grid1Cls}"><label class="${labelClass('props.color')}">Color</label><input type="color" data-prop="props.color" value="${valueFor('props.color')||'#000000'}">${syncBtn('props.color')}</div>`;
+            // Background color for non-box elements (default transparent)
+            if(el.type!=='box'){
+                const hasBg = el.props.backgroundColor && el.props.backgroundColor!=='transparent';
+                h += `<hr><div class="${grid1Cls}"><label>Background</label><div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap"><label style="font-weight:normal;display:flex;align-items:center;gap:4px"><input type="checkbox" class="no-background-cb" ${!hasBg?'checked':''}> No background</label><input type="color" class="background-color-input" data-prop="props.backgroundColor" value="${hasBg?el.props.backgroundColor:'#ffffff'}" ${!hasBg?'disabled':''}></div></div>`;
+            }
         h += `<hr><button id="btn-delete">Delete Element</button>`;
         pp.innerHTML = h;
             
@@ -2976,6 +2989,56 @@ document.addEventListener('DOMContentLoaded', ()=>{
                     });
                 });
             }
+            // Background color (non-box): "No background" = transparent
+            if(el.type !== 'box'){
+                const noBgCb = pp.querySelector('.no-background-cb');
+                const bgInput = pp.querySelector('.background-color-input');
+                if(noBgCb && bgInput){
+                    noBgCb.addEventListener('change', function(){
+                        pushBeforeChange();
+                        if(this.checked){
+                            el.props.backgroundColor = 'transparent';
+                            bgInput.disabled = true;
+                        } else {
+                            el.props.backgroundColor = bgInput.value || '#ffffff';
+                            bgInput.disabled = false;
+                        }
+                        render(); saveCurrentDesign(); updateProps();
+                    });
+                    bgInput.addEventListener('input', function(){
+                        pushBeforeChange();
+                        el.props.backgroundColor = this.value;
+                        noBgCb.checked = false;
+                        bgInput.disabled = false;
+                        render(); saveCurrentDesign(); updateProps();
+                    });
+                }
+            }
+            // Box fill: "No fill" = transparent
+            if(el.type === 'box'){
+                const noFillCb = pp.querySelector('.no-fill-cb');
+                const fillInput = pp.querySelector('.fill-color-input');
+                if(noFillCb && fillInput){
+                    noFillCb.addEventListener('change', function(){
+                        pushBeforeChange();
+                        if(this.checked){
+                            el.props.fillColor = 'transparent';
+                            fillInput.disabled = true;
+                        } else {
+                            el.props.fillColor = fillInput.value || '#ffffff';
+                            fillInput.disabled = false;
+                        }
+                        render(); saveCurrentDesign(); updateProps();
+                    });
+                    fillInput.addEventListener('input', function(){
+                        pushBeforeChange();
+                        el.props.fillColor = this.value;
+                        noFillCb.checked = false;
+                        fillInput.disabled = false;
+                        render(); saveCurrentDesign(); updateProps();
+                    });
+                }
+            }
     }
 
     function multiPropsPanel(elems){
@@ -3014,7 +3077,7 @@ document.addEventListener('DOMContentLoaded', ()=>{
                 const hasBoxElement = elems.some(el => el.type === 'box');
                 if(hasBoxElement){
                     h += `<hr><div class="prop-grid"><label>Border (px)</label><input type="number" step="1" data-prop="multi.props.thickness" value="${common('props.thickness')!==''?common('props.thickness'):2}" min="0"><label>Border Color</label><input type="color" data-prop="multi.props.color" value="${common('props.color')||'#000000'}"></div>`;
-                    h += `<div class="prop-grid"><label>Fill Color</label><input type="color" data-prop="multi.props.fillColor" value="${common('props.fillColor')||'#ffffff'}"><label></label></div>`;
+                    h += `<div class="prop-grid"><label>Fill Color</label><input type="color" data-prop="multi.props.fillColor" value="${(common('props.fillColor')&&common('props.fillColor')!=='transparent')?common('props.fillColor'):'#ffffff'}"><label></label></div>`;
             }
             h += `<div class="prop-grid"><label>Padding Top</label><input type="number" step="0.01" data-prop="multi.props.paddingTop" value="${common('props.paddingTop')}" min="0"><label>Padding Right</label><input type="number" step="0.01" data-prop="multi.props.paddingRight" value="${common('props.paddingRight')}" min="0"></div>`;
             h += `<div class="prop-grid"><label>Padding Bottom</label><input type="number" step="0.01" data-prop="multi.props.paddingBottom" value="${common('props.paddingBottom')}" min="0"><label>Padding Left</label><input type="number" step="0.01" data-prop="multi.props.paddingLeft" value="${common('props.paddingLeft')}" min="0"></div>`;
@@ -5108,7 +5171,7 @@ document.addEventListener('DOMContentLoaded', ()=>{
                                     d.style.borderStyle = 'none';
                                     d.style.borderColor = 'transparent';
                                 }
-                            d.style.backgroundColor = el.props.fillColor || '#ffffff';
+                            d.style.backgroundColor = el.props.fillColor || 'transparent';
                             break;
                         case 'qr': {
                             const effectiveSequenceIndex = waveContext && waveContext.waveSequenceIndex !== undefined ? waveContext.waveSequenceIndex : sequenceIndex;
@@ -5293,6 +5356,15 @@ document.addEventListener('DOMContentLoaded', ()=>{
                             }
                             d.appendChild(img);
                             break;
+                        }
+                    }
+                    // Background for non-box (box already set in case 'box')
+                    if(el.type !== 'box'){
+                        const bg = el.props.backgroundColor;
+                        d.style.backgroundColor = (bg && bg !== 'transparent') ? bg : 'transparent';
+                        if(bg && bg !== 'transparent'){
+                            d.style.printColorAdjust = 'exact';
+                            d.style.webkitPrintColorAdjust = 'exact';
                         }
                     }
                     
@@ -5760,7 +5832,7 @@ document.addEventListener('DOMContentLoaded', ()=>{
                                     d.style.borderStyle = 'none';
                                     d.style.borderColor = 'transparent';
                                 }
-                            d.style.backgroundColor = el.props.fillColor || '#ffffff';
+                            d.style.backgroundColor = el.props.fillColor || 'transparent';
                             break;
                         case 'qr': {
                             const effectiveSequenceIndex = waveContext && waveContext.waveSequenceIndex !== undefined ? waveContext.waveSequenceIndex : sequenceIndex;
@@ -5948,6 +6020,15 @@ document.addEventListener('DOMContentLoaded', ()=>{
                             }
                             d.appendChild(img);
                             break;
+                        }
+                    }
+                    // Background for non-box (box already set in case 'box')
+                    if(el.type !== 'box'){
+                        const bg = el.props.backgroundColor;
+                        d.style.backgroundColor = (bg && bg !== 'transparent') ? bg : 'transparent';
+                        if(bg && bg !== 'transparent'){
+                            d.style.printColorAdjust = 'exact';
+                            d.style.webkitPrintColorAdjust = 'exact';
                         }
                     }
                     
@@ -6345,7 +6426,7 @@ document.addEventListener('DOMContentLoaded', ()=>{
                         } else {
                             d.style.border = 'none';
                         }
-                        d.style.backgroundColor = el.props.fillColor || '#ffffff';
+                        d.style.backgroundColor = el.props.fillColor || 'transparent';
                         break;
                     case 'qr': {
                         const effectiveSequenceIndex = waveContext && waveContext.waveSequenceIndex !== undefined ? waveContext.waveSequenceIndex : sequenceIndex;
@@ -6492,6 +6573,15 @@ document.addEventListener('DOMContentLoaded', ()=>{
                         }
                         d.appendChild(img);
                         break;
+                    }
+                }
+                // Background for non-box (box already set in case 'box')
+                if(el.type !== 'box'){
+                    const bg = el.props.backgroundColor;
+                    d.style.backgroundColor = (bg && bg !== 'transparent') ? bg : 'transparent';
+                    if(bg && bg !== 'transparent'){
+                        d.style.printColorAdjust = 'exact';
+                        d.style.webkitPrintColorAdjust = 'exact';
                     }
                 }
                 
