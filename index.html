@@ -102,8 +102,15 @@
         .column-mention-dropdown-item:last-child{border-bottom:none}
         .column-mention-dropdown-item:hover,.column-mention-dropdown-item.column-mention-dropdown-item-selected{background:#e8f0fe;color:#1967d2}
         #canvas-wrapper{position:relative}
-        #bw-preview-overlay{position:absolute;left:0;top:0;pointer-events:none;display:none;z-index:1}
+        #bw-preview-overlay{position:absolute;left:0;top:0;pointer-events:none;display:none;z-index:2}
         #bw-preview-overlay.bw-preview-visible{display:block}
+        #canvas-wrapper.bw-preview-active #label-canvas{visibility:hidden}
+        .bw-controls{display:grid;grid-template-columns:minmax(90px,auto) 1fr minmax(48px,auto);gap:6px 10px;align-items:center}
+        .bw-controls .bw-label{grid-column:1;font-size:13px}
+        .bw-controls .bw-control{grid-column:2;min-width:0}
+        .bw-controls .bw-value{grid-column:3;text-align:right;font-size:13px;min-width:40px}
+        .bw-controls .bw-control-full{grid-column:2/4}
+        .bw-controls .bw-toggle-row{grid-column:1/-1;display:flex;align-items:center;gap:8px}
     </style>
 </head>
 <body>
@@ -211,39 +218,33 @@
             <hr>
             <div class="sidebar-section" id="bw-preview-section">
                 <h3>Anteprima termica (B&amp;N)</h3>
-                <label style="display:flex;align-items:center;gap:8px;margin-bottom:8px">
-                    <input type="checkbox" id="bw-mode-toggle">
-                    <span>Attiva anteprima B&amp;N</span>
-                </label>
-                <div class="bw-controls" style="display:flex;flex-direction:column;gap:8px">
-                    <div class="prop-grid" style="grid-template-columns:1fr auto">
-                        <label>Gamma</label>
-                        <span><input type="range" id="bw-gamma" min="0.5" max="2.5" step="0.1" value="1" style="width:80px;vertical-align:middle"><span id="bw-gamma-val">1</span></span>
+                <div class="bw-controls">
+                    <div class="bw-toggle-row">
+                        <input type="checkbox" id="bw-mode-toggle">
+                        <span>Attiva anteprima B&amp;N</span>
                     </div>
-                    <div class="prop-grid" style="grid-template-columns:1fr auto">
-                        <label>Threshold</label>
-                        <span><input type="range" id="bw-threshold" min="0" max="100" value="50" style="width:80px;vertical-align:middle"><span id="bw-threshold-val">50%</span></span>
-                    </div>
-                    <div class="prop-grid" style="grid-template-columns:1fr auto">
-                        <label>Contrast</label>
-                        <span><input type="range" id="bw-contrast" min="0.5" max="2" step="0.1" value="1" style="width:80px;vertical-align:middle"><span id="bw-contrast-val">1</span></span>
-                    </div>
-                    <div class="prop-grid" style="grid-template-columns:1fr auto">
-                        <label>Dot gain</label>
-                        <span><input type="range" id="bw-dotgain" min="0" max="30" value="0" style="width:80px;vertical-align:middle"><span id="bw-dotgain-val">0%</span></span>
-                    </div>
-                    <div class="prop-grid" style="grid-template-columns:1fr 1fr">
-                        <label>Dithering</label>
-                        <select id="bw-dithering">
+                    <span class="bw-label">Gamma</span>
+                    <input type="range" id="bw-gamma" class="bw-control" min="0.5" max="2.5" step="0.1" value="1">
+                    <span id="bw-gamma-val" class="bw-value">1</span>
+                    <span class="bw-label">Threshold</span>
+                    <input type="range" id="bw-threshold" class="bw-control" min="0" max="100" value="50">
+                    <span id="bw-threshold-val" class="bw-value">50%</span>
+                    <span class="bw-label">Contrast</span>
+                    <input type="range" id="bw-contrast" class="bw-control" min="0.5" max="2" step="0.1" value="1">
+                    <span id="bw-contrast-val" class="bw-value">1</span>
+                    <span class="bw-label">Dot gain</span>
+                    <input type="range" id="bw-dotgain" class="bw-control" min="0" max="30" value="0">
+                    <span id="bw-dotgain-val" class="bw-value">0%</span>
+                    <span class="bw-label">Dithering</span>
+                    <select id="bw-dithering" class="bw-control-full">
                             <option value="none">Nessuno</option>
                             <option value="floyd-steinberg">Floyd-Steinberg</option>
+                            <option value="error-diffusion">Error Diffusion (Stucki)</option>
                             <option value="ordered bayer">Ordered Bayer</option>
+                            <option value="halftone">Halftone</option>
                         </select>
-                    </div>
-                    <div class="prop-grid" style="grid-template-columns:1fr auto">
-                        <label>Preview DPI</label>
-                        <input type="number" id="bw-preview-dpi" min="72" max="300" value="203" style="width:70px">
-                    </div>
+                    <span class="bw-label">Preview DPI</span>
+                    <input type="number" id="bw-preview-dpi" class="bw-control-full" min="72" max="300" value="203">
                 </div>
             </div>
         </div>
@@ -282,10 +283,10 @@ document.addEventListener('DOMContentLoaded', ()=>{
         // B&W thermal preview state
         let bwModeEnabled = false;
         let bwGamma = 1;
-        let bwThreshold = 0.5;
+        let bwThreshold = 50;
         let bwContrast = 1;
         let bwDotGain = 0;
-        let bwDithering = 'none'; // 'none' | 'floyd-steinberg' | 'ordered bayer'
+        let bwDithering = 'none'; // 'none' | 'floyd-steinberg' | 'error-diffusion' | 'ordered bayer' | 'halftone'
         let bwPreviewDpi = 203;
         const FONT_FAVORITES_KEY = 'grist_label_font_favorites'; // Key for font favorites
     const MAX_HISTORY = 100;
@@ -1130,6 +1131,7 @@ document.addEventListener('DOMContentLoaded', ()=>{
                     showBorder:false, borderColor:'#000000', borderWidth:1, borderTop:true, borderRight:true, borderBottom:true, borderLeft:true,
                     borderRadiusTopLeft:0, borderRadiusTopRight:0, borderRadiusBottomRight:0, borderRadiusBottomLeft:0,
                 paddingTop: 0, paddingRight: 0, paddingBottom: 0, paddingLeft: 0,
+                marginTop: 0, marginRight: 0, marginBottom: 0, marginLeft: 0,
                 thickness:2, format:'CODE128', displayValue:true,
                     fillColor:'transparent', decimals:2, asPercent:false,
                     lineHeight: 1.2, textOverflow: 'clip',
@@ -1156,6 +1158,10 @@ document.addEventListener('DOMContentLoaded', ()=>{
             base.props.paddingBottom = Number(base.props.paddingBottom) || 0;
             base.props.paddingLeft = Number(base.props.paddingLeft) || 0;
         }
+        base.props.marginTop = Number(base.props.marginTop) || 0;
+        base.props.marginRight = Number(base.props.marginRight) || 0;
+        base.props.marginBottom = Number(base.props.marginBottom) || 0;
+        base.props.marginLeft = Number(base.props.marginLeft) || 0;
 
         base.x = Number(base.x) || 0;
         base.y = Number(base.y) || 0;
@@ -1510,6 +1516,8 @@ document.addEventListener('DOMContentLoaded', ()=>{
                     break;
                 }
                     case 'image': {
+                        const mt = Number(el.props.marginTop) || 0, mr = Number(el.props.marginRight) || 0, mb = Number(el.props.marginBottom) || 0, ml = Number(el.props.marginLeft) || 0;
+                        if(mt || mr || mb || ml) d.style.padding = `${mt}cm ${mr}cm ${mb}cm ${ml}cm`;
                         const img = document.createElement('img');
                         img.style.pointerEvents='none';
                         img.style.width='100%';
@@ -1700,22 +1708,87 @@ document.addEventListener('DOMContentLoaded', ()=>{
             bwPreviewDebounceTimer = null;
             if(!bwModeEnabled || typeof html2canvas === 'undefined') return;
             const overlay = document.getElementById('bw-preview-overlay');
-            if(!overlay) return;
+            const wrapper = document.getElementById('canvas-wrapper');
+            if(!overlay || !wrapper) return;
+            wrapper.classList.remove('bw-preview-active');
             const scale = bwPreviewDpi / 96;
-            html2canvas(lc, { scale: scale, useCORS: true, allowTaint: true, backgroundColor: '#ffffff' }).then(canvas => {
-                const w = canvas.width;
-                const h = canvas.height;
-                const ctx = canvas.getContext('2d');
-                let imageData = ctx.getImageData(0, 0, w, h);
-                imageData = applyBwPipeline(imageData, w, h);
-                overlay.width = w;
-                overlay.height = h;
-                overlay.style.width = `${W}cm`;
-                overlay.style.height = `${H}cm`;
-                const octx = overlay.getContext('2d');
-                octx.putImageData(imageData, 0, 0);
-                overlay.classList.add('bw-preview-visible');
-            }).catch(() => { overlay.classList.remove('bw-preview-visible'); });
+            const PX_PER_CM = 37.795276;
+            const captureW = Math.round(W * PX_PER_CM);
+            const captureH = Math.round(H * PX_PER_CM);
+            const savedTransform = cw.style.transform || '';
+            cw.style.transform = canvasRotation === 0 ? 'scale(1)' : `rotate(${canvasRotation}deg) scale(1)`;
+            function doCapture(){
+                html2canvas(lc, {
+                    width: captureW,
+                    height: captureH,
+                    scale: scale,
+                    useCORS: true,
+                    allowTaint: true,
+                    backgroundColor: '#ffffff',
+                    onclone: function(clonedDoc, clonedNode){
+                        if(!clonedNode || !clonedNode.querySelector) return;
+                        const cloneLc = clonedNode.id === 'label-canvas' ? clonedNode : clonedDoc.getElementById('label-canvas');
+                        if(!cloneLc) return;
+                        const cloneElements = cloneLc.querySelectorAll('.label-element');
+                        cloneElements.forEach(function(cloneEl){
+                            const cloneImg = cloneEl.querySelector('img');
+                            if(!cloneImg) return;
+                            const elId = cloneEl.getAttribute('data-id');
+                            const el = S.find(function(e){ return e.id === elId; });
+                            if(!el || el.type !== 'image') return;
+                            const origImg = lc.querySelector('[data-id="' + elId + '"] img');
+                            if(!origImg || !origImg.complete || origImg.naturalWidth === 0) return;
+                            const nw = origImg.naturalWidth, nh = origImg.naturalHeight;
+                            const fit = (el.props && el.props.objectFit) || 'contain';
+                            const mt = Number(el.props.marginTop) || 0, mr = Number(el.props.marginRight) || 0, mb = Number(el.props.marginBottom) || 0, ml = Number(el.props.marginLeft) || 0;
+                            const contentW = (el.width - ml - mr) * PX_PER_CM;
+                            const contentH = (el.height - mt - mb) * PX_PER_CM;
+                            let dw, dh, left, top;
+                            if(fit === 'fill'){
+                                dw = contentW; dh = contentH; left = ml * PX_PER_CM; top = mt * PX_PER_CM;
+                            } else if(fit === 'none' || fit === 'scale-down'){
+                                const scaleDown = (fit === 'scale-down') ? Math.min(contentW/nw, contentH/nh, 1) : 1;
+                                dw = nw * scaleDown; dh = nh * scaleDown;
+                                left = ml * PX_PER_CM + (contentW - dw) / 2; top = mt * PX_PER_CM + (contentH - dh) / 2;
+                            } else {
+                                const s = (fit === 'cover') ? Math.max(contentW/nw, contentH/nh) : Math.min(contentW/nw, contentH/nh);
+                                dw = nw * s; dh = nh * s;
+                                left = ml * PX_PER_CM + (contentW - dw) / 2; top = mt * PX_PER_CM + (contentH - dh) / 2;
+                            }
+                            cloneImg.style.width = dw + 'px';
+                            cloneImg.style.height = dh + 'px';
+                            cloneImg.style.maxWidth = 'none';
+                            cloneImg.style.maxHeight = 'none';
+                            cloneImg.style.objectFit = 'none';
+                            cloneImg.style.position = 'absolute';
+                            cloneImg.style.left = left + 'px';
+                            cloneImg.style.top = top + 'px';
+                            cloneEl.style.overflow = 'hidden';
+                        });
+                    }
+                }).then(canvas => {
+                    cw.style.transform = savedTransform;
+                    const w = canvas.width;
+                    const h = canvas.height;
+                    const ctx = canvas.getContext('2d');
+                    let imageData = ctx.getImageData(0, 0, w, h);
+                    imageData = applyBwPipeline(imageData, w, h);
+                    overlay.width = w;
+                    overlay.height = h;
+                    overlay.style.width = `${W}cm`;
+                    overlay.style.height = `${H}cm`;
+                    overlay.style.aspectRatio = `${W}/${H}`;
+                    const octx = overlay.getContext('2d');
+                    octx.putImageData(imageData, 0, 0);
+                    overlay.classList.add('bw-preview-visible');
+                    wrapper.classList.add('bw-preview-active');
+                }).catch(() => {
+                    cw.style.transform = savedTransform;
+                    overlay.classList.remove('bw-preview-visible');
+                    wrapper.classList.remove('bw-preview-active');
+                });
+            }
+            requestAnimationFrame(() => requestAnimationFrame(doCapture));
         }
         function applyBwPipeline(imageData, width, height){
             const data = imageData.data;
@@ -1773,6 +1846,36 @@ document.addEventListener('DOMContentLoaded', ()=>{
                         }
                     }
                 }
+            } else if(bwDithering === 'error-diffusion'){
+                const buf = new Float64Array(width * height);
+                for(let i = 0; i < len; i += 4) buf[i/4] = data[i];
+                const d42 = 42;
+                for(let y = 0; y < height; y++){
+                    for(let x = 0; x < width; x++){
+                        const idx = y * width + x;
+                        const i = idx * 4;
+                        const old = buf[idx];
+                        const newVal = old >= thresh ? 255 : 0;
+                        data[i] = data[i+1] = data[i+2] = newVal;
+                        const e = old - newVal;
+                        if(x + 1 < width) buf[idx + 1] += e * 8/d42;
+                        if(x + 2 < width) buf[idx + 2] += e * 4/d42;
+                        if(y + 1 < height){
+                            if(x >= 2) buf[idx + width - 2] += e * 2/d42;
+                            if(x >= 1) buf[idx + width - 1] += e * 4/d42;
+                            buf[idx + width] += e * 8/d42;
+                            if(x + 1 < width) buf[idx + width + 1] += e * 4/d42;
+                            if(x + 2 < width) buf[idx + width + 2] += e * 2/d42;
+                        }
+                        if(y + 2 < height){
+                            if(x >= 2) buf[idx + width * 2 - 2] += e * 1/d42;
+                            if(x >= 1) buf[idx + width * 2 - 1] += e * 2/d42;
+                            buf[idx + width * 2] += e * 4/d42;
+                            if(x + 1 < width) buf[idx + width * 2 + 1] += e * 2/d42;
+                            if(x + 2 < width) buf[idx + width * 2 + 2] += e * 1/d42;
+                        }
+                    }
+                }
             } else if(bwDithering === 'ordered bayer'){
                 const bayer4 = [0,8,2,10,12,4,14,6,3,11,1,9,15,7,13,5].map(x => (x+0.5)/16);
                 for(let y = 0; y < height; y++){
@@ -1781,6 +1884,27 @@ document.addEventListener('DOMContentLoaded', ()=>{
                         const v = data[i];
                         const bx = x % 4, by = y % 4;
                         const threshold = bayer4[by * 4 + bx] * 255;
+                        const out = v >= threshold ? 255 : 0;
+                        data[i] = data[i+1] = data[i+2] = out;
+                    }
+                }
+            } else if(bwDithering === 'halftone'){
+                const size = 8;
+                const center = (size - 1) / 2;
+                const maxD = Math.sqrt(center * center + center * center);
+                const halftoneMatrix = [];
+                for(let by = 0; by < size; by++){
+                    for(let bx = 0; bx < size; bx++){
+                        const d = Math.sqrt((bx - center) * (bx - center) + (by - center) * (by - center));
+                        halftoneMatrix.push(d / maxD);
+                    }
+                }
+                for(let y = 0; y < height; y++){
+                    for(let x = 0; x < width; x++){
+                        const i = (y * width + x) * 4;
+                        const v = data[i];
+                        const bx = x % size, by = y % size;
+                        const threshold = halftoneMatrix[by * size + bx] * 255;
                         const out = v >= threshold ? 255 : 0;
                         data[i] = data[i+1] = data[i+2] = out;
                     }
@@ -2846,6 +2970,8 @@ document.addEventListener('DOMContentLoaded', ()=>{
                 const objFitVal = valueFor('props.objectFit'); const fallbackVal = valueFor('props.fallbackLink');
                 h += `<hr><div class="${grid1Cls}"><label class="${labelClass('props.objectFit')}">Object Fit</label><select data-prop="props.objectFit"><option value="contain" ${(objFitVal||'contain')==='contain'?'selected':''}>Contain</option><option value="cover" ${objFitVal==='cover'?'selected':''}>Cover</option><option value="fill" ${objFitVal==='fill'?'selected':''}>Fill</option><option value="none" ${objFitVal==='none'?'selected':''}>None</option><option value="scale-down" ${objFitVal==='scale-down'?'selected':''}>Scale Down</option></select>${syncBtn('props.objectFit')}</div>`;
                 h += `<div class="${grid1Cls}"><label class="${labelClass('props.fallbackLink')}">Fallback Link</label><input type="text" data-prop="props.fallbackLink" placeholder="https://..." value="${escapeHtml(String(fallbackVal||''))}">${syncBtn('props.fallbackLink')}</div>`;
+                const mT = valueFor('props.marginTop'), mR = valueFor('props.marginRight'), mB = valueFor('props.marginBottom'), mL = valueFor('props.marginLeft');
+                h += `<hr><div style="margin-top:8px"><label style="font-size:12px;display:block;margin-bottom:6px">Margini (cm)</label><div class="${grid1Cls}"><label>Su</label><input type="number" step="0.01" data-prop="props.marginTop" value="${Number(mT||0).toFixed(2)}" min="0"><label>Destra</label><input type="number" step="0.01" data-prop="props.marginRight" value="${Number(mR||0).toFixed(2)}" min="0"><label>Giu</label><input type="number" step="0.01" data-prop="props.marginBottom" value="${Number(mB||0).toFixed(2)}" min="0"><label>Sinistra</label><input type="number" step="0.01" data-prop="props.marginLeft" value="${Number(mL||0).toFixed(2)}" min="0"></div></div>`;
             }
 
             if(el.type==='text' || el.type==='data'){
@@ -5419,6 +5545,8 @@ document.addEventListener('DOMContentLoaded', ()=>{
                             break;
                         }
                         case 'image': {
+                            const mt = Number(el.props.marginTop) || 0, mr = Number(el.props.marginRight) || 0, mb = Number(el.props.marginBottom) || 0, ml = Number(el.props.marginLeft) || 0;
+                            if(mt || mr || mb || ml) d.style.padding = `${mt}cm ${mr}cm ${mb}cm ${ml}cm`;
                             const img = document.createElement('img');
                             img.style.pointerEvents='none';
                             img.style.width='100%';
@@ -6079,6 +6207,8 @@ document.addEventListener('DOMContentLoaded', ()=>{
                             break;
                         }
                         case 'image': {
+                            const mt = Number(el.props.marginTop) || 0, mr = Number(el.props.marginRight) || 0, mb = Number(el.props.marginBottom) || 0, ml = Number(el.props.marginLeft) || 0;
+                            if(mt || mr || mb || ml) d.style.padding = `${mt}cm ${mr}cm ${mb}cm ${ml}cm`;
                             const img = document.createElement('img');
                             img.style.pointerEvents='none';
                             img.style.width='100%';
@@ -6671,6 +6801,8 @@ document.addEventListener('DOMContentLoaded', ()=>{
                         break;
                     }
                     case 'image': {
+                        const mt = Number(el.props.marginTop) || 0, mr = Number(el.props.marginRight) || 0, mb = Number(el.props.marginBottom) || 0, ml = Number(el.props.marginLeft) || 0;
+                        if(mt || mr || mb || ml) d.style.padding = `${mt}cm ${mr}cm ${mb}cm ${ml}cm`;
                         const img = document.createElement('img');
                         img.style.pointerEvents='none';
                         img.style.width='100%';
@@ -7470,7 +7602,7 @@ document.addEventListener('DOMContentLoaded', ()=>{
         if(p.includes('.')){
             const [o,k] = p.split('.');
             if(!el[o]) el[o] = {};
-                if(['fontSize','decimals','thickness','borderWidth','rotation','paddingTop','paddingRight','paddingBottom','paddingLeft','x','y','width','height','borderRadiusTopLeft','borderRadiusTopRight','borderRadiusBottomRight','borderRadiusBottomLeft'].includes(k)) el[o][k] = Number(v);
+                if(['fontSize','decimals','thickness','borderWidth','rotation','paddingTop','paddingRight','paddingBottom','paddingLeft','marginTop','marginRight','marginBottom','marginLeft','x','y','width','height','borderRadiusTopLeft','borderRadiusTopRight','borderRadiusBottomRight','borderRadiusBottomLeft'].includes(k)) el[o][k] = Number(v);
                 else if(['showBorder','displayValue','asPercent','borderTop','borderRight','borderBottom','borderLeft'].includes(k)) el[o][k] = !!v;
                 else if(k === 'fontWeight'){
                     // Handle fontWeight: can be number (100-900) or string ('normal', 'bold')
@@ -7607,7 +7739,7 @@ document.addEventListener('DOMContentLoaded', ()=>{
                 if(keyPath.includes('.')){
                     const [o,k] = keyPath.split('.');
                     if(!el[o]) el[o] = {};
-                        if(['fontSize','lineHeight','decimals','thickness','borderWidth','rotation','paddingTop','paddingRight','paddingBottom','paddingLeft','x','y','width','height'].includes(k)) el[o][k] = Number(value);
+                        if(['fontSize','lineHeight','decimals','thickness','borderWidth','rotation','paddingTop','paddingRight','paddingBottom','paddingLeft','marginTop','marginRight','marginBottom','marginLeft','x','y','width','height'].includes(k)) el[o][k] = Number(value);
                         else if(['showBorder','displayValue','asPercent','borderTop','borderRight','borderBottom','borderLeft'].includes(k)) el[o][k] = !!value;
                         else if(k === 'fontWeight'){
                             // Handle fontWeight: can be number (100-900) or string ('normal', 'bold')
@@ -8141,12 +8273,17 @@ document.addEventListener('DOMContentLoaded', ()=>{
         // B&W thermal preview UI
         const bwToggle = document.getElementById('bw-mode-toggle');
         const bwOverlay = document.getElementById('bw-preview-overlay');
+        const canvasWrapper = document.getElementById('canvas-wrapper');
         if(bwToggle){
             bwToggle.checked = bwModeEnabled;
             bwToggle.addEventListener('change', (e)=>{
                 bwModeEnabled = e.target.checked;
-                if(!bwModeEnabled && bwOverlay) bwOverlay.classList.remove('bw-preview-visible');
-                else if(bwModeEnabled) scheduleBwPreviewUpdate();
+                if(!bwModeEnabled){
+                    if(bwOverlay) bwOverlay.classList.remove('bw-preview-visible');
+                    if(canvasWrapper) canvasWrapper.classList.remove('bw-preview-active');
+                } else {
+                    scheduleBwPreviewUpdate();
+                }
             });
         }
         function syncBwControlsFromState(){
