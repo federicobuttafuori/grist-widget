@@ -2375,17 +2375,20 @@ document.addEventListener('DOMContentLoaded', ()=>{
         return primary + ', ' + getTextOutlineShadow(w2, el.props.textOutline2Color || '#ffffff', w1);
     }
 
-    /** Contorno immagine: drop-shadow segue il bordo alpha (contorno reale), non il container. */
+    /** Contorno immagine: drop-shadow segue il bordo alpha (contorno reale), non il container.
+     * - Step fisso 0.25px per crescita visiva progressiva (0.1→0.5→1 senza salto a "1px pieno")
+     * - 16 direzioni (22.5°) per ridurre effetto scalettato e migliorare fedeltà al profilo */
     function getImageOutlineFilter(widthPx, color, startRadius){
         if(!widthPx || widthPx <= 0) return '';
         const w = Math.min(20, Math.max(0.1, Number(widthPx)));
         const start = Number(startRadius) || 0;
-        const steps = Math.max(1, Math.ceil(w));
+        const stepPx = 0.25;
+        const steps = Math.max(1, Math.ceil(w / stepPx));
         const stepSize = w / steps;
         const parts = [];
         for(let i = 1; i <= steps; i++){
             const r = start + stepSize * i;
-            for(let a = 0; a < 360; a += 45){
+            for(let a = 0; a < 360; a += 22.5){
                 const rad = a * Math.PI / 180;
                 const x = Math.round(r * Math.cos(rad) * 100) / 100;
                 const y = Math.round(r * Math.sin(rad) * 100) / 100;
