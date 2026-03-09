@@ -53,6 +53,9 @@
         .prop-grid-label-sync{display:grid;grid-template-columns:1fr 26px;gap:8px;align-items:center}
         .prop-grid-label-sync label{font-size:14px;font-weight:600}
         .prop-grid label{font-size:14px;font-weight:500}
+        .prop-block{margin-top:12px;padding-top:12px;border-top:1px solid #e8e8e8}
+        .prop-block-title{font-size:13px;font-weight:600;margin-bottom:8px;color:#333}
+        .prop-block-check{font-weight:normal;font-size:13px;display:flex;align-items:center;gap:6px;cursor:pointer}
         .prop-label-synced{color:#2e7d32}
         .prop-label-override{color:#1565c0}
         .prop-sync-btn{width:22px;height:22px;padding:0;border:1px solid #ccc;border-radius:4px;cursor:pointer;font-size:12px;display:inline-flex;align-items:center;justify-content:center;background:#f5f5f5;flex-shrink:0}
@@ -235,6 +238,9 @@
                     <span class="bw-label">Dot gain</span>
                     <input type="range" id="bw-dotgain" class="bw-control" min="0" max="30" value="0">
                     <span id="bw-dotgain-val" class="bw-value">0%</span>
+                    <span class="bw-label">Brightness</span>
+                    <input type="range" id="bw-brightness" class="bw-control" min="-100" max="100" value="0">
+                    <span id="bw-brightness-val" class="bw-value">0</span>
                     <span class="bw-label">Dithering</span>
                     <select id="bw-dithering" class="bw-control-full">
                             <option value="none">Nessuno</option>
@@ -243,6 +249,17 @@
                             <option value="ordered bayer">Ordered Bayer</option>
                             <option value="halftone">Halftone</option>
                         </select>
+                    <span class="bw-label">Halftone size</span>
+                    <select id="bw-halftone-size" class="bw-control-full">
+                            <option value="4">4 px</option>
+                            <option value="6">6 px</option>
+                            <option value="8" selected>8 px</option>
+                            <option value="12">12 px</option>
+                        </select>
+                    <div class="bw-toggle-row">
+                        <input type="checkbox" id="bw-invert">
+                        <span>Inverti (bianco su nero)</span>
+                    </div>
                     <span class="bw-label">Preview DPI</span>
                     <input type="number" id="bw-preview-dpi" class="bw-control-full" min="72" max="300" value="203">
                 </div>
@@ -286,7 +303,10 @@ document.addEventListener('DOMContentLoaded', ()=>{
         let bwThreshold = 50;
         let bwContrast = 1;
         let bwDotGain = 0;
+        let bwBrightness = 0;
+        let bwInvert = false;
         let bwDithering = 'none'; // 'none' | 'floyd-steinberg' | 'error-diffusion' | 'ordered bayer' | 'halftone'
+        let bwHalftoneSize = 8;
         let bwPreviewDpi = 203;
         const FONT_FAVORITES_KEY = 'grist_label_font_favorites'; // Key for font favorites
     const MAX_HISTORY = 100;
@@ -1132,6 +1152,7 @@ document.addEventListener('DOMContentLoaded', ()=>{
                     borderRadiusTopLeft:0, borderRadiusTopRight:0, borderRadiusBottomRight:0, borderRadiusBottomLeft:0,
                 paddingTop: 0, paddingRight: 0, paddingBottom: 0, paddingLeft: 0,
                 marginTop: 0, marginRight: 0, marginBottom: 0, marginLeft: 0,
+                textOutlineWidth: 0, textOutlineColor: '#000000', textOutlineEnabled: false, textOutline2Width: 0, textOutline2Color: '#ffffff', textOutline2Enabled: false,
                 thickness:2, format:'CODE128', displayValue:true,
                     fillColor:'transparent', decimals:2, asPercent:false,
                     lineHeight: 1.2, textOverflow: 'clip',
@@ -1162,6 +1183,12 @@ document.addEventListener('DOMContentLoaded', ()=>{
         base.props.marginRight = Number(base.props.marginRight) || 0;
         base.props.marginBottom = Number(base.props.marginBottom) || 0;
         base.props.marginLeft = Number(base.props.marginLeft) || 0;
+        base.props.textOutlineWidth = Math.max(0, Number(base.props.textOutlineWidth) || 0);
+        base.props.textOutlineColor = base.props.textOutlineColor || '#000000';
+        if(base.props.textOutlineEnabled === undefined) base.props.textOutlineEnabled = (Number(base.props.textOutlineWidth) || 0) > 0;
+        base.props.textOutline2Width = Math.max(0, Number(base.props.textOutline2Width) || 0);
+        base.props.textOutline2Color = base.props.textOutline2Color || '#ffffff';
+        if(base.props.textOutline2Enabled === undefined) base.props.textOutline2Enabled = (Number(base.props.textOutline2Width) || 0) > 0;
 
         base.x = Number(base.x) || 0;
         base.y = Number(base.y) || 0;
@@ -1350,9 +1377,13 @@ document.addEventListener('DOMContentLoaded', ()=>{
                     }
                     span.style.lineHeight = el.props.lineHeight !== undefined ? String(el.props.lineHeight) : '1.2';
                     span.style.color = el.props.color || '#000000';
-                    
+                    const outlineShadow = getCombinedTextOutlineShadow(el);
+                    if(outlineShadow){
+                        span.style.textShadow = outlineShadow;
+                        span.querySelectorAll('span').forEach(function(s){ s.style.textShadow = outlineShadow; });
+                    }
                     d.appendChild(span);
-                    
+
                     // Apply text overflow handling after element is in DOM
                     requestAnimationFrame(() => {
                         const containerWidth = d.offsetWidth;
@@ -1391,9 +1422,13 @@ document.addEventListener('DOMContentLoaded', ()=>{
                     }
                     span.style.lineHeight = el.props.lineHeight !== undefined ? String(el.props.lineHeight) : '1.2';
                     span.style.color = el.props.color || '#000000';
-                    
+                    const outlineShadowData = getCombinedTextOutlineShadow(el);
+                    if(outlineShadowData){
+                        span.style.textShadow = outlineShadowData;
+                        span.querySelectorAll('span').forEach(function(s){ s.style.textShadow = outlineShadowData; });
+                    }
                     d.appendChild(span);
-                    
+
                     // Apply text overflow handling after element is in DOM
                     requestAnimationFrame(() => {
                         const containerWidth = d.offsetWidth;
@@ -1523,6 +1558,8 @@ document.addEventListener('DOMContentLoaded', ()=>{
                         img.style.width='100%';
                         img.style.height='100%';
                         img.style.objectFit = el.props.objectFit || 'contain';
+                        const imageOutlineFilter = getCombinedImageOutlineFilter(el);
+                        if(imageOutlineFilter) img.style.filter = imageOutlineFilter;
                         
                         // Build Imgur URL from Grist column value
                         let imageUrl = '';
@@ -1798,6 +1835,14 @@ document.addEventListener('DOMContentLoaded', ()=>{
                 let y = 0.299 * r + 0.587 * g + 0.114 * b;
                 data[i] = data[i+1] = data[i+2] = Math.round(y);
             }
+            if(bwBrightness !== 0){
+                const add = bwBrightness * 2.55;
+                for(let i = 0; i < len; i += 4){
+                    let v = data[i] + add;
+                    v = Math.round(Math.max(0, Math.min(255, v)));
+                    data[i] = data[i+1] = data[i+2] = v;
+                }
+            }
             const gamma = Math.max(0.1, bwGamma);
             for(let i = 0; i < len; i += 4){
                 let v = data[i];
@@ -1889,9 +1934,9 @@ document.addEventListener('DOMContentLoaded', ()=>{
                     }
                 }
             } else if(bwDithering === 'halftone'){
-                const size = 8;
+                const size = Math.max(2, Math.min(16, bwHalftoneSize));
                 const center = (size - 1) / 2;
-                const maxD = Math.sqrt(center * center + center * center);
+                const maxD = Math.sqrt(center * center + center * center) || 1;
                 const halftoneMatrix = [];
                 for(let by = 0; by < size; by++){
                     for(let bx = 0; bx < size; bx++){
@@ -1908,6 +1953,12 @@ document.addEventListener('DOMContentLoaded', ()=>{
                         const out = v >= threshold ? 255 : 0;
                         data[i] = data[i+1] = data[i+2] = out;
                     }
+                }
+            }
+            if(bwInvert){
+                for(let i = 0; i < len; i += 4){
+                    const v = 255 - data[i];
+                    data[i] = data[i+1] = data[i+2] = v;
                 }
             }
             return imageData;
@@ -2283,6 +2334,75 @@ document.addEventListener('DOMContentLoaded', ()=>{
     function applySequencePlaceholder(str, sequenceIndex){
         if(!str || typeof str !== 'string') return str;
         return str.replace(/\*\*sequence\*\*/g, String(sequenceIndex)).replace(/@sequence@/g, String(sequenceIndex));
+    }
+
+    /**
+     * Contorno testo (text outline):
+     * - Problema: l'utente non vedeva alcun contorno attorno alle lettere nonostante l'opzione attiva.
+     * - Causa: -webkit-text-stroke non è supportato in modo affidabile su tutti i browser e non
+     *   si applica correttamente agli span figli creati dalle Regex Formatting Rules; inoltre
+     *   updateProps() nei listener ricostruiva il pannello e faceva tornare lo scroll in alto.
+     * - Soluzione: contorno realizzato con text-shadow (ombre multiple in 8 direzioni per ogni
+     *   pixel di spessore); applicazione dello stesso textShadow al contenitore e a tutti gli
+     *   span interni; rimozione di updateProps() dai listener del contorno per evitare il salto scroll.
+     */
+    function getTextOutlineShadow(widthPx, color, startRadius){
+        if(!widthPx || widthPx <= 0) return '';
+        const w = Math.min(20, Math.max(0.1, Number(widthPx)));
+        const start = Number(startRadius) || 0;
+        const steps = Math.max(1, Math.ceil(w));
+        const stepSize = w / steps;
+        const parts = [];
+        for(let i = 1; i <= steps; i++){
+            const r = start + stepSize * i;
+            for(let a = 0; a < 360; a += 45){
+                const rad = a * Math.PI / 180;
+                const x = Math.round(r * Math.cos(rad) * 100) / 100;
+                const y = Math.round(r * Math.sin(rad) * 100) / 100;
+                parts.push(x + 'px ' + y + 'px 0 ' + color);
+            }
+        }
+        return parts.join(', ');
+    }
+
+    function getCombinedTextOutlineShadow(el){
+        if(!el.props.textOutlineEnabled) return '';
+        const w1 = Math.max(0, Number(el.props.textOutlineWidth) || 0);
+        if(w1 <= 0) return '';
+        const primary = getTextOutlineShadow(w1, el.props.textOutlineColor || '#000000', 0);
+        const w2 = Math.max(0, Number(el.props.textOutline2Width) || 0);
+        if(!el.props.textOutline2Enabled || w2 <= 0) return primary;
+        return primary + ', ' + getTextOutlineShadow(w2, el.props.textOutline2Color || '#ffffff', w1);
+    }
+
+    /** Contorno immagine: drop-shadow segue il bordo alpha (contorno reale), non il container. */
+    function getImageOutlineFilter(widthPx, color, startRadius){
+        if(!widthPx || widthPx <= 0) return '';
+        const w = Math.min(20, Math.max(0.1, Number(widthPx)));
+        const start = Number(startRadius) || 0;
+        const steps = Math.max(1, Math.ceil(w));
+        const stepSize = w / steps;
+        const parts = [];
+        for(let i = 1; i <= steps; i++){
+            const r = start + stepSize * i;
+            for(let a = 0; a < 360; a += 45){
+                const rad = a * Math.PI / 180;
+                const x = Math.round(r * Math.cos(rad) * 100) / 100;
+                const y = Math.round(r * Math.sin(rad) * 100) / 100;
+                parts.push('drop-shadow(' + x + 'px ' + y + 'px 0 ' + color + ')');
+            }
+        }
+        return parts.join(' ');
+    }
+
+    function getCombinedImageOutlineFilter(el){
+        if(!el.props.textOutlineEnabled) return '';
+        const w1 = Math.max(0, Number(el.props.textOutlineWidth) || 0);
+        if(w1 <= 0) return '';
+        const primary = getImageOutlineFilter(w1, el.props.textOutlineColor || '#000000', 0);
+        const w2 = Math.max(0, Number(el.props.textOutline2Width) || 0);
+        if(!el.props.textOutline2Enabled || w2 <= 0) return primary;
+        return primary + ' ' + getImageOutlineFilter(w2, el.props.textOutline2Color || '#ffffff', w1);
     }
 
     // Helper function to set text content with regex formatting
@@ -3038,7 +3158,7 @@ document.addEventListener('DOMContentLoaded', ()=>{
         const showBorderVal = valueFor('props.showBorder'); const borderColorVal = valueFor('props.borderColor'); const borderWidthVal = valueFor('props.borderWidth');
         h += `<hr><div class="${grid1Cls}"><label class="${labelClass('props.showBorder')}">Show Border</label><input type="checkbox" data-prop="props.showBorder" ${showBorderVal?'checked':''}>${syncBtn('props.showBorder')}</div>`;
         h += `<div class="${grid1Cls}"><label class="${labelClass('props.borderColor')}">Border Color</label><input type="color" data-prop="props.borderColor" value="${borderColorVal||'#000000'}">${syncBtn('props.borderColor')}</div>`;
-        h += `<div class="${grid1Cls}"><label class="${labelClass('props.borderWidth')}">Border Width</label><input type="number" data-prop="props.borderWidth" value="${borderWidthVal!==undefined?borderWidthVal:1}" min="0">${syncBtn('props.borderWidth')}</div>`;
+        h += `<div class="${grid1Cls}"><label class="${labelClass('props.borderWidth')}">Border Width</label><input type="number" step="0.1" data-prop="props.borderWidth" value="${borderWidthVal!==undefined?borderWidthVal:1}" min="0">${syncBtn('props.borderWidth')}</div>`;
             if(showBorderVal){
                 const btVal = valueFor('props.borderTop'); const brVal = valueFor('props.borderRight'); const bbVal = valueFor('props.borderBottom'); const blVal = valueFor('props.borderLeft');
                 h += `<div style="margin-top:8px"><label style="font-size:12px;font-weight:600;display:block;margin-bottom:6px">Border Sides:</label><div class="prop-border-sides">`;
@@ -3054,10 +3174,25 @@ document.addEventListener('DOMContentLoaded', ()=>{
                 h += `</div></div>`;
             }
         if(el.type!=='box') h += `<hr><div class="${grid1Cls}"><label class="${labelClass('props.color')}">Color</label><input type="color" data-prop="props.color" value="${valueFor('props.color')||'#000000'}">${syncBtn('props.color')}</div>`;
-            // Background color for text, data and image (line, qr, barcode have no background option)
             if(el.type==='text' || el.type==='data' || el.type==='image'){
                 const hasBg = el.props.backgroundColor && el.props.backgroundColor!=='transparent';
-                h += `<hr><div class="${grid1Cls}"><label>Background</label><div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap"><label style="font-weight:normal;display:flex;align-items:center;gap:4px"><input type="checkbox" class="no-background-cb" ${!hasBg?'checked':''}> No background</label><input type="color" class="background-color-input" data-prop="props.backgroundColor" value="${hasBg?el.props.backgroundColor:'#ffffff'}" ${!hasBg?'disabled':''}></div></div>`;
+                const bgHex = (hasBg && /^#[0-9A-Fa-f]{6}$/.test(String(el.props.backgroundColor||''))) ? String(el.props.backgroundColor) : '#ffffff';
+                h += `<hr><div class="prop-block"><div class="prop-block-title">Sfondo</div><label class="prop-block-check"><input type="checkbox" class="enable-background-cb" ${hasBg?'checked':''}> Abilita sfondo</label><div class="${grid1Cls}" style="margin-top:6px"><label>Colore</label><input type="color" class="background-color-input" data-prop="props.backgroundColor" value="${bgHex}" ${!hasBg?'disabled':''}></div></div>`;
+            }
+            if(el.type==='text' || el.type==='data' || el.type==='image'){
+                const outlineW = Math.max(0, Number(el.props.textOutlineWidth)||0);
+                const outlineColor = /^#[0-9A-Fa-f]{6}$/.test(String(el.props.textOutlineColor||'')) ? String(el.props.textOutlineColor) : '#000000';
+                const outline2W = Math.max(0, Number(el.props.textOutline2Width)||0);
+                const outline2Color = /^#[0-9A-Fa-f]{6}$/.test(String(el.props.textOutline2Color||'')) ? String(el.props.textOutline2Color) : '#ffffff';
+                const outlineEnabled = !!el.props.textOutlineEnabled;
+                const outline2Enabled = !!el.props.textOutline2Enabled;
+                const outlineBlockTitle = el.type==='image' ? 'Contorno' : 'Contorno Testo';
+                h += `<hr><div class="${grid1Cls}"><label>${outlineBlockTitle}</label><input type="checkbox" class="text-outline-cb" ${outlineEnabled?'checked':''}></div>`;
+                h += `<div class="${grid1Cls}"><label>Spessore</label><div style="display:flex;align-items:center;gap:4px"><input type="number" class="text-outline-width-input" value="${outlineW}" min="0" max="20" step="0.1" ${!outlineEnabled?'disabled':''} style="width:56px"><span style="font-size:13px">px</span></div></div>`;
+                h += `<div class="${grid1Cls}"><label>Colore</label><input type="color" class="text-outline-color-input" value="${outlineColor}" ${!outlineEnabled?'disabled':''}></div>`;
+                h += `<div class="${grid1Cls}" style="margin-top:8px"><label>Contorno secondario</label><input type="checkbox" class="text-outline2-cb" ${outline2Enabled?'checked':''} ${!outlineEnabled?'disabled':''}></div>`;
+                h += `<div class="${grid1Cls}"><label>Spessore 2</label><div style="display:flex;align-items:center;gap:4px"><input type="number" class="text-outline2-width-input" value="${outline2W}" min="0" max="20" step="0.1" ${!outlineEnabled||!outline2Enabled?'disabled':''} style="width:56px"><span style="font-size:13px">px</span></div></div>`;
+                h += `<div class="${grid1Cls}"><label>Colore 2</label><input type="color" class="text-outline2-color-input" value="${outline2Color}" ${!outlineEnabled||!outline2Enabled?'disabled':''}></div>`;
             }
         h += `<hr><button id="btn-delete">Delete Element</button>`;
         pp.innerHTML = h;
@@ -3266,28 +3401,84 @@ document.addEventListener('DOMContentLoaded', ()=>{
                     });
                 });
             }
-            // Background color (text/data/image): "No background" = transparent
             if(el.type === 'text' || el.type === 'data' || el.type === 'image'){
-                const noBgCb = pp.querySelector('.no-background-cb');
+                const enableBgCb = pp.querySelector('.enable-background-cb');
                 const bgInput = pp.querySelector('.background-color-input');
-                if(noBgCb && bgInput){
-                    noBgCb.addEventListener('change', function(){
+                if(enableBgCb && bgInput){
+                    enableBgCb.addEventListener('change', function(){
                         pushBeforeChange();
                         if(this.checked){
-                            el.props.backgroundColor = 'transparent';
-                            bgInput.disabled = true;
-                        } else {
                             el.props.backgroundColor = bgInput.value || '#ffffff';
                             bgInput.disabled = false;
+                        } else {
+                            el.props.backgroundColor = 'transparent';
+                            bgInput.disabled = true;
                         }
                         render(); saveCurrentDesign(); updateProps();
                     });
                     bgInput.addEventListener('input', function(){
                         pushBeforeChange();
                         el.props.backgroundColor = this.value;
-                        noBgCb.checked = false;
+                        enableBgCb.checked = true;
                         bgInput.disabled = false;
                         render(); saveCurrentDesign(); updateProps();
+                    });
+                }
+            }
+            // Contorno testo / immagine: listener per checkbox, spessore e colore (senza updateProps per evitare salto scroll)
+            if(el.type === 'text' || el.type === 'data' || el.type === 'image'){
+                const outlineCb = pp.querySelector('.text-outline-cb');
+                const outlineWidthInput = pp.querySelector('.text-outline-width-input');
+                const outlineColorInput = pp.querySelector('.text-outline-color-input');
+                const outline2Cb = pp.querySelector('.text-outline2-cb');
+                const outline2WidthInput = pp.querySelector('.text-outline2-width-input');
+                const outline2ColorInput = pp.querySelector('.text-outline2-color-input');
+                if(outlineCb && outlineWidthInput && outlineColorInput){
+                    outlineCb.addEventListener('change', function(){
+                        pushBeforeChange();
+                        el.props.textOutlineEnabled = !!this.checked;
+                        outlineWidthInput.disabled = !this.checked;
+                        outlineColorInput.disabled = !this.checked;
+                        if(!this.checked){
+                            el.props.textOutline2Enabled = false;
+                            if(outline2Cb){ outline2Cb.checked = false; outline2Cb.disabled = true; }
+                            if(outline2WidthInput) outline2WidthInput.disabled = true;
+                            if(outline2ColorInput) outline2ColorInput.disabled = true;
+                        } else {
+                            if(outline2Cb){ outline2Cb.disabled = false; if(outline2Cb.checked){ outline2WidthInput.disabled = false; outline2ColorInput.disabled = false; } }
+                        }
+                        render(); saveCurrentDesign();
+                    });
+                    outlineWidthInput.addEventListener('input', function(){
+                        pushBeforeChange();
+                        const v = Math.max(0, Math.min(20, parseFloat(this.value) || 0));
+                        el.props.textOutlineWidth = v;
+                        render(); saveCurrentDesign();
+                    });
+                    outlineColorInput.addEventListener('input', function(){
+                        pushBeforeChange();
+                        el.props.textOutlineColor = (this.value && /^#[0-9A-Fa-f]{6}$/.test(this.value)) ? this.value : '#000000';
+                        render(); saveCurrentDesign();
+                    });
+                }
+                if(outline2Cb && outline2WidthInput && outline2ColorInput){
+                    outline2Cb.addEventListener('change', function(){
+                        pushBeforeChange();
+                        el.props.textOutline2Enabled = !!this.checked;
+                        outline2WidthInput.disabled = !this.checked || !(outlineCb && outlineCb.checked);
+                        outline2ColorInput.disabled = !this.checked || !(outlineCb && outlineCb.checked);
+                        render(); saveCurrentDesign();
+                    });
+                    outline2WidthInput.addEventListener('input', function(){
+                        pushBeforeChange();
+                        const v = Math.max(0, Math.min(20, parseFloat(this.value) || 0));
+                        el.props.textOutline2Width = v;
+                        render(); saveCurrentDesign();
+                    });
+                    outline2ColorInput.addEventListener('input', function(){
+                        pushBeforeChange();
+                        el.props.textOutline2Color = (this.value && /^#[0-9A-Fa-f]{6}$/.test(this.value)) ? this.value : '#ffffff';
+                        render(); saveCurrentDesign();
                     });
                 }
             }
@@ -3359,7 +3550,7 @@ document.addEventListener('DOMContentLoaded', ()=>{
             h += `<div class="prop-grid"><label>Padding Top</label><input type="number" step="0.01" data-prop="multi.props.paddingTop" value="${common('props.paddingTop')}" min="0"><label>Padding Right</label><input type="number" step="0.01" data-prop="multi.props.paddingRight" value="${common('props.paddingRight')}" min="0"></div>`;
             h += `<div class="prop-grid"><label>Padding Bottom</label><input type="number" step="0.01" data-prop="multi.props.paddingBottom" value="${common('props.paddingBottom')}" min="0"><label>Padding Left</label><input type="number" step="0.01" data-prop="multi.props.paddingLeft" value="${common('props.paddingLeft')}" min="0"></div>`;
                 h += `<hr><div class="prop-grid"><label>Rotation°</label><input type="number" step="0.1" data-prop="multi.props.rotation" value="${common('props.rotation')}"><label>Show Border</label><input type="checkbox" data-prop="multi.props.showBorder" ${common('props.showBorder')?'checked':''}></div>`;
-            h += `<div class="prop-grid"><label>Border Color</label><input type="color" data-prop="multi.props.borderColor" value="${common('props.borderColor')||'#000000'}"><label>Border Width</label><input type="number" step="1" data-prop="multi.props.borderWidth" value="${common('props.borderWidth')}" min="0"></div>`;
+            h += `<div class="prop-grid"><label>Border Color</label><input type="color" data-prop="multi.props.borderColor" value="${common('props.borderColor')||'#000000'}"><label>Border Width</label><input type="number" step="0.1" data-prop="multi.props.borderWidth" value="${common('props.borderWidth')}" min="0"></div>`;
             if(common('props.showBorder')){
                 h += `<div class="prop-grid" style="margin-top:8px"><label style="font-size:12px">Border Sides:</label><div style="display:grid;grid-template-columns:1fr 1fr;gap:4px"><label style="font-size:12px;font-weight:normal;display:flex;align-items:center;gap:4px"><input type="checkbox" data-prop="multi.props.borderTop" ${common('props.borderTop')!==false?'checked':''}>Top</label><label style="font-size:12px;font-weight:normal;display:flex;align-items:center;gap:4px"><input type="checkbox" data-prop="multi.props.borderRight" ${common('props.borderRight')!==false?'checked':''}>Right</label><label style="font-size:12px;font-weight:normal;display:flex;align-items:center;gap:4px"><input type="checkbox" data-prop="multi.props.borderBottom" ${common('props.borderBottom')!==false?'checked':''}>Bottom</label><label style="font-size:12px;font-weight:normal;display:flex;align-items:center;gap:4px"><input type="checkbox" data-prop="multi.props.borderLeft" ${common('props.borderLeft')!==false?'checked':''}>Left</label></div></div>`;
                 h += `<div style="margin-top:8px"><label style="font-size:12px;display:block;margin-bottom:6px">Border Radius (px):</label><div class="prop-border-radius-grid"><div class="prop-border-radius-cell"><label>↖ Top Left</label><input type="number" data-prop="multi.props.borderRadiusTopLeft" value="${common('props.borderRadiusTopLeft')||0}" min="0" step="0.1"></div><div class="prop-border-radius-cell"><label>↗ Top Right</label><input type="number" data-prop="multi.props.borderRadiusTopRight" value="${common('props.borderRadiusTopRight')||0}" min="0" step="0.1"></div><div class="prop-border-radius-cell"><label>↙ Bottom Left</label><input type="number" data-prop="multi.props.borderRadiusBottomLeft" value="${common('props.borderRadiusBottomLeft')||0}" min="0" step="0.1"></div><div class="prop-border-radius-cell"><label>↘ Bottom Right</label><input type="number" data-prop="multi.props.borderRadiusBottomRight" value="${common('props.borderRadiusBottomRight')||0}" min="0" step="0.1"></div></div></div>`;
@@ -5375,7 +5566,11 @@ document.addEventListener('DOMContentLoaded', ()=>{
                             }
                             span.style.lineHeight = el.props.lineHeight !== undefined ? String(el.props.lineHeight) : '1.2';
                             span.style.color = el.props.color || '#000000';
-                            
+                            const outlineShadowP1 = getCombinedTextOutlineShadow(el);
+                            if(outlineShadowP1){
+                                span.style.textShadow = outlineShadowP1;
+                                span.querySelectorAll('span').forEach(function(s){ s.style.textShadow = outlineShadowP1; });
+                            }
                             d.appendChild(span);
                             break;
                         }
@@ -5410,7 +5605,11 @@ document.addEventListener('DOMContentLoaded', ()=>{
                             }
                             span.style.lineHeight = el.props.lineHeight !== undefined ? String(el.props.lineHeight) : '1.2';
                             span.style.color = el.props.color || '#000000';
-                            
+                            const outlineShadowP1d = getCombinedTextOutlineShadow(el);
+                            if(outlineShadowP1d){
+                                span.style.textShadow = outlineShadowP1d;
+                                span.querySelectorAll('span').forEach(function(s){ s.style.textShadow = outlineShadowP1d; });
+                            }
                             d.appendChild(span);
                             break;
                         }
@@ -5552,6 +5751,8 @@ document.addEventListener('DOMContentLoaded', ()=>{
                             img.style.width='100%';
                             img.style.height='100%';
                             img.style.objectFit = el.props.objectFit || 'contain';
+                            const imageOutlineFilterP1 = getCombinedImageOutlineFilter(el);
+                            if(imageOutlineFilterP1) img.style.filter = imageOutlineFilterP1;
                             
                             // Build Imgur URL from Grist column value
                             let imageUrl = '';
@@ -6038,7 +6239,11 @@ document.addEventListener('DOMContentLoaded', ()=>{
                             }
                             span.style.lineHeight = el.props.lineHeight !== undefined ? String(el.props.lineHeight) : '1.2';
                             span.style.color = el.props.color || '#000000';
-                            
+                            const outlineShadowP1 = getCombinedTextOutlineShadow(el);
+                            if(outlineShadowP1){
+                                span.style.textShadow = outlineShadowP1;
+                                span.querySelectorAll('span').forEach(function(s){ s.style.textShadow = outlineShadowP1; });
+                            }
                             d.appendChild(span);
                             break;
                         }
@@ -6073,7 +6278,11 @@ document.addEventListener('DOMContentLoaded', ()=>{
                             }
                             span.style.lineHeight = el.props.lineHeight !== undefined ? String(el.props.lineHeight) : '1.2';
                             span.style.color = el.props.color || '#000000';
-                            
+                            const outlineShadowP1d = getCombinedTextOutlineShadow(el);
+                            if(outlineShadowP1d){
+                                span.style.textShadow = outlineShadowP1d;
+                                span.querySelectorAll('span').forEach(function(s){ s.style.textShadow = outlineShadowP1d; });
+                            }
                             d.appendChild(span);
                             break;
                         }
@@ -6214,6 +6423,8 @@ document.addEventListener('DOMContentLoaded', ()=>{
                             img.style.width='100%';
                             img.style.height='100%';
                             img.style.objectFit = el.props.objectFit || 'contain';
+                            const imageOutlineFilterP1 = getCombinedImageOutlineFilter(el);
+                            if(imageOutlineFilterP1) img.style.filter = imageOutlineFilterP1;
                             
                             // Build Imgur URL from Grist column value
                             let imageUrl = '';
@@ -6665,6 +6876,11 @@ document.addEventListener('DOMContentLoaded', ()=>{
                         span.style.fontFamily = el.props.fontFamily || 'Arial, sans-serif';
                         span.style.fontSize = (el.props.fontSize || 16) + 'px';
                         span.style.color = el.props.color || '#000000';
+                        const outlineShadowP3 = getCombinedTextOutlineShadow(el);
+                        if(outlineShadowP3){
+                            span.style.textShadow = outlineShadowP3;
+                            span.querySelectorAll('span').forEach(function(s){ s.style.textShadow = outlineShadowP3; });
+                        }
                         d.appendChild(span);
                         break;
                     }
@@ -6691,6 +6907,11 @@ document.addEventListener('DOMContentLoaded', ()=>{
                         span.style.fontFamily = el.props.fontFamily || 'Arial, sans-serif';
                         span.style.fontSize = (el.props.fontSize || 16) + 'px';
                         span.style.color = el.props.color || '#000000';
+                        const outlineShadowP3d = getCombinedTextOutlineShadow(el);
+                        if(outlineShadowP3d){
+                            span.style.textShadow = outlineShadowP3d;
+                            span.querySelectorAll('span').forEach(function(s){ s.style.textShadow = outlineShadowP3d; });
+                        }
                         d.appendChild(span);
                         break;
                     }
@@ -6808,6 +7029,8 @@ document.addEventListener('DOMContentLoaded', ()=>{
                         img.style.width='100%';
                         img.style.height='100%';
                         img.style.objectFit = el.props.objectFit || 'contain';
+                        const imageOutlineFilterP3 = getCombinedImageOutlineFilter(el);
+                        if(imageOutlineFilterP3) img.style.filter = imageOutlineFilterP3;
                         let imageUrl = '';
                         if(el.props.boundColumn && R && Object.prototype.hasOwnProperty.call(R, el.props.boundColumn)){
                             const imgurId = R[el.props.boundColumn];
@@ -7602,8 +7825,8 @@ document.addEventListener('DOMContentLoaded', ()=>{
         if(p.includes('.')){
             const [o,k] = p.split('.');
             if(!el[o]) el[o] = {};
-                if(['fontSize','decimals','thickness','borderWidth','rotation','paddingTop','paddingRight','paddingBottom','paddingLeft','marginTop','marginRight','marginBottom','marginLeft','x','y','width','height','borderRadiusTopLeft','borderRadiusTopRight','borderRadiusBottomRight','borderRadiusBottomLeft'].includes(k)) el[o][k] = Number(v);
-                else if(['showBorder','displayValue','asPercent','borderTop','borderRight','borderBottom','borderLeft'].includes(k)) el[o][k] = !!v;
+                if(['fontSize','decimals','thickness','borderWidth','rotation','paddingTop','paddingRight','paddingBottom','paddingLeft','marginTop','marginRight','marginBottom','marginLeft','textOutlineWidth','textOutline2Width','x','y','width','height','borderRadiusTopLeft','borderRadiusTopRight','borderRadiusBottomRight','borderRadiusBottomLeft'].includes(k)) el[o][k] = Number(v);
+                else if(['showBorder','displayValue','asPercent','borderTop','borderRight','borderBottom','borderLeft','textOutlineEnabled','textOutline2Enabled'].includes(k)) el[o][k] = !!v;
                 else if(k === 'fontWeight'){
                     // Handle fontWeight: can be number (100-900) or string ('normal', 'bold')
                     const numVal = Number(v);
@@ -7739,8 +7962,8 @@ document.addEventListener('DOMContentLoaded', ()=>{
                 if(keyPath.includes('.')){
                     const [o,k] = keyPath.split('.');
                     if(!el[o]) el[o] = {};
-                        if(['fontSize','lineHeight','decimals','thickness','borderWidth','rotation','paddingTop','paddingRight','paddingBottom','paddingLeft','marginTop','marginRight','marginBottom','marginLeft','x','y','width','height'].includes(k)) el[o][k] = Number(value);
-                        else if(['showBorder','displayValue','asPercent','borderTop','borderRight','borderBottom','borderLeft'].includes(k)) el[o][k] = !!value;
+                        if(['fontSize','lineHeight','decimals','thickness','borderWidth','rotation','paddingTop','paddingRight','paddingBottom','paddingLeft','marginTop','marginRight','marginBottom','marginLeft','textOutlineWidth','textOutline2Width','x','y','width','height'].includes(k)) el[o][k] = Number(value);
+                        else if(['showBorder','displayValue','asPercent','borderTop','borderRight','borderBottom','borderLeft','textOutlineEnabled','textOutline2Enabled'].includes(k)) el[o][k] = !!value;
                         else if(k === 'fontWeight'){
                             // Handle fontWeight: can be number (100-900) or string ('normal', 'bold')
                             const numVal = Number(value);
@@ -8291,13 +8514,19 @@ document.addEventListener('DOMContentLoaded', ()=>{
             const t = document.getElementById('bw-threshold');
             const c = document.getElementById('bw-contrast');
             const d = document.getElementById('bw-dotgain');
+            const b = document.getElementById('bw-brightness');
             const sel = document.getElementById('bw-dithering');
+            const hsize = document.getElementById('bw-halftone-size');
+            const inv = document.getElementById('bw-invert');
             const dpi = document.getElementById('bw-preview-dpi');
             if(g){ g.value = bwGamma; document.getElementById('bw-gamma-val').textContent = bwGamma; }
             if(t){ t.value = Math.round(bwThreshold); document.getElementById('bw-threshold-val').textContent = Math.round(bwThreshold) + '%'; }
             if(c){ c.value = bwContrast; document.getElementById('bw-contrast-val').textContent = bwContrast; }
             if(d){ d.value = bwDotGain; document.getElementById('bw-dotgain-val').textContent = bwDotGain + '%'; }
+            if(b){ b.value = bwBrightness; document.getElementById('bw-brightness-val').textContent = bwBrightness; }
             if(sel) sel.value = bwDithering;
+            if(hsize) hsize.value = String(bwHalftoneSize);
+            if(inv) inv.checked = bwInvert;
             if(dpi) dpi.value = bwPreviewDpi;
         }
         function attachBwControl(id, getVal, setState, updateLabel){
@@ -8318,11 +8547,28 @@ document.addEventListener('DOMContentLoaded', ()=>{
         attachBwControl('bw-threshold', el => parseFloat(el.value), v => { bwThreshold = v; }, v => Math.round(v) + '%');
         attachBwControl('bw-contrast', el => parseFloat(el.value), v => { bwContrast = v; }, v => String(v));
         attachBwControl('bw-dotgain', el => parseFloat(el.value), v => { bwDotGain = v; }, v => v + '%');
+        attachBwControl('bw-brightness', el => parseFloat(el.value), v => { bwBrightness = v; }, v => String(Math.round(v)));
         const bwDitheringSelect = document.getElementById('bw-dithering');
         if(bwDitheringSelect){
             bwDitheringSelect.value = bwDithering;
             bwDitheringSelect.addEventListener('change', (e)=>{
                 bwDithering = e.target.value;
+                if(bwModeEnabled) scheduleBwPreviewUpdate();
+            });
+        }
+        const bwHalftoneSizeSelect = document.getElementById('bw-halftone-size');
+        if(bwHalftoneSizeSelect){
+            bwHalftoneSizeSelect.value = String(bwHalftoneSize);
+            bwHalftoneSizeSelect.addEventListener('change', (e)=>{
+                const v = parseInt(e.target.value, 10);
+                if(!isNaN(v) && v >= 2 && v <= 16){ bwHalftoneSize = v; if(bwModeEnabled) scheduleBwPreviewUpdate(); }
+            });
+        }
+        const bwInvertCheckbox = document.getElementById('bw-invert');
+        if(bwInvertCheckbox){
+            bwInvertCheckbox.checked = bwInvert;
+            bwInvertCheckbox.addEventListener('change', (e)=>{
+                bwInvert = e.target.checked;
                 if(bwModeEnabled) scheduleBwPreviewUpdate();
             });
         }
