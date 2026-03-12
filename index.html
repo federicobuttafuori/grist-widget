@@ -21,7 +21,7 @@
         input,select,textarea{width:100%;padding:6px;border:1px solid #ccc;border-radius:4px;font-size:14px}
         textarea{resize:vertical;min-height:60px}
         hr{border:none;border-top:1px solid #eee;margin:12px 0}
-        #toolbar{flex-shrink:0;padding:8px;background:#fff;border-bottom:1px solid #e0e0e0;display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+        #toolbar{flex-shrink:0;padding:8px;background:#fff;border-bottom:1px solid #e0e0e0;display:flex;gap:8px;align-items:center;flex-wrap:nowrap;overflow-x:auto;min-width:0}
         #toolbar .zoom-label{font-size:14px;margin-left:auto}
         #toolbar .divider{width:1px;height:24px;background:#e0e0e0;margin:0 4px}
         #main-content{display:flex;flex-grow:1;overflow:hidden}
@@ -94,7 +94,7 @@
         .status-message{position:fixed;top:60px;right:20px;padding:12px 16px;background:#4CAF50;color:#fff;border-radius:4px;box-shadow:0 2px 8px rgba(0,0,0,.2);z-index:1000;animation:slideIn .3s ease-out}
         @keyframes slideIn{from{transform:translateX(400px);opacity:0}to{transform:translateX(0);opacity:1}}
         .status-message.error{background:#f44336}
-            #mini-toolbar{display:none;gap:8px;background:#fff;padding:8px;border-bottom:1px solid #e0e0e0;flex-direction:row;align-items:center;justify-content:center;flex-shrink:0}
+            #mini-toolbar{display:none;gap:8px;background:#fff;padding:8px;border-bottom:1px solid #e0e0e0;flex-direction:row;align-items:center;justify-content:center;flex-shrink:0;overflow-x:auto;min-width:0}
             #mini-toolbar button{padding:8px 12px;font-size:14px}
             #mini-toolbar select{padding:6px 8px;font-size:13px;border:1px solid #ccc;border-radius:4px;background:#fff;min-width:100px;max-width:150px}
             .widget-mode #canvas-container .label-element{pointer-events:none;cursor:default}
@@ -1147,7 +1147,7 @@ document.addEventListener('DOMContentLoaded', ()=>{
                 text: 'Sample Text',
                 fontSize: 16, fontWeight: 'normal', fontFamily: 'Arial, sans-serif',
                 textAlign: 'left', valign: 'top', color: '#000000',
-                boundColumn: '', prefix:'', suffix:'', rotation:0,
+                boundColumn: '', prefix:'', suffix:'', rotation:0, dateTimeFormat: 'DD/MM/YYYY',
                     showBorder:false, borderColor:'#000000', borderWidth:1, borderTop:true, borderRight:true, borderBottom:true, borderLeft:true,
                     borderRadiusTopLeft:0, borderRadiusTopRight:0, borderRadiusBottomRight:0, borderRadiusBottomLeft:0,
                 paddingTop: 0, paddingRight: 0, paddingBottom: 0, paddingLeft: 0,
@@ -1766,12 +1766,16 @@ document.addEventListener('DOMContentLoaded', ()=>{
                         if(!clonedNode || !clonedNode.querySelector) return;
                         const cloneLc = clonedNode.id === 'label-canvas' ? clonedNode : clonedDoc.getElementById('label-canvas');
                         if(!cloneLc) return;
+                        cloneLc.style.overflow = 'visible';
                         const cloneElements = cloneLc.querySelectorAll('.label-element');
                         cloneElements.forEach(function(cloneEl){
-                            const cloneImg = cloneEl.querySelector('img');
-                            if(!cloneImg) return;
                             const elId = cloneEl.getAttribute('data-id');
                             const el = S.find(function(e){ return e.id === elId; });
+                            const rotation = el ? (Number(el.props.rotation) || 0) % 360 : 0;
+                            const isVertical = (rotation === 90 || rotation === -90 || rotation === 270 || rotation === -270);
+                            if(isVertical) cloneEl.style.overflow = 'visible';
+                            const cloneImg = cloneEl.querySelector('img');
+                            if(!cloneImg) return;
                             if(!el || el.type !== 'image') return;
                             const origImg = lc.querySelector('[data-id="' + elId + '"] img');
                             if(!origImg || !origImg.complete || origImg.naturalWidth === 0) return;
@@ -1800,7 +1804,7 @@ document.addEventListener('DOMContentLoaded', ()=>{
                             cloneImg.style.position = 'absolute';
                             cloneImg.style.left = left + 'px';
                             cloneImg.style.top = top + 'px';
-                            cloneEl.style.overflow = 'hidden';
+                            if(!isVertical) cloneEl.style.overflow = 'hidden';
                         });
                     }
                 }).then(canvas => {
@@ -2319,11 +2323,12 @@ document.addEventListener('DOMContentLoaded', ()=>{
                 if(Object.prototype.hasOwnProperty.call(R, columnToUse)){
                     let v = R[columnToUse];
                     if(v === null || v === undefined) return '';
-                    if(el && el.type === 'data' && typeof v === 'number'){
+                    if(el && el.type === 'data' && typeof v === 'number' && !isDateValue(v)){
                         const dec = (el.props.decimals !== undefined) ? Number(el.props.decimals) : 2;
                         const pct = !!el.props.asPercent;
                         return fmt(v, dec, pct);
                     }
+                    if(el && isDateValue(v)) return formatDateValue(v, el.props && el.props.dateTimeFormat);
                     return String(v);
                 }
                 return match;
@@ -2423,6 +2428,18 @@ document.addEventListener('DOMContentLoaded', ()=>{
         }
     }
 
+    /** Evita ReDoS: | finale crea alternativa vuota che matcha "" ovunque, causando loop infinito e crash. */
+    function sanitizeRegexPattern(pattern){
+        if(!pattern || typeof pattern !== 'string') return pattern;
+        let p = pattern.trim();
+        while(p.endsWith('|') && !p.endsWith('\\|')){
+            const backslashes = (p.match(/\\+$/) || [''])[0].length;
+            if(backslashes % 2 === 0) p = p.slice(0, -1);
+            else break;
+        }
+        return (p === '') ? '(?!)' : p;
+    }
+
     // Apply regex formatting rules to text
     function applyRegexFormatting(text, rules){
         if(!text || typeof text !== 'string' || !rules || !Array.isArray(rules) || rules.length === 0){
@@ -2439,7 +2456,8 @@ document.addEventListener('DOMContentLoaded', ()=>{
             if(!rule.pattern || rule.enabled === false) return;
             
             try {
-                const regex = new RegExp(rule.pattern, 'g');
+                const safePattern = sanitizeRegexPattern(rule.pattern);
+                const regex = new RegExp(safePattern, 'g');
                 let match;
                 while((match = regex.exec(text)) !== null){
                     matches.push({
@@ -2609,18 +2627,19 @@ document.addEventListener('DOMContentLoaded', ()=>{
             const hasBoundValue = useOverrideForBound || (R && Object.prototype.hasOwnProperty.call(R, boundColumnToUse));
             if(!hasColumnSyntaxInText && boundColumnToUse && hasBoundValue){
                 let v = useOverrideForBound ? waveContext.overrideWeight : R[boundColumnToUse];
-                if(el.type === 'data' && (typeof v === 'number' || (typeof v === 'string' && !isNaN(parseFloat(v))))){
+                if(el.type === 'data' && (typeof v === 'number' || (typeof v === 'string' && !isNaN(parseFloat(v)))) && !isDateValue(v)){
                     const dec = (el.props.decimals !== undefined) ? Number(el.props.decimals) : 2;
                     const pct = !!el.props.asPercent;
                     return prefix + fmt(v,dec,pct) + suffix;
                 }
+                if(isDateValue(v)){
+                    const formatted = formatDateValue(v, el.props.dateTimeFormat);
+                    if(el.type === 'barcode' || el.type === 'qr') return formatted;
+                    return prefix + formatted + suffix;
+                }
                 // For barcode and qr, return only the value (prefix/suffix are handled separately in rendering)
                 if(el.type === 'barcode' || el.type === 'qr'){
                     return String(v);
-                }
-                // For text fields, use boundColumn value with processed prefix/suffix
-                if(el.type === 'text'){
-                    return prefix + String(v) + suffix;
                 }
                 return prefix + String(v) + suffix;
             }
@@ -2659,6 +2678,34 @@ document.addEventListener('DOMContentLoaded', ()=>{
         if(p) n=n*100;
         n=n.toFixed(d);
         return p?n+'%':n;
+    }
+
+    function isDateValue(v){
+        if(v instanceof Date) return true;
+        if(typeof v === 'string' && /^\d{4}-\d{2}-\d{2}/.test(v)) return true;
+        if(typeof v === 'number' && !isNaN(v) && v > 1e9 && v < 2e12) return true;
+        return false;
+    }
+
+    function formatDateValue(v, format){
+        if(v === null || v === undefined) return '';
+        let d;
+        if(v instanceof Date) d = v;
+        else if(typeof v === 'number') d = v > 1e12 ? new Date(v) : new Date(v * 1000);
+        else if(typeof v === 'string') d = new Date(v);
+        else return String(v);
+        if(isNaN(d.getTime())) return String(v);
+        const pad = n => String(n).padStart(2, '0');
+        const Y = d.getFullYear();
+        const M = pad(d.getMonth() + 1);
+        const D = pad(d.getDate());
+        const H = pad(d.getHours());
+        const m = pad(d.getMinutes());
+        const s = pad(d.getSeconds());
+        const fmt = (format || 'DD/MM/YYYY').replace(/YYYY/g, Y).replace(/YY/g, String(Y).slice(-2))
+            .replace(/MM/g, M).replace(/DD/g, D).replace(/dd/g, D)
+            .replace(/HH/g, H).replace(/mm/g, m).replace(/ss/g, s);
+        return fmt;
     }
 
     // ---------- Selection / Buttons / Props ----------
@@ -3041,7 +3088,13 @@ document.addEventListener('DOMContentLoaded', ()=>{
         h += `<div class="${grid1Cls}"><label class="${labelClass('width')}">Width</label><input type="number" step="0.01" data-prop="width" value="${(Number(valueFor('width'))||0).toFixed(2)}">${syncBtn('width')}</div>`;
         h += `<div class="${grid1Cls}"><label class="${labelClass('height')}">Height</label><input type="number" step="0.01" data-prop="height" value="${(Number(valueFor('height'))||0).toFixed(2)}">${syncBtn('height')}</div><hr>`;
 
-        if(el.type==='text') h += `<div class="${grid1Cls}"><label class="${labelClass('props.text')}">Text</label><textarea data-prop="props.text" class="column-mention-input" data-column-mention="1">${escapeHtml(String(valueFor('props.text')||''))}</textarea>${syncBtn('props.text')}</div>`;
+        if(el.type==='text'){
+            h += `<div class="${grid1Cls}"><label class="${labelClass('props.text')}">Text</label><textarea data-prop="props.text" class="column-mention-input" data-column-mention="1">${escapeHtml(String(valueFor('props.text')||''))}</textarea>${syncBtn('props.text')}</div>`;
+            const dtFmtValText = valueFor('props.dateTimeFormat') || 'DD/MM/YYYY';
+            const dateFormatPresets = [['DD/MM/YYYY','gg/mm/aaaa'],['DD/MM/YYYY HH:mm','gg/mm/aaaa hh:mm'],['DD/MM/YYYY HH:mm:ss','gg/mm/aaaa hh:mm:ss'],['YYYY-MM-DD','aaaa-mm-gg'],['YYYY-MM-DD HH:mm','aaaa-mm-gg hh:mm'],['MM/DD/YYYY','mm/gg/aaaa'],['DD.MM.YYYY','gg.mm.aaaa']];
+            const isCustomText = !dateFormatPresets.some(([v])=>v===dtFmtValText);
+            h += `<div class="${grid1Cls} date-time-format-row"><label class="${labelClass('props.dateTimeFormat')}">Formato Data/Ora</label><div><select class="date-time-format-select">${dateFormatPresets.map(([v,l])=>`<option value="${escapeHtml(v)}" ${dtFmtValText===v?'selected':''}>${l}</option>`).join('')}<option value="__custom__" ${isCustomText?'selected':''}>Custom</option></select><input type="text" class="date-time-format-custom-input" placeholder="es. DD-MM-YYYY" value="${isCustomText?escapeHtml(dtFmtValText):''}" style="margin-top:4px;width:100%;display:${isCustomText?'block':'none'}"></div>${syncBtn('props.dateTimeFormat')}</div>`;
+        }
 
             if(el.type==='data' || el.type==='qr' || el.type==='barcode' || el.type==='image'){
             h += `<div class="${grid1Cls}"><label class="${labelClass('props.boundColumn')}">Bound Column</label>${bindHtml}${syncBtn('props.boundColumn')}</div>`;
@@ -3053,6 +3106,10 @@ document.addEventListener('DOMContentLoaded', ()=>{
             const decVal = valueFor('props.decimals'); const asPctVal = valueFor('props.asPercent');
             h += `<hr><div class="${grid1Cls}"><label class="${labelClass('props.decimals')}">Decimals</label><input type="number" step="1" data-prop="props.decimals" value="${decVal!==undefined?decVal:2}" min="0" max="10">${syncBtn('props.decimals')}</div>`;
             h += `<div class="${grid1Cls}"><label class="${labelClass('props.asPercent')}">As Percent</label><input type="checkbox" data-prop="props.asPercent" ${asPctVal?'checked':''}>${syncBtn('props.asPercent')}</div>`;
+            const dtFmtVal = valueFor('props.dateTimeFormat') || 'DD/MM/YYYY';
+            const dateFormatPresets = [['DD/MM/YYYY','gg/mm/aaaa'],['DD/MM/YYYY HH:mm','gg/mm/aaaa hh:mm'],['DD/MM/YYYY HH:mm:ss','gg/mm/aaaa hh:mm:ss'],['YYYY-MM-DD','aaaa-mm-gg'],['YYYY-MM-DD HH:mm','aaaa-mm-gg hh:mm'],['MM/DD/YYYY','mm/gg/aaaa'],['DD.MM.YYYY','gg.mm.aaaa']];
+            const isCustom = !dateFormatPresets.some(([v])=>v===dtFmtVal);
+            h += `<div class="${grid1Cls} date-time-format-row"><label class="${labelClass('props.dateTimeFormat')}">Formato Data/Ora</label><div><select class="date-time-format-select">${dateFormatPresets.map(([v,l])=>`<option value="${escapeHtml(v)}" ${dtFmtVal===v?'selected':''}>${l}</option>`).join('')}<option value="__custom__" ${isCustom?'selected':''}>Custom</option></select><input type="text" class="date-time-format-custom-input" placeholder="es. DD-MM-YYYY" value="${isCustom?escapeHtml(dtFmtVal):''}" style="margin-top:4px;width:100%;display:${isCustom?'block':'none'}"></div>${syncBtn('props.dateTimeFormat')}</div>`;
         }
 
         if(el.type==='qr' || el.type==='barcode'){
@@ -3479,6 +3536,30 @@ document.addEventListener('DOMContentLoaded', ()=>{
                         pushBeforeChange();
                         el.props.textOutline2Color = (this.value && /^#[0-9A-Fa-f]{6}$/.test(this.value)) ? this.value : '#ffffff';
                         render(); saveCurrentDesign();
+                    });
+                }
+            }
+            // Formato Data/Ora: select + custom input (senza data-prop per gestione custom)
+            if(el.type === 'text' || el.type === 'data'){
+                const dtSelect = pp.querySelector('.date-time-format-select');
+                const dtCustomInput = pp.querySelector('.date-time-format-custom-input');
+                if(dtSelect){
+                    dtSelect.addEventListener('change', function(){
+                        pushBeforeChange();
+                        if(this.value !== '__custom__'){
+                            el.props.dateTimeFormat = this.value;
+                            if(dtCustomInput){ dtCustomInput.style.display = 'none'; dtCustomInput.value = ''; }
+                            render(); saveCurrentDesign(); updateProps();
+                        } else {
+                            if(dtCustomInput){ dtCustomInput.style.display = 'block'; dtCustomInput.value = el.props.dateTimeFormat || 'DD/MM/YYYY'; }
+                        }
+                    });
+                }
+                if(dtCustomInput){
+                    dtCustomInput.addEventListener('input', function(){
+                        pushBeforeChange();
+                        el.props.dateTimeFormat = this.value || 'DD/MM/YYYY';
+                        render(); saveCurrentDesign(); updateProps();
                     });
                 }
             }
@@ -4374,7 +4455,7 @@ document.addEventListener('DOMContentLoaded', ()=>{
         }
 
         function ensureLegacyMasterThreadsSyncedProps(){
-            const defaultSyncedProps = ['props.boundColumn','props.prefix','props.suffix','props.text','props.fallbackLink'];
+            const defaultSyncedProps = ['props.boundColumn','props.prefix','props.suffix','props.text','props.fallbackLink','props.dateTimeFormat'];
             masterDataThreads.forEach(thread => {
                 if(!Array.isArray(thread.syncedProps)){
                     thread.syncedProps = defaultSyncedProps.slice();
@@ -4389,7 +4470,7 @@ document.addEventListener('DOMContentLoaded', ()=>{
             });
         }
 
-        const DEFAULT_SYNCED_PROPS_LIST = ['props.boundColumn', 'props.prefix', 'props.suffix', 'props.text', 'props.fallbackLink', 'props.regexRules'];
+        const DEFAULT_SYNCED_PROPS_LIST = ['props.boundColumn', 'props.prefix', 'props.suffix', 'props.text', 'props.fallbackLink', 'props.dateTimeFormat', 'props.regexRules'];
 
         function createMasterThread(name, templateElement = null){
             if(!name || name.trim() === ''){
