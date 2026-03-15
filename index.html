@@ -1381,7 +1381,9 @@ document.addEventListener('DOMContentLoaded', ()=>{
                     const outlineShadow = getCombinedTextOutlineShadow(el);
                     if(outlineShadow){
                         span.style.textShadow = outlineShadow;
-                        span.querySelectorAll('span').forEach(function(s){ s.style.textShadow = outlineShadow; });
+                        span.style.webkitPrintColorAdjust = 'exact';
+                        span.style.printColorAdjust = 'exact';
+                        span.querySelectorAll('span').forEach(function(s){ s.style.textShadow = outlineShadow; s.style.webkitPrintColorAdjust = 'exact'; s.style.printColorAdjust = 'exact'; });
                     }
                     d.appendChild(span);
                     
@@ -1426,7 +1428,9 @@ document.addEventListener('DOMContentLoaded', ()=>{
                     const outlineShadowData = getCombinedTextOutlineShadow(el);
                     if(outlineShadowData){
                         span.style.textShadow = outlineShadowData;
-                        span.querySelectorAll('span').forEach(function(s){ s.style.textShadow = outlineShadowData; });
+                        span.style.webkitPrintColorAdjust = 'exact';
+                        span.style.printColorAdjust = 'exact';
+                        span.querySelectorAll('span').forEach(function(s){ s.style.textShadow = outlineShadowData; s.style.webkitPrintColorAdjust = 'exact'; s.style.printColorAdjust = 'exact'; });
                     }
                     d.appendChild(span);
                     
@@ -1560,7 +1564,11 @@ document.addEventListener('DOMContentLoaded', ()=>{
                         img.style.height='100%';
                         img.style.objectFit = el.props.objectFit || 'contain';
                         const imageOutlineFilter = getCombinedImageOutlineFilter(el);
-                        if(imageOutlineFilter) img.style.filter = imageOutlineFilter;
+                        if(imageOutlineFilter){
+                            img.style.filter = imageOutlineFilter;
+                            img.style.webkitPrintColorAdjust = 'exact';
+                            img.style.printColorAdjust = 'exact';
+                        }
                         
                         // Build Imgur URL from Grist column value
                         let imageUrl = '';
@@ -5651,7 +5659,9 @@ document.addEventListener('DOMContentLoaded', ()=>{
                             const outlineShadowP1 = getCombinedTextOutlineShadow(el);
                             if(outlineShadowP1){
                                 span.style.textShadow = outlineShadowP1;
-                                span.querySelectorAll('span').forEach(function(s){ s.style.textShadow = outlineShadowP1; });
+                                span.style.webkitPrintColorAdjust = 'exact';
+                                span.style.printColorAdjust = 'exact';
+                                span.querySelectorAll('span').forEach(function(s){ s.style.textShadow = outlineShadowP1; s.style.webkitPrintColorAdjust = 'exact'; s.style.printColorAdjust = 'exact'; });
                             }
                             d.appendChild(span);
                             break;
@@ -5690,7 +5700,9 @@ document.addEventListener('DOMContentLoaded', ()=>{
                             const outlineShadowP1d = getCombinedTextOutlineShadow(el);
                             if(outlineShadowP1d){
                                 span.style.textShadow = outlineShadowP1d;
-                                span.querySelectorAll('span').forEach(function(s){ s.style.textShadow = outlineShadowP1d; });
+                                span.style.webkitPrintColorAdjust = 'exact';
+                                span.style.printColorAdjust = 'exact';
+                                span.querySelectorAll('span').forEach(function(s){ s.style.textShadow = outlineShadowP1d; s.style.webkitPrintColorAdjust = 'exact'; s.style.printColorAdjust = 'exact'; });
                             }
                             d.appendChild(span);
                             break;
@@ -5834,7 +5846,11 @@ document.addEventListener('DOMContentLoaded', ()=>{
                             img.style.height='100%';
                             img.style.objectFit = el.props.objectFit || 'contain';
                             const imageOutlineFilterP1 = getCombinedImageOutlineFilter(el);
-                            if(imageOutlineFilterP1) img.style.filter = imageOutlineFilterP1;
+                            if(imageOutlineFilterP1){
+                                img.style.filter = imageOutlineFilterP1;
+                                img.style.webkitPrintColorAdjust = 'exact';
+                                img.style.printColorAdjust = 'exact';
+                            }
                             
                             // Build Imgur URL from Grist column value
                             let imageUrl = '';
@@ -6324,7 +6340,9 @@ document.addEventListener('DOMContentLoaded', ()=>{
                             const outlineShadowP1 = getCombinedTextOutlineShadow(el);
                             if(outlineShadowP1){
                                 span.style.textShadow = outlineShadowP1;
-                                span.querySelectorAll('span').forEach(function(s){ s.style.textShadow = outlineShadowP1; });
+                                span.style.webkitPrintColorAdjust = 'exact';
+                                span.style.printColorAdjust = 'exact';
+                                span.querySelectorAll('span').forEach(function(s){ s.style.textShadow = outlineShadowP1; s.style.webkitPrintColorAdjust = 'exact'; s.style.printColorAdjust = 'exact'; });
                             }
                             d.appendChild(span);
                             break;
@@ -6363,7 +6381,9 @@ document.addEventListener('DOMContentLoaded', ()=>{
                             const outlineShadowP1d = getCombinedTextOutlineShadow(el);
                             if(outlineShadowP1d){
                                 span.style.textShadow = outlineShadowP1d;
-                                span.querySelectorAll('span').forEach(function(s){ s.style.textShadow = outlineShadowP1d; });
+                                span.style.webkitPrintColorAdjust = 'exact';
+                                span.style.printColorAdjust = 'exact';
+                                span.querySelectorAll('span').forEach(function(s){ s.style.textShadow = outlineShadowP1d; s.style.webkitPrintColorAdjust = 'exact'; s.style.printColorAdjust = 'exact'; });
                             }
                             d.appendChild(span);
                             break;
@@ -6506,7 +6526,11 @@ document.addEventListener('DOMContentLoaded', ()=>{
                             img.style.height='100%';
                             img.style.objectFit = el.props.objectFit || 'contain';
                             const imageOutlineFilterP1 = getCombinedImageOutlineFilter(el);
-                            if(imageOutlineFilterP1) img.style.filter = imageOutlineFilterP1;
+                            if(imageOutlineFilterP1){
+                                img.style.filter = imageOutlineFilterP1;
+                                img.style.webkitPrintColorAdjust = 'exact';
+                                img.style.printColorAdjust = 'exact';
+                            }
                             
                             // Build Imgur URL from Grist column value
                             let imageUrl = '';
@@ -6961,7 +6985,9 @@ document.addEventListener('DOMContentLoaded', ()=>{
                         const outlineShadowP3 = getCombinedTextOutlineShadow(el);
                         if(outlineShadowP3){
                             span.style.textShadow = outlineShadowP3;
-                            span.querySelectorAll('span').forEach(function(s){ s.style.textShadow = outlineShadowP3; });
+                            span.style.webkitPrintColorAdjust = 'exact';
+                            span.style.printColorAdjust = 'exact';
+                            span.querySelectorAll('span').forEach(function(s){ s.style.textShadow = outlineShadowP3; s.style.webkitPrintColorAdjust = 'exact'; s.style.printColorAdjust = 'exact'; });
                         }
                         d.appendChild(span);
                         break;
@@ -6992,7 +7018,9 @@ document.addEventListener('DOMContentLoaded', ()=>{
                         const outlineShadowP3d = getCombinedTextOutlineShadow(el);
                         if(outlineShadowP3d){
                             span.style.textShadow = outlineShadowP3d;
-                            span.querySelectorAll('span').forEach(function(s){ s.style.textShadow = outlineShadowP3d; });
+                            span.style.webkitPrintColorAdjust = 'exact';
+                            span.style.printColorAdjust = 'exact';
+                            span.querySelectorAll('span').forEach(function(s){ s.style.textShadow = outlineShadowP3d; s.style.webkitPrintColorAdjust = 'exact'; s.style.printColorAdjust = 'exact'; });
                         }
                         d.appendChild(span);
                         break;
@@ -7112,7 +7140,11 @@ document.addEventListener('DOMContentLoaded', ()=>{
                         img.style.height='100%';
                         img.style.objectFit = el.props.objectFit || 'contain';
                         const imageOutlineFilterP3 = getCombinedImageOutlineFilter(el);
-                        if(imageOutlineFilterP3) img.style.filter = imageOutlineFilterP3;
+                        if(imageOutlineFilterP3){
+                            img.style.filter = imageOutlineFilterP3;
+                            img.style.webkitPrintColorAdjust = 'exact';
+                            img.style.printColorAdjust = 'exact';
+                        }
                         let imageUrl = '';
                         if(el.props.boundColumn && R && Object.prototype.hasOwnProperty.call(R, el.props.boundColumn)){
                             const imgurId = R[el.props.boundColumn];
@@ -8791,7 +8823,7 @@ document.addEventListener('DOMContentLoaded', ()=>{
                     const btnPrint = document.getElementById('btn-print').cloneNode(true);
                     btnPrint.id = 'mini-btn-print';
                     btnPrint.addEventListener('click', () => document.getElementById('btn-print').click());
-
+                    
                     const profileSelect = document.createElement('select');
                     profileSelect.id = 'mini-profile-selector';
                     profileSelect.style.cssText = 'padding:6px 8px;font-size:13px;border:1px solid #ccc;border-radius:4px;background:#fff;min-width:100px;max-width:150px';
@@ -8799,7 +8831,7 @@ document.addEventListener('DOMContentLoaded', ()=>{
                         profileSelector.value = e.target.value;
                         profileSelector.dispatchEvent(new Event('change'));
                     });
-
+                    
                     const designSelect = document.createElement('select');
                     designSelect.id = 'mini-design-selector';
                     designSelect.style.cssText = 'padding:6px 8px;font-size:13px;border:1px solid #ccc;border-radius:4px;background:#fff;min-width:100px;max-width:150px';
@@ -8807,7 +8839,7 @@ document.addEventListener('DOMContentLoaded', ()=>{
                         designSelector.value = e.target.value;
                         designSelector.dispatchEvent(new Event('change'));
                     });
-
+                    
                     const canvasSelect = document.createElement('select');
                     canvasSelect.id = 'mini-canvas-selector';
                     canvasSelect.style.cssText = 'padding:6px 8px;font-size:13px;border:1px solid #ccc;border-radius:4px;background:#fff;min-width:80px;max-width:120px;display:none';
@@ -8816,7 +8848,7 @@ document.addEventListener('DOMContentLoaded', ()=>{
                         canvasSelector.value = e.target.value;
                         canvasSelector.dispatchEvent(new Event('change'));
                     });
-
+                    
                     const btnRotate = document.getElementById('btn-rotate-canvas').cloneNode(true);
                     btnRotate.id = 'mini-btn-rotate';
                     btnRotate.addEventListener('click', () => document.getElementById('btn-rotate-canvas').click());
