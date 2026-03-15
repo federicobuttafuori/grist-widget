@@ -1248,6 +1248,39 @@ document.addEventListener('DOMContentLoaded', ()=>{
             countToRender = Math.min(count, MAX_PREVIEW_LABELS);
         }
         
+        // Preprocess image for consistent B&W: contrast stretch (2nd–98th percentile) on luminance, output grayscale.
+        function normalizeImageForBw(img){
+            try {
+                if(!img.complete || img.naturalWidth === 0 || img.naturalHeight === 0) return;
+                const w = img.naturalWidth, h = img.naturalHeight;
+                const canvas = document.createElement('canvas');
+                canvas.width = w;
+                canvas.height = h;
+                const ctx = canvas.getContext('2d');
+                ctx.drawImage(img, 0, 0);
+                const imageData = ctx.getImageData(0, 0, w, h);
+                const data = imageData.data;
+                const len = data.length;
+                const lum = [];
+                for(let i = 0; i < len; i += 4){
+                    const y = 0.299 * data[i] + 0.587 * data[i+1] + 0.114 * data[i+2];
+                    lum.push(y);
+                }
+                lum.sort((a,b) => a - b);
+                const n = lum.length;
+                const p2 = lum[Math.floor(n * 0.02)] ?? lum[0];
+                const p98 = lum[Math.min(Math.floor(n * 0.98), n - 1)] ?? lum[n - 1];
+                const span = Math.max(p98 - p2, 1);
+                for(let i = 0; i < len; i += 4){
+                    const y = 0.299 * data[i] + 0.587 * data[i+1] + 0.114 * data[i+2];
+                    const v = Math.round(Math.max(0, Math.min(255, (y - p2) / span * 255)));
+                    data[i] = data[i+1] = data[i+2] = v;
+                }
+                ctx.putImageData(imageData, 0, 0);
+                img.src = canvas.toDataURL('image/png');
+            } catch(e) { /* CORS or canvas security: leave img unchanged */ }
+        }
+
         // Helper function to render elements for a specific canvas and sequence index
         function renderElementsForCanvas(canvasData, sequenceIndex, baseOffsetY, waveContext = null){
             const sorted = canvasData.map(normalizeElement).slice().sort((a,b)=> (a.zIndex||0) - (b.zIndex||0));
@@ -1591,6 +1624,12 @@ document.addEventListener('DOMContentLoaded', ()=>{
                         }
                         
                         if(imageUrl){
+                            img.onload = function(){
+                                if(el.props.normalizeForBw && img.src && !img.src.startsWith('data:')){
+                                    normalizeImageForBw(img);
+                                }
+                            };
+                            if(!imageUrl.startsWith('data:')) img.crossOrigin = 'anonymous';
                             img.src = imageUrl;
                             let fallbackTried = false;
                             img.onerror = function(){
@@ -1620,6 +1659,12 @@ document.addEventListener('DOMContentLoaded', ()=>{
                             // No column selected, but fallback link available - use it directly
                             const fallbackUrl = String(el.props.fallbackLink).trim();
                             if(fallbackUrl){
+                                img.onload = function(){
+                                    if(el.props.normalizeForBw && img.src && !img.src.startsWith('data:')){
+                                        normalizeImageForBw(img);
+                                    }
+                                };
+                                if(!fallbackUrl.startsWith('data:')) img.crossOrigin = 'anonymous';
                                 img.src = fallbackUrl;
                                 img.onerror = function(){
                                     img.style.display = 'none';
@@ -3154,8 +3199,10 @@ document.addEventListener('DOMContentLoaded', ()=>{
 
             if(el.type==='image'){
                 const objFitVal = valueFor('props.objectFit'); const fallbackVal = valueFor('props.fallbackLink');
+                const normalizeForBwVal = valueFor('props.normalizeForBw');
                 h += `<hr><div class="${grid1Cls}"><label class="${labelClass('props.objectFit')}">Object Fit</label><select data-prop="props.objectFit"><option value="contain" ${(objFitVal||'contain')==='contain'?'selected':''}>Contain</option><option value="cover" ${objFitVal==='cover'?'selected':''}>Cover</option><option value="fill" ${objFitVal==='fill'?'selected':''}>Fill</option><option value="none" ${objFitVal==='none'?'selected':''}>None</option><option value="scale-down" ${objFitVal==='scale-down'?'selected':''}>Scale Down</option></select>${syncBtn('props.objectFit')}</div>`;
                 h += `<div class="${grid1Cls}"><label class="${labelClass('props.fallbackLink')}">Fallback Link</label><input type="text" data-prop="props.fallbackLink" placeholder="https://..." value="${escapeHtml(String(fallbackVal||''))}">${syncBtn('props.fallbackLink')}</div>`;
+                h += `<div class="${grid1Cls}"><label class="${labelClass('props.normalizeForBw')}" title="Stabilize brightness and contrast for consistent black-and-white printing">Normalize for B&amp;W</label><input type="checkbox" data-prop="props.normalizeForBw" ${normalizeForBwVal?'checked':''}>${syncBtn('props.normalizeForBw')}</div>`;
                 const mT = valueFor('props.marginTop'), mR = valueFor('props.marginRight'), mB = valueFor('props.marginBottom'), mL = valueFor('props.marginLeft');
                 h += `<hr><div style="margin-top:8px"><label style="font-size:12px;display:block;margin-bottom:6px">Margini (cm)</label><div class="${grid1Cls}"><label>Su</label><input type="number" step="0.01" data-prop="props.marginTop" value="${Number(mT||0).toFixed(2)}" min="0"><label>Destra</label><input type="number" step="0.01" data-prop="props.marginRight" value="${Number(mR||0).toFixed(2)}" min="0"><label>Giu</label><input type="number" step="0.01" data-prop="props.marginBottom" value="${Number(mB||0).toFixed(2)}" min="0"><label>Sinistra</label><input type="number" step="0.01" data-prop="props.marginLeft" value="${Number(mL||0).toFixed(2)}" min="0"></div></div>`;
             }
@@ -4479,7 +4526,7 @@ document.addEventListener('DOMContentLoaded', ()=>{
             });
         }
 
-        const DEFAULT_SYNCED_PROPS_LIST = ['props.boundColumn', 'props.prefix', 'props.suffix', 'props.text', 'props.fallbackLink', 'props.dateTimeFormat', 'props.regexRules'];
+        const DEFAULT_SYNCED_PROPS_LIST = ['props.boundColumn', 'props.prefix', 'props.suffix', 'props.text', 'props.fallbackLink', 'props.normalizeForBw', 'props.dateTimeFormat', 'props.regexRules'];
 
         function createMasterThread(name, templateElement = null){
             if(!name || name.trim() === ''){
@@ -4850,7 +4897,7 @@ document.addEventListener('DOMContentLoaded', ()=>{
             if(!firstElement) return;
             
             const thread = createMasterThread(threadName || undefined, firstElement);
-            ['props.boundColumn','props.prefix','props.suffix','props.text','props.fallbackLink'].forEach(propKey => {
+            ['props.boundColumn','props.prefix','props.suffix','props.text','props.fallbackLink','props.normalizeForBw'].forEach(propKey => {
                 const v = getElementPropValue(firstElement, propKey);
                 if(v !== undefined) thread.data[propKey] = v;
             });
@@ -5873,6 +5920,12 @@ document.addEventListener('DOMContentLoaded', ()=>{
                             }
                             
                             if(imageUrl){
+                                img.onload = function(){
+                                    if(el.props.normalizeForBw && img.src && !img.src.startsWith('data:')){
+                                        normalizeImageForBw(img);
+                                    }
+                                };
+                                if(!imageUrl.startsWith('data:')) img.crossOrigin = 'anonymous';
                                 img.src = imageUrl;
                                 let fallbackTried = false;
                                 img.onerror = function(){
@@ -5902,6 +5955,12 @@ document.addEventListener('DOMContentLoaded', ()=>{
                                 // No column selected, but fallback link available - use it directly
                                 const fallbackUrl = String(el.props.fallbackLink).trim();
                                 if(fallbackUrl){
+                                    img.onload = function(){
+                                        if(el.props.normalizeForBw && img.src && !img.src.startsWith('data:')){
+                                            normalizeImageForBw(img);
+                                        }
+                                    };
+                                    if(!fallbackUrl.startsWith('data:')) img.crossOrigin = 'anonymous';
                                     img.src = fallbackUrl;
                                     img.onerror = function(){
                                         img.style.display = 'none';
@@ -6557,6 +6616,12 @@ document.addEventListener('DOMContentLoaded', ()=>{
                                 if(el.props.fallbackLink){
                                     img.dataset.fallbackLink = String(el.props.fallbackLink).trim();
                                 }
+                                img.onload = function(){
+                                    if(el.props.normalizeForBw && img.src && !img.src.startsWith('data:')){
+                                        normalizeImageForBw(img);
+                                    }
+                                };
+                                if(!imageUrl.startsWith('data:')) img.crossOrigin = 'anonymous';
                                 img.src = imageUrl;
                                 let fallbackTried = false;
                                 img.onerror = function(){
@@ -6586,6 +6651,12 @@ document.addEventListener('DOMContentLoaded', ()=>{
                                 // No column selected, but fallback link available - use it directly
                                 const fallbackUrl = String(el.props.fallbackLink).trim();
                                 if(fallbackUrl){
+                                    img.onload = function(){
+                                        if(el.props.normalizeForBw && img.src && !img.src.startsWith('data:')){
+                                            normalizeImageForBw(img);
+                                        }
+                                    };
+                                    if(!fallbackUrl.startsWith('data:')) img.crossOrigin = 'anonymous';
                                     img.src = fallbackUrl;
                                     img.onerror = function(){
                                         img.style.display = 'none';
@@ -7165,6 +7236,12 @@ document.addEventListener('DOMContentLoaded', ()=>{
                             if(el.props.fallbackLink){
                                 img.dataset.fallbackLink = String(el.props.fallbackLink).trim();
                             }
+                            img.onload = function(){
+                                if(el.props.normalizeForBw && img.src && !img.src.startsWith('data:')){
+                                    normalizeImageForBw(img);
+                                }
+                            };
+                            if(!imageUrl.startsWith('data:')) img.crossOrigin = 'anonymous';
                             img.src = imageUrl;
                             let fallbackTried = false;
                             img.onerror = function(){
@@ -7184,6 +7261,12 @@ document.addEventListener('DOMContentLoaded', ()=>{
                             // No column selected, but fallback link available - use it directly
                             const fallbackUrl = String(el.props.fallbackLink).trim();
                             if(fallbackUrl){
+                                img.onload = function(){
+                                    if(el.props.normalizeForBw && img.src && !img.src.startsWith('data:')){
+                                        normalizeImageForBw(img);
+                                    }
+                                };
+                                if(!fallbackUrl.startsWith('data:')) img.crossOrigin = 'anonymous';
                                 img.src = fallbackUrl;
                                 img.onerror = function(){
                                     // No fallback or fallback also failed - hide image
