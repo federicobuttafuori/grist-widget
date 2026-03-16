@@ -2464,6 +2464,12 @@ document.addEventListener('DOMContentLoaded', ()=>{
         return primary + ' ' + getImageOutlineFilter(w2, el.props.textOutline2Color || '#ffffff', w1);
     }
 
+    /** In stampa il bianco (#fff/#ffffff) viene spesso reso nero. Sostituiamo con un bianco leggermente off per forzare l’inchiostro. */
+    function outlineForPrint(outlineString){
+        if(!outlineString || typeof outlineString !== 'string') return outlineString;
+        return outlineString.replace(/#fff(?:fff)?\b/gi, '#fefefe');
+    }
+
     // Helper function to set text content with regex formatting
     function setTextWithRegexFormatting(element, text, elementRules){
         // Combine global rules with element-specific rules
@@ -5703,7 +5709,7 @@ document.addEventListener('DOMContentLoaded', ()=>{
                             }
                             span.style.lineHeight = el.props.lineHeight !== undefined ? String(el.props.lineHeight) : '1.2';
                             span.style.color = el.props.color || '#000000';
-                            const outlineShadowP1 = getCombinedTextOutlineShadow(el);
+                            const outlineShadowP1 = outlineForPrint(getCombinedTextOutlineShadow(el));
                             if(outlineShadowP1){
                                 span.style.textShadow = outlineShadowP1;
                                 span.style.webkitPrintColorAdjust = 'exact';
@@ -5744,7 +5750,7 @@ document.addEventListener('DOMContentLoaded', ()=>{
                             }
                             span.style.lineHeight = el.props.lineHeight !== undefined ? String(el.props.lineHeight) : '1.2';
                             span.style.color = el.props.color || '#000000';
-                            const outlineShadowP1d = getCombinedTextOutlineShadow(el);
+                            const outlineShadowP1d = outlineForPrint(getCombinedTextOutlineShadow(el));
                             if(outlineShadowP1d){
                                 span.style.textShadow = outlineShadowP1d;
                                 span.style.webkitPrintColorAdjust = 'exact';
@@ -5892,7 +5898,7 @@ document.addEventListener('DOMContentLoaded', ()=>{
                             img.style.width='100%';
                             img.style.height='100%';
                             img.style.objectFit = el.props.objectFit || 'contain';
-                            const imageOutlineFilterP1 = getCombinedImageOutlineFilter(el);
+                            const imageOutlineFilterP1 = outlineForPrint(getCombinedImageOutlineFilter(el));
                             if(imageOutlineFilterP1){
                                 img.style.filter = imageOutlineFilterP1;
                                 img.style.webkitPrintColorAdjust = 'exact';
@@ -6396,7 +6402,7 @@ document.addEventListener('DOMContentLoaded', ()=>{
                             }
                             span.style.lineHeight = el.props.lineHeight !== undefined ? String(el.props.lineHeight) : '1.2';
                             span.style.color = el.props.color || '#000000';
-                            const outlineShadowP1 = getCombinedTextOutlineShadow(el);
+                            const outlineShadowP1 = outlineForPrint(getCombinedTextOutlineShadow(el));
                             if(outlineShadowP1){
                                 span.style.textShadow = outlineShadowP1;
                                 span.style.webkitPrintColorAdjust = 'exact';
@@ -6437,7 +6443,7 @@ document.addEventListener('DOMContentLoaded', ()=>{
                             }
                             span.style.lineHeight = el.props.lineHeight !== undefined ? String(el.props.lineHeight) : '1.2';
                             span.style.color = el.props.color || '#000000';
-                            const outlineShadowP1d = getCombinedTextOutlineShadow(el);
+                            const outlineShadowP1d = outlineForPrint(getCombinedTextOutlineShadow(el));
                             if(outlineShadowP1d){
                                 span.style.textShadow = outlineShadowP1d;
                                 span.style.webkitPrintColorAdjust = 'exact';
@@ -6584,7 +6590,7 @@ document.addEventListener('DOMContentLoaded', ()=>{
                             img.style.width='100%';
                             img.style.height='100%';
                             img.style.objectFit = el.props.objectFit || 'contain';
-                            const imageOutlineFilterP1 = getCombinedImageOutlineFilter(el);
+                            const imageOutlineFilterP1 = outlineForPrint(getCombinedImageOutlineFilter(el));
                             if(imageOutlineFilterP1){
                                 img.style.filter = imageOutlineFilterP1;
                                 img.style.webkitPrintColorAdjust = 'exact';
@@ -7053,7 +7059,7 @@ document.addEventListener('DOMContentLoaded', ()=>{
                         span.style.fontFamily = el.props.fontFamily || 'Arial, sans-serif';
                         span.style.fontSize = (el.props.fontSize || 16) + 'px';
                         span.style.color = el.props.color || '#000000';
-                        const outlineShadowP3 = getCombinedTextOutlineShadow(el);
+                        const outlineShadowP3 = outlineForPrint(getCombinedTextOutlineShadow(el));
                         if(outlineShadowP3){
                             span.style.textShadow = outlineShadowP3;
                             span.style.webkitPrintColorAdjust = 'exact';
@@ -7086,7 +7092,7 @@ document.addEventListener('DOMContentLoaded', ()=>{
                         span.style.fontFamily = el.props.fontFamily || 'Arial, sans-serif';
                         span.style.fontSize = (el.props.fontSize || 16) + 'px';
                         span.style.color = el.props.color || '#000000';
-                        const outlineShadowP3d = getCombinedTextOutlineShadow(el);
+                        const outlineShadowP3d = outlineForPrint(getCombinedTextOutlineShadow(el));
                         if(outlineShadowP3d){
                             span.style.textShadow = outlineShadowP3d;
                             span.style.webkitPrintColorAdjust = 'exact';
@@ -7210,7 +7216,7 @@ document.addEventListener('DOMContentLoaded', ()=>{
                         img.style.width='100%';
                         img.style.height='100%';
                         img.style.objectFit = el.props.objectFit || 'contain';
-                        const imageOutlineFilterP3 = getCombinedImageOutlineFilter(el);
+                        const imageOutlineFilterP3 = outlineForPrint(getCombinedImageOutlineFilter(el));
                         if(imageOutlineFilterP3){
                             img.style.filter = imageOutlineFilterP3;
                             img.style.webkitPrintColorAdjust = 'exact';
