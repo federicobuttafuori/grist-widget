@@ -870,7 +870,19 @@ document.addEventListener('DOMContentLoaded', ()=>{
                         globalSequenceCountColumn: globalSequenceCountColumn,
                         packWaves: packWaves || [],
                         globalRegexRules: globalRegexRules || [],
-                        masterDataThreads: masterDataThreads || []
+                        masterDataThreads: masterDataThreads || [],
+                        bwPreview: {
+                            modeEnabled: bwModeEnabled,
+                            gamma: bwGamma,
+                            threshold: bwThreshold,
+                            contrast: bwContrast,
+                            dotGain: bwDotGain,
+                            brightness: bwBrightness,
+                            invert: bwInvert,
+                            dithering: bwDithering,
+                            halftoneSize: bwHalftoneSize,
+                            previewDpi: bwPreviewDpi
+                        }
                 };
                 localStorage.setItem(KEY, JSON.stringify(payloadObj));
             } catch(e) {
@@ -8710,6 +8722,7 @@ document.addEventListener('DOMContentLoaded', ()=>{
                 } else {
                     scheduleBwPreviewUpdate();
                 }
+                saveCurrentDesign();
             });
         }
         function syncBwControlsFromState(){
@@ -8744,6 +8757,7 @@ document.addEventListener('DOMContentLoaded', ()=>{
                     if(label) label.textContent = updateLabel(v);
                 }
                 if(bwModeEnabled) scheduleBwPreviewUpdate();
+                saveCurrentDesign();
             });
         }
         attachBwControl('bw-gamma', el => parseFloat(el.value), v => { bwGamma = v; }, v => String(v));
@@ -8757,6 +8771,7 @@ document.addEventListener('DOMContentLoaded', ()=>{
             bwDitheringSelect.addEventListener('change', (e)=>{
                 bwDithering = e.target.value;
                 if(bwModeEnabled) scheduleBwPreviewUpdate();
+                saveCurrentDesign();
             });
         }
         const bwHalftoneSizeSelect = document.getElementById('bw-halftone-size');
@@ -8764,7 +8779,7 @@ document.addEventListener('DOMContentLoaded', ()=>{
             bwHalftoneSizeSelect.value = String(bwHalftoneSize);
             bwHalftoneSizeSelect.addEventListener('change', (e)=>{
                 const v = parseInt(e.target.value, 10);
-                if(!isNaN(v) && v >= 2 && v <= 16){ bwHalftoneSize = v; if(bwModeEnabled) scheduleBwPreviewUpdate(); }
+                if(!isNaN(v) && v >= 2 && v <= 16){ bwHalftoneSize = v; if(bwModeEnabled) scheduleBwPreviewUpdate(); saveCurrentDesign(); }
             });
         }
         const bwInvertCheckbox = document.getElementById('bw-invert');
@@ -8773,6 +8788,7 @@ document.addEventListener('DOMContentLoaded', ()=>{
             bwInvertCheckbox.addEventListener('change', (e)=>{
                 bwInvert = e.target.checked;
                 if(bwModeEnabled) scheduleBwPreviewUpdate();
+                saveCurrentDesign();
             });
         }
         const bwDpiInput = document.getElementById('bw-preview-dpi');
@@ -8780,7 +8796,7 @@ document.addEventListener('DOMContentLoaded', ()=>{
             bwDpiInput.value = bwPreviewDpi;
             bwDpiInput.addEventListener('change', (e)=>{
                 const v = parseInt(e.target.value, 10);
-                if(!isNaN(v) && v >= 72 && v <= 300){ bwPreviewDpi = v; if(bwModeEnabled) scheduleBwPreviewUpdate(); }
+                if(!isNaN(v) && v >= 72 && v <= 300){ bwPreviewDpi = v; if(bwModeEnabled) scheduleBwPreviewUpdate(); saveCurrentDesign(); }
             });
         }
         syncBwControlsFromState();
@@ -9085,6 +9101,20 @@ document.addEventListener('DOMContentLoaded', ()=>{
                         masterDataThreads = deepCopy(parsed.masterDataThreads);
                     } else {
                         masterDataThreads = [];
+                    }
+                    // Load anteprima termica (B&W preview) options if saved
+                    if(parsed.bwPreview && typeof parsed.bwPreview === 'object'){
+                        const p = parsed.bwPreview;
+                        if(typeof p.modeEnabled === 'boolean') bwModeEnabled = p.modeEnabled;
+                        if(typeof p.gamma === 'number' && p.gamma >= 0.5 && p.gamma <= 2.5) bwGamma = p.gamma;
+                        if(typeof p.threshold === 'number' && p.threshold >= 0 && p.threshold <= 100) bwThreshold = p.threshold;
+                        if(typeof p.contrast === 'number' && p.contrast >= 0.5 && p.contrast <= 2) bwContrast = p.contrast;
+                        if(typeof p.dotGain === 'number' && p.dotGain >= 0 && p.dotGain <= 30) bwDotGain = p.dotGain;
+                        if(typeof p.brightness === 'number' && p.brightness >= -100 && p.brightness <= 100) bwBrightness = p.brightness;
+                        if(typeof p.invert === 'boolean') bwInvert = p.invert;
+                        if(typeof p.dithering === 'string' && ['none','floyd-steinberg','error-diffusion','ordered bayer','halftone'].includes(p.dithering)) bwDithering = p.dithering;
+                        if(typeof p.halftoneSize === 'number' && p.halftoneSize >= 2 && p.halftoneSize <= 16) bwHalftoneSize = p.halftoneSize;
+                        if(typeof p.previewDpi === 'number' && p.previewDpi >= 72 && p.previewDpi <= 300) bwPreviewDpi = p.previewDpi;
                     }
                     ensureLegacyMasterThreadsSyncedProps();
                     // Restore current profile, design and canvas if saved
