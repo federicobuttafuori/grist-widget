@@ -1260,7 +1260,7 @@ document.addEventListener('DOMContentLoaded', ()=>{
             countToRender = Math.min(count, MAX_PREVIEW_LABELS);
         }
         
-        // Preprocess image for consistent B&W: contrast stretch (2nd–98th percentile) on luminance, output grayscale.
+        // Preprocess image for consistent B&W: contrast stretch + shadow lift + gamma per evitare stampa troppo scura.
         function normalizeImageForBw(img){
             try {
                 if(!img.complete || img.naturalWidth === 0 || img.naturalHeight === 0) return;
@@ -1280,12 +1280,23 @@ document.addEventListener('DOMContentLoaded', ()=>{
                 }
                 lum.sort((a,b) => a - b);
                 const n = lum.length;
-                const p2 = lum[Math.floor(n * 0.02)] ?? lum[0];
-                const p98 = lum[Math.min(Math.floor(n * 0.98), n - 1)] ?? lum[n - 1];
-                const span = Math.max(p98 - p2, 1);
+                // Percentili più estremi per stretch più aggressivo (immagini molto scure)
+                const pLow = lum[Math.floor(n * 0.005)] ?? lum[0];
+                const pHigh = lum[Math.min(Math.floor(n * 0.995), n - 1)] ?? lum[n - 1];
+                const span = Math.max(pHigh - pLow, 1);
+                // Shadow lift: il nero minimo non va sotto 50 (evita etichette quasi tutte nere in stampa)
+                const shadowLift = 50;
+                // Gamma < 1 schiarisce mezzitoni e ombre
+                const gamma = 0.85;
                 for(let i = 0; i < len; i += 4){
-                    const y = 0.299 * data[i] + 0.587 * data[i+1] + 0.114 * data[i+2];
-                    const v = Math.round(Math.max(0, Math.min(255, (y - p2) / span * 255)));
+                    let y = 0.299 * data[i] + 0.587 * data[i+1] + 0.114 * data[i+2];
+                    let v = (y - pLow) / span * 255;
+                    v = Math.max(0, Math.min(255, v));
+                    // Shadow lift: mappa [0,255] -> [shadowLift, 255]
+                    v = shadowLift + (255 - shadowLift) * (v / 255);
+                    // Gamma per schiarire ancora
+                    v = Math.pow(v / 255, gamma) * 255;
+                    v = Math.round(Math.max(0, Math.min(255, v)));
                     data[i] = data[i+1] = data[i+2] = v;
                 }
                 ctx.putImageData(imageData, 0, 0);
