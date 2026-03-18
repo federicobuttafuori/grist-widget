@@ -100,7 +100,7 @@
             #mini-toolbar .mini-tb-profile{grid-column:2;grid-row:1;min-width:0}
             #mini-toolbar .mini-tb-print1{grid-column:1;grid-row:2}
             #mini-toolbar .mini-tb-design{grid-column:2;grid-row:2;min-width:0}
-            #mini-toolbar .mini-toolbar-col3{grid-column:3;grid-row:1 / span 2;display:flex;flex-direction:column;justify-content:center;gap:6px;align-self:stretch;min-width:0}
+            #mini-toolbar .mini-toolbar-col3{grid-column:3;grid-row:1 / span 2;display:flex;flex-direction:column;justify-content:flex-start;gap:6px;align-self:start;min-width:0}
             #mini-toolbar .mini-tb-print button,#mini-toolbar .mini-tb-print1 button{padding:6px 10px;font-size:13px;white-space:nowrap}
             #mini-toolbar .mini-tb-profile select,#mini-toolbar .mini-tb-design select{width:100%;padding:4px 8px;font-size:12px;border:1px solid #ccc;border-radius:4px;background:#fff;box-sizing:border-box}
             #mini-toolbar .mini-toolbar-col3 select{width:100%;min-width:7em;padding:4px 8px;font-size:12px;border:1px solid #ccc;border-radius:4px;background:#fff;box-sizing:border-box}
@@ -642,14 +642,18 @@ document.addEventListener('DOMContentLoaded', ()=>{
                 }
             }
             canvasSelector.value = currentCanvas.toString();
-            
-            // Aggiorna anche il selettore canvas nella mini toolbar se esiste
-            const miniCanvasSelect = document.getElementById('mini-canvas-selector');
-            if (miniCanvasSelect) {
-                // Mostra solo se canvas2 è abilitato
-                miniCanvasSelect.style.display = canvas2Flag ? 'block' : 'none';
-                miniCanvasSelect.value = currentCanvas.toString();
-            }
+            syncMiniCanvasSelector();
+        }
+
+        function syncMiniCanvasSelector(){
+            const mini = document.getElementById('mini-canvas-selector');
+            if (!mini) return;
+            const profile = profiles[currentProfile];
+            const design = profile && profile.designs[currentDesign] ? profile.designs[currentDesign] : null;
+            const canvas2Flag = !!(design && design.canvas2Enabled);
+            mini.style.display = '';
+            mini.innerHTML = '<option value="1">Canvas 1</option><option value="2"' + (canvas2Flag ? '' : ' disabled') + '>Canvas 2</option>';
+            mini.value = String((!canvas2Flag && currentCanvas === 2) ? 1 : currentCanvas);
         }
 
         function switchProfile(profileKey){
@@ -8890,8 +8894,7 @@ document.addEventListener('DOMContentLoaded', ()=>{
 
                     const canvasSelect = document.createElement('select');
                     canvasSelect.id = 'mini-canvas-selector';
-                    canvasSelect.style.display = 'none';
-                    canvasSelect.innerHTML = '<option value="1">Canvas 1</option><option value="2">Canvas 2</option>';
+                    canvasSelect.innerHTML = '<option value="1">Canvas 1</option><option value="2" disabled>Canvas 2</option>';
                     canvasSelect.addEventListener('change', (e) => {
                         canvasSelector.value = e.target.value;
                         canvasSelector.dispatchEvent(new Event('change'));
@@ -8949,18 +8952,7 @@ document.addEventListener('DOMContentLoaded', ()=>{
                     }
                 }
                 
-                // Aggiorna il selettore canvas nella mini toolbar
-                const miniCanvasSelect = document.getElementById('mini-canvas-selector');
-                if (miniCanvasSelect) {
-                    const profile = profiles[currentProfile];
-                    if (profile && profile.designs[currentDesign]) {
-                        const design = profile.designs[currentDesign];
-                        const canvas2Flag = design.canvas2Enabled || false;
-                        // Mostra solo se canvas2 è abilitato
-                        miniCanvasSelect.style.display = canvas2Flag ? 'block' : 'none';
-                        miniCanvasSelect.value = currentCanvas.toString();
-                    }
-                }
+                syncMiniCanvasSelector();
                 
                 miniToolbar.style.display = 'flex';
                 
