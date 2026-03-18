@@ -109,7 +109,6 @@
         #bw-preview-overlay{position:absolute;left:0;top:0;pointer-events:none;display:none;z-index:2}
         #bw-preview-overlay.bw-preview-visible{display:block}
         #canvas-wrapper.bw-preview-active #label-canvas{visibility:hidden}
-        .outlined{filter:url(#outline)}
         .bw-controls{display:grid;grid-template-columns:minmax(90px,auto) 1fr minmax(48px,auto);gap:6px 10px;align-items:center}
         .bw-controls .bw-label{grid-column:1;font-size:13px}
         .bw-controls .bw-control{grid-column:2;min-width:0}
@@ -119,6 +118,7 @@
     </style>
 </head>
 <body>
+    <svg id="outline-filters-host" width="0" height="0" style="position:absolute;overflow:hidden;pointer-events:none" aria-hidden="true"><defs id="outline-filters-defs"></defs></svg>
     <div id="toolbar">
         <button id="btn-clear" title="Clear Layout">🗑️ Clear</button>
         <div class="divider"></div>
@@ -1427,12 +1427,7 @@ document.addEventListener('DOMContentLoaded', ()=>{
                     }
                     span.style.lineHeight = el.props.lineHeight !== undefined ? String(el.props.lineHeight) : '1.2';
                     span.style.color = el.props.color || '#000000';
-                    if(el.props.textOutlineEnabled && (Number(el.props.textOutlineWidth) || 0) > 0){
-                        span.classList.add('outlined');
-                        span.style.webkitPrintColorAdjust = 'exact';
-                        span.style.printColorAdjust = 'exact';
-                        span.querySelectorAll('span').forEach(function(s){ s.classList.add('outlined'); s.style.webkitPrintColorAdjust = 'exact'; s.style.printColorAdjust = 'exact'; });
-                    }
+                    applySvgOutlineToTextContainer(el, span);
                     d.appendChild(span);
                     
                     // Apply text overflow handling after element is in DOM
@@ -1473,12 +1468,7 @@ document.addEventListener('DOMContentLoaded', ()=>{
                     }
                     span.style.lineHeight = el.props.lineHeight !== undefined ? String(el.props.lineHeight) : '1.2';
                     span.style.color = el.props.color || '#000000';
-                    if(el.props.textOutlineEnabled && (Number(el.props.textOutlineWidth) || 0) > 0){
-                        span.classList.add('outlined');
-                        span.style.webkitPrintColorAdjust = 'exact';
-                        span.style.printColorAdjust = 'exact';
-                        span.querySelectorAll('span').forEach(function(s){ s.classList.add('outlined'); s.style.webkitPrintColorAdjust = 'exact'; s.style.printColorAdjust = 'exact'; });
-                    }
+                    applySvgOutlineToTextContainer(el, span);
                     d.appendChild(span);
                     
                     // Apply text overflow handling after element is in DOM
@@ -1610,11 +1600,7 @@ document.addEventListener('DOMContentLoaded', ()=>{
                         img.style.width='100%';
                         img.style.height='100%';
                         img.style.objectFit = el.props.objectFit || 'contain';
-                        if(el.props.textOutlineEnabled && (Number(el.props.textOutlineWidth) || 0) > 0){
-                            img.classList.add('outlined');
-                            img.style.webkitPrintColorAdjust = 'exact';
-                            img.style.printColorAdjust = 'exact';
-                        }
+                        applySvgOutlineToImage(el, img);
                         
                         // Build Imgur URL from Grist column value
                         let imageUrl = '';
@@ -2440,7 +2426,105 @@ document.addEventListener('DOMContentLoaded', ()=>{
         return primary + ' ' + getImageOutlineFilter(w2, el.props.textOutline2Color || '#ffffff', w1);
     }
 
-    // Note: outline in stampa ora usa un filtro SVG (`.outlined`) invece di text-shadow/drop-shadow.
+    const OUTLINE_FILTER_NS = 'http://www.w3.org/2000/svg';
+    function normalizeOutlineColorHex(hex, fallback){
+        const s = String(hex || '').trim();
+        if(/^#[0-9A-Fa-f]{6}$/.test(s)) return s.toLowerCase();
+        if(/^#[0-9A-Fa-f]{3}$/.test(s)) return ('#' + s[1]+s[1]+s[2]+s[2]+s[3]+s[3]).toLowerCase();
+        return fallback;
+    }
+    function ensureOutlineSvgFilter(el){
+        const defs = document.getElementById('outline-filters-defs');
+        if(!defs) return null;
+        const w1 = Math.max(0.5, Math.min(20, Number(el.props.textOutlineWidth) || 1));
+        const c1 = normalizeOutlineColorHex(el.props.textOutlineColor, '#000000');
+        const use2 = !!(el.props.textOutline2Enabled && (Number(el.props.textOutline2Width) || 0) > 0);
+        const w2 = use2 ? Math.max(0.5, Math.min(20, Number(el.props.textOutline2Width) || 1)) : 0;
+        const c2 = normalizeOutlineColorHex(el.props.textOutline2Color, '#ffffff');
+        const id = use2
+            ? ('ol_' + String(w1).replace('.', 'p') + '_' + String(w2).replace('.', 'p') + '_' + c1.slice(1) + '_' + c2.slice(1))
+            : ('ol_' + String(w1).replace('.', 'p') + '_' + c1.slice(1));
+        if(document.getElementById(id)) return id;
+        const filter = document.createElementNS(OUTLINE_FILTER_NS, 'filter');
+        filter.setAttribute('id', id);
+        filter.setAttribute('x', '-100%');
+        filter.setAttribute('y', '-100%');
+        filter.setAttribute('width', '300%');
+        filter.setAttribute('height', '300%');
+        filter.setAttribute('color-interpolation-filters', 'sRGB');
+        function morph(inp, rad, res){
+            const m = document.createElementNS(OUTLINE_FILTER_NS, 'feMorphology');
+            m.setAttribute('in', inp);
+            m.setAttribute('operator', 'dilate');
+            m.setAttribute('radius', String(rad));
+            m.setAttribute('result', res);
+            filter.appendChild(m);
+        }
+        function flood(col, res){
+            const f = document.createElementNS(OUTLINE_FILTER_NS, 'feFlood');
+            f.setAttribute('flood-color', col);
+            f.setAttribute('result', res);
+            filter.appendChild(f);
+        }
+        function comp(i1, i2, op, res){
+            const c = document.createElementNS(OUTLINE_FILTER_NS, 'feComposite');
+            c.setAttribute('in', i1);
+            c.setAttribute('in2', i2);
+            c.setAttribute('operator', op);
+            c.setAttribute('result', res);
+            filter.appendChild(c);
+        }
+        function merge(ins){
+            const mg = document.createElementNS(OUTLINE_FILTER_NS, 'feMerge');
+            ins.forEach(function(n){
+                const mn = document.createElementNS(OUTLINE_FILTER_NS, 'feMergeNode');
+                mn.setAttribute('in', n);
+                mg.appendChild(mn);
+            });
+            filter.appendChild(mg);
+        }
+        if(!use2){
+            morph('SourceAlpha', w1, 'expanded');
+            flood(c1, 'col');
+            comp('col', 'expanded', 'in', 'outline');
+            merge(['outline', 'SourceGraphic']);
+        } else {
+            const rout = w1 + w2;
+            morph('SourceAlpha', rout, 'expO');
+            morph('SourceAlpha', w1, 'expI');
+            comp('expO', 'expI', 'out', 'bandO');
+            flood(c2, 'f2');
+            comp('f2', 'bandO', 'in', 'ring2');
+            comp('expI', 'SourceAlpha', 'out', 'bandI');
+            flood(c1, 'f1');
+            comp('f1', 'bandI', 'in', 'ring1');
+            merge(['ring2', 'ring1', 'SourceGraphic']);
+        }
+        defs.appendChild(filter);
+        return id;
+    }
+    function applySvgOutlineToTextContainer(el, span){
+        if(!el.props.textOutlineEnabled || (Number(el.props.textOutlineWidth) || 0) <= 0) return;
+        const fid = ensureOutlineSvgFilter(el);
+        if(!fid) return;
+        const u = 'url(#' + fid + ')';
+        span.style.filter = u;
+        span.style.webkitPrintColorAdjust = 'exact';
+        span.style.printColorAdjust = 'exact';
+        span.querySelectorAll('span').forEach(function(s){
+            s.style.filter = u;
+            s.style.webkitPrintColorAdjust = 'exact';
+            s.style.printColorAdjust = 'exact';
+        });
+    }
+    function applySvgOutlineToImage(el, img){
+        if(!el.props.textOutlineEnabled || (Number(el.props.textOutlineWidth) || 0) <= 0) return;
+        const fid = ensureOutlineSvgFilter(el);
+        if(!fid) return;
+        img.style.filter = 'url(#' + fid + ')';
+        img.style.webkitPrintColorAdjust = 'exact';
+        img.style.printColorAdjust = 'exact';
+    }
 
     // Helper function to set text content with regex formatting
     function setTextWithRegexFormatting(element, text, elementRules){
@@ -5706,12 +5790,7 @@ document.addEventListener('DOMContentLoaded', ()=>{
                             }
                             span.style.lineHeight = el.props.lineHeight !== undefined ? String(el.props.lineHeight) : '1.2';
                             span.style.color = el.props.color || '#000000';
-                            if(el.props.textOutlineEnabled && (Number(el.props.textOutlineWidth) || 0) > 0){
-                                span.classList.add('outlined');
-                                span.style.webkitPrintColorAdjust = 'exact';
-                                span.style.printColorAdjust = 'exact';
-                                span.querySelectorAll('span').forEach(function(s){ s.classList.add('outlined'); s.style.webkitPrintColorAdjust = 'exact'; s.style.printColorAdjust = 'exact'; });
-                            }
+                            applySvgOutlineToTextContainer(el, span);
                             d.appendChild(span);
                             break;
                         }
@@ -5746,12 +5825,7 @@ document.addEventListener('DOMContentLoaded', ()=>{
                             }
                             span.style.lineHeight = el.props.lineHeight !== undefined ? String(el.props.lineHeight) : '1.2';
                             span.style.color = el.props.color || '#000000';
-                            if(el.props.textOutlineEnabled && (Number(el.props.textOutlineWidth) || 0) > 0){
-                                span.classList.add('outlined');
-                                span.style.webkitPrintColorAdjust = 'exact';
-                                span.style.printColorAdjust = 'exact';
-                                span.querySelectorAll('span').forEach(function(s){ s.classList.add('outlined'); s.style.webkitPrintColorAdjust = 'exact'; s.style.printColorAdjust = 'exact'; });
-                            }
+                            applySvgOutlineToTextContainer(el, span);
                             d.appendChild(span);
                             break;
                         }
@@ -5893,11 +5967,7 @@ document.addEventListener('DOMContentLoaded', ()=>{
                             img.style.width='100%';
                             img.style.height='100%';
                             img.style.objectFit = el.props.objectFit || 'contain';
-                            if(el.props.textOutlineEnabled && (Number(el.props.textOutlineWidth) || 0) > 0){
-                                img.classList.add('outlined');
-                                img.style.webkitPrintColorAdjust = 'exact';
-                                img.style.printColorAdjust = 'exact';
-                            }
+                            applySvgOutlineToImage(el, img);
                             
                             // Build Imgur URL from Grist column value
                             let imageUrl = '';
@@ -6396,12 +6466,7 @@ document.addEventListener('DOMContentLoaded', ()=>{
                             }
                             span.style.lineHeight = el.props.lineHeight !== undefined ? String(el.props.lineHeight) : '1.2';
                             span.style.color = el.props.color || '#000000';
-                            if(el.props.textOutlineEnabled && (Number(el.props.textOutlineWidth) || 0) > 0){
-                                span.classList.add('outlined');
-                                span.style.webkitPrintColorAdjust = 'exact';
-                                span.style.printColorAdjust = 'exact';
-                                span.querySelectorAll('span').forEach(function(s){ s.classList.add('outlined'); s.style.webkitPrintColorAdjust = 'exact'; s.style.printColorAdjust = 'exact'; });
-                            }
+                            applySvgOutlineToTextContainer(el, span);
                             d.appendChild(span);
                             break;
                         }
@@ -6436,12 +6501,7 @@ document.addEventListener('DOMContentLoaded', ()=>{
                             }
                             span.style.lineHeight = el.props.lineHeight !== undefined ? String(el.props.lineHeight) : '1.2';
                             span.style.color = el.props.color || '#000000';
-                            if(el.props.textOutlineEnabled && (Number(el.props.textOutlineWidth) || 0) > 0){
-                                span.classList.add('outlined');
-                                span.style.webkitPrintColorAdjust = 'exact';
-                                span.style.printColorAdjust = 'exact';
-                                span.querySelectorAll('span').forEach(function(s){ s.classList.add('outlined'); s.style.webkitPrintColorAdjust = 'exact'; s.style.printColorAdjust = 'exact'; });
-                            }
+                            applySvgOutlineToTextContainer(el, span);
                             d.appendChild(span);
                             break;
                         }
@@ -6582,11 +6642,7 @@ document.addEventListener('DOMContentLoaded', ()=>{
                             img.style.width='100%';
                             img.style.height='100%';
                             img.style.objectFit = el.props.objectFit || 'contain';
-                            if(el.props.textOutlineEnabled && (Number(el.props.textOutlineWidth) || 0) > 0){
-                                img.classList.add('outlined');
-                                img.style.webkitPrintColorAdjust = 'exact';
-                                img.style.printColorAdjust = 'exact';
-                            }
+                            applySvgOutlineToImage(el, img);
                             
                             // Build Imgur URL from Grist column value
                             let imageUrl = '';
@@ -7050,12 +7106,7 @@ document.addEventListener('DOMContentLoaded', ()=>{
                         span.style.fontFamily = el.props.fontFamily || 'Arial, sans-serif';
                         span.style.fontSize = (el.props.fontSize || 16) + 'px';
                         span.style.color = el.props.color || '#000000';
-                        if(el.props.textOutlineEnabled && (Number(el.props.textOutlineWidth) || 0) > 0){
-                            span.classList.add('outlined');
-                            span.style.webkitPrintColorAdjust = 'exact';
-                            span.style.printColorAdjust = 'exact';
-                            span.querySelectorAll('span').forEach(function(s){ s.classList.add('outlined'); s.style.webkitPrintColorAdjust = 'exact'; s.style.printColorAdjust = 'exact'; });
-                        }
+                        applySvgOutlineToTextContainer(el, span);
                         d.appendChild(span);
                         break;
                     }
@@ -7082,12 +7133,7 @@ document.addEventListener('DOMContentLoaded', ()=>{
                         span.style.fontFamily = el.props.fontFamily || 'Arial, sans-serif';
                         span.style.fontSize = (el.props.fontSize || 16) + 'px';
                         span.style.color = el.props.color || '#000000';
-                        if(el.props.textOutlineEnabled && (Number(el.props.textOutlineWidth) || 0) > 0){
-                            span.classList.add('outlined');
-                            span.style.webkitPrintColorAdjust = 'exact';
-                            span.style.printColorAdjust = 'exact';
-                            span.querySelectorAll('span').forEach(function(s){ s.classList.add('outlined'); s.style.webkitPrintColorAdjust = 'exact'; s.style.printColorAdjust = 'exact'; });
-                        }
+                        applySvgOutlineToTextContainer(el, span);
                         d.appendChild(span);
                         break;
                     }
@@ -7205,11 +7251,7 @@ document.addEventListener('DOMContentLoaded', ()=>{
                         img.style.width='100%';
                         img.style.height='100%';
                         img.style.objectFit = el.props.objectFit || 'contain';
-                        if(el.props.textOutlineEnabled && (Number(el.props.textOutlineWidth) || 0) > 0){
-                            img.classList.add('outlined');
-                            img.style.webkitPrintColorAdjust = 'exact';
-                            img.style.printColorAdjust = 'exact';
-                        }
+                        applySvgOutlineToImage(el, img);
                         let imageUrl = '';
                         if(el.props.boundColumn && R && Object.prototype.hasOwnProperty.call(R, el.props.boundColumn)){
                             const imgurId = R[el.props.boundColumn];
@@ -9364,20 +9406,5 @@ document.addEventListener('DOMContentLoaded', ()=>{
 }); // DOMContentLoaded
 </script>
 
-<svg width="0" height="0" style="position:absolute;overflow:hidden">
-  <defs>
-    <filter id="outline">
-      <feMorphology in="SourceAlpha" operator="dilate" radius="3" result="expanded"/>
-      <feFlood flood-color="#000000" result="color"/>
-      <feComposite in="color" in2="expanded" operator="in" result="outline"/>
-      <feMerge>
-        <feMergeNode in="outline"/>
-        <feMergeNode in="SourceGraphic"/>
-      </feMerge>
-    </filter>
-  </defs>
-</svg>
-
 </body>
-</html>
 </html>
