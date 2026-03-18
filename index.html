@@ -109,6 +109,7 @@
         #bw-preview-overlay{position:absolute;left:0;top:0;pointer-events:none;display:none;z-index:2}
         #bw-preview-overlay.bw-preview-visible{display:block}
         #canvas-wrapper.bw-preview-active #label-canvas{visibility:hidden}
+        .outlined{filter:url(#outline)}
         .bw-controls{display:grid;grid-template-columns:minmax(90px,auto) 1fr minmax(48px,auto);gap:6px 10px;align-items:center}
         .bw-controls .bw-label{grid-column:1;font-size:13px}
         .bw-controls .bw-control{grid-column:2;min-width:0}
@@ -1426,12 +1427,11 @@ document.addEventListener('DOMContentLoaded', ()=>{
                     }
                     span.style.lineHeight = el.props.lineHeight !== undefined ? String(el.props.lineHeight) : '1.2';
                     span.style.color = el.props.color || '#000000';
-                    const outlineShadow = getCombinedTextOutlineShadow(el);
-                    if(outlineShadow){
-                        span.style.textShadow = outlineShadow;
+                    if(el.props.textOutlineEnabled && (Number(el.props.textOutlineWidth) || 0) > 0){
+                        span.classList.add('outlined');
                         span.style.webkitPrintColorAdjust = 'exact';
                         span.style.printColorAdjust = 'exact';
-                        span.querySelectorAll('span').forEach(function(s){ s.style.textShadow = outlineShadow; s.style.webkitPrintColorAdjust = 'exact'; s.style.printColorAdjust = 'exact'; });
+                        span.querySelectorAll('span').forEach(function(s){ s.classList.add('outlined'); s.style.webkitPrintColorAdjust = 'exact'; s.style.printColorAdjust = 'exact'; });
                     }
                     d.appendChild(span);
                     
@@ -1473,12 +1473,11 @@ document.addEventListener('DOMContentLoaded', ()=>{
                     }
                     span.style.lineHeight = el.props.lineHeight !== undefined ? String(el.props.lineHeight) : '1.2';
                     span.style.color = el.props.color || '#000000';
-                    const outlineShadowData = getCombinedTextOutlineShadow(el);
-                    if(outlineShadowData){
-                        span.style.textShadow = outlineShadowData;
+                    if(el.props.textOutlineEnabled && (Number(el.props.textOutlineWidth) || 0) > 0){
+                        span.classList.add('outlined');
                         span.style.webkitPrintColorAdjust = 'exact';
                         span.style.printColorAdjust = 'exact';
-                        span.querySelectorAll('span').forEach(function(s){ s.style.textShadow = outlineShadowData; s.style.webkitPrintColorAdjust = 'exact'; s.style.printColorAdjust = 'exact'; });
+                        span.querySelectorAll('span').forEach(function(s){ s.classList.add('outlined'); s.style.webkitPrintColorAdjust = 'exact'; s.style.printColorAdjust = 'exact'; });
                     }
                     d.appendChild(span);
                     
@@ -1611,9 +1610,8 @@ document.addEventListener('DOMContentLoaded', ()=>{
                         img.style.width='100%';
                         img.style.height='100%';
                         img.style.objectFit = el.props.objectFit || 'contain';
-                        const imageOutlineFilter = getCombinedImageOutlineFilter(el);
-                        if(imageOutlineFilter){
-                            img.style.filter = imageOutlineFilter;
+                        if(el.props.textOutlineEnabled && (Number(el.props.textOutlineWidth) || 0) > 0){
+                            img.classList.add('outlined');
                             img.style.webkitPrintColorAdjust = 'exact';
                             img.style.printColorAdjust = 'exact';
                         }
@@ -2442,48 +2440,7 @@ document.addEventListener('DOMContentLoaded', ()=>{
         return primary + ' ' + getImageOutlineFilter(w2, el.props.textOutline2Color || '#ffffff', w1);
     }
 
-    /** In stampa il bianco (#fff/#ffffff) viene spesso reso nero. Sostituiamo con un bianco leggermente off per forzare l’inchiostro. */
-    function outlineForPrint(outlineString){
-        if(!outlineString || typeof outlineString !== 'string') return outlineString;
-        return outlineString.replace(/#fff(?:fff)?\b/gi, '#fefefe');
-    }
-
-    function isNearWhiteHex(hex){
-        if(!hex || typeof hex !== 'string') return false;
-        const h = hex.trim();
-        if(!/^#([0-9A-Fa-f]{3}|[0-9A-Fa-f]{6})$/.test(h)) return false;
-        const full = h.length === 4
-            ? ('#' + h[1] + h[1] + h[2] + h[2] + h[3] + h[3])
-            : h;
-        const r = parseInt(full.slice(1,3), 16);
-        const g = parseInt(full.slice(3,5), 16);
-        const b = parseInt(full.slice(5,7), 16);
-        return r >= 250 && g >= 250 && b >= 250;
-    }
-
-    function getPrintTextOutlineShadow(el){
-        if(!el || !el.props || !el.props.textOutlineEnabled) return '';
-        const w1 = Math.max(0, Number(el.props.textOutlineWidth) || 0);
-        const w2 = Math.max(0, Number(el.props.textOutline2Width) || 0);
-        const c1 = String(el.props.textOutlineColor || '#000000');
-        const c2 = String(el.props.textOutline2Color || '#ffffff');
-        const parts = [];
-        if(w1 > 0 && !isNearWhiteHex(c1)) parts.push(getTextOutlineShadow(w1, c1, 0));
-        if(el.props.textOutline2Enabled && w2 > 0 && !isNearWhiteHex(c2)) parts.push(getTextOutlineShadow(w2, c2, w1));
-        return parts.filter(Boolean).join(', ');
-    }
-
-    function getPrintImageOutlineFilter(el){
-        if(!el || !el.props || !el.props.textOutlineEnabled) return '';
-        const w1 = Math.max(0, Number(el.props.textOutlineWidth) || 0);
-        const w2 = Math.max(0, Number(el.props.textOutline2Width) || 0);
-        const c1 = String(el.props.textOutlineColor || '#000000');
-        const c2 = String(el.props.textOutline2Color || '#ffffff');
-        const parts = [];
-        if(w1 > 0 && !isNearWhiteHex(c1)) parts.push(getImageOutlineFilter(w1, c1, 0));
-        if(el.props.textOutline2Enabled && w2 > 0 && !isNearWhiteHex(c2)) parts.push(getImageOutlineFilter(w2, c2, w1));
-        return parts.filter(Boolean).join(' ');
-    }
+    // Note: outline in stampa ora usa un filtro SVG (`.outlined`) invece di text-shadow/drop-shadow.
 
     // Helper function to set text content with regex formatting
     function setTextWithRegexFormatting(element, text, elementRules){
@@ -5749,12 +5706,11 @@ document.addEventListener('DOMContentLoaded', ()=>{
                             }
                             span.style.lineHeight = el.props.lineHeight !== undefined ? String(el.props.lineHeight) : '1.2';
                             span.style.color = el.props.color || '#000000';
-                            const outlineShadowP1 = getPrintTextOutlineShadow(el);
-                            if(outlineShadowP1){
-                                span.style.textShadow = outlineShadowP1;
+                            if(el.props.textOutlineEnabled && (Number(el.props.textOutlineWidth) || 0) > 0){
+                                span.classList.add('outlined');
                                 span.style.webkitPrintColorAdjust = 'exact';
                                 span.style.printColorAdjust = 'exact';
-                                span.querySelectorAll('span').forEach(function(s){ s.style.textShadow = outlineShadowP1; s.style.webkitPrintColorAdjust = 'exact'; s.style.printColorAdjust = 'exact'; });
+                                span.querySelectorAll('span').forEach(function(s){ s.classList.add('outlined'); s.style.webkitPrintColorAdjust = 'exact'; s.style.printColorAdjust = 'exact'; });
                             }
                             d.appendChild(span);
                             break;
@@ -5790,12 +5746,11 @@ document.addEventListener('DOMContentLoaded', ()=>{
                             }
                             span.style.lineHeight = el.props.lineHeight !== undefined ? String(el.props.lineHeight) : '1.2';
                             span.style.color = el.props.color || '#000000';
-                            const outlineShadowP1d = getPrintTextOutlineShadow(el);
-                            if(outlineShadowP1d){
-                                span.style.textShadow = outlineShadowP1d;
+                            if(el.props.textOutlineEnabled && (Number(el.props.textOutlineWidth) || 0) > 0){
+                                span.classList.add('outlined');
                                 span.style.webkitPrintColorAdjust = 'exact';
                                 span.style.printColorAdjust = 'exact';
-                                span.querySelectorAll('span').forEach(function(s){ s.style.textShadow = outlineShadowP1d; s.style.webkitPrintColorAdjust = 'exact'; s.style.printColorAdjust = 'exact'; });
+                                span.querySelectorAll('span').forEach(function(s){ s.classList.add('outlined'); s.style.webkitPrintColorAdjust = 'exact'; s.style.printColorAdjust = 'exact'; });
                             }
                             d.appendChild(span);
                             break;
@@ -5938,9 +5893,8 @@ document.addEventListener('DOMContentLoaded', ()=>{
                             img.style.width='100%';
                             img.style.height='100%';
                             img.style.objectFit = el.props.objectFit || 'contain';
-                            const imageOutlineFilterP1 = getPrintImageOutlineFilter(el);
-                            if(imageOutlineFilterP1){
-                                img.style.filter = imageOutlineFilterP1;
+                            if(el.props.textOutlineEnabled && (Number(el.props.textOutlineWidth) || 0) > 0){
+                                img.classList.add('outlined');
                                 img.style.webkitPrintColorAdjust = 'exact';
                                 img.style.printColorAdjust = 'exact';
                             }
@@ -6442,12 +6396,11 @@ document.addEventListener('DOMContentLoaded', ()=>{
                             }
                             span.style.lineHeight = el.props.lineHeight !== undefined ? String(el.props.lineHeight) : '1.2';
                             span.style.color = el.props.color || '#000000';
-                            const outlineShadowP1 = getPrintTextOutlineShadow(el);
-                            if(outlineShadowP1){
-                                span.style.textShadow = outlineShadowP1;
+                            if(el.props.textOutlineEnabled && (Number(el.props.textOutlineWidth) || 0) > 0){
+                                span.classList.add('outlined');
                                 span.style.webkitPrintColorAdjust = 'exact';
                                 span.style.printColorAdjust = 'exact';
-                                span.querySelectorAll('span').forEach(function(s){ s.style.textShadow = outlineShadowP1; s.style.webkitPrintColorAdjust = 'exact'; s.style.printColorAdjust = 'exact'; });
+                                span.querySelectorAll('span').forEach(function(s){ s.classList.add('outlined'); s.style.webkitPrintColorAdjust = 'exact'; s.style.printColorAdjust = 'exact'; });
                             }
                             d.appendChild(span);
                             break;
@@ -6483,12 +6436,11 @@ document.addEventListener('DOMContentLoaded', ()=>{
                             }
                             span.style.lineHeight = el.props.lineHeight !== undefined ? String(el.props.lineHeight) : '1.2';
                             span.style.color = el.props.color || '#000000';
-                            const outlineShadowP1d = getPrintTextOutlineShadow(el);
-                            if(outlineShadowP1d){
-                                span.style.textShadow = outlineShadowP1d;
+                            if(el.props.textOutlineEnabled && (Number(el.props.textOutlineWidth) || 0) > 0){
+                                span.classList.add('outlined');
                                 span.style.webkitPrintColorAdjust = 'exact';
                                 span.style.printColorAdjust = 'exact';
-                                span.querySelectorAll('span').forEach(function(s){ s.style.textShadow = outlineShadowP1d; s.style.webkitPrintColorAdjust = 'exact'; s.style.printColorAdjust = 'exact'; });
+                                span.querySelectorAll('span').forEach(function(s){ s.classList.add('outlined'); s.style.webkitPrintColorAdjust = 'exact'; s.style.printColorAdjust = 'exact'; });
                             }
                             d.appendChild(span);
                             break;
@@ -6630,9 +6582,8 @@ document.addEventListener('DOMContentLoaded', ()=>{
                             img.style.width='100%';
                             img.style.height='100%';
                             img.style.objectFit = el.props.objectFit || 'contain';
-                            const imageOutlineFilterP1 = getPrintImageOutlineFilter(el);
-                            if(imageOutlineFilterP1){
-                                img.style.filter = imageOutlineFilterP1;
+                            if(el.props.textOutlineEnabled && (Number(el.props.textOutlineWidth) || 0) > 0){
+                                img.classList.add('outlined');
                                 img.style.webkitPrintColorAdjust = 'exact';
                                 img.style.printColorAdjust = 'exact';
                             }
@@ -7099,12 +7050,11 @@ document.addEventListener('DOMContentLoaded', ()=>{
                         span.style.fontFamily = el.props.fontFamily || 'Arial, sans-serif';
                         span.style.fontSize = (el.props.fontSize || 16) + 'px';
                         span.style.color = el.props.color || '#000000';
-                        const outlineShadowP3 = getPrintTextOutlineShadow(el);
-                        if(outlineShadowP3){
-                            span.style.textShadow = outlineShadowP3;
+                        if(el.props.textOutlineEnabled && (Number(el.props.textOutlineWidth) || 0) > 0){
+                            span.classList.add('outlined');
                             span.style.webkitPrintColorAdjust = 'exact';
                             span.style.printColorAdjust = 'exact';
-                            span.querySelectorAll('span').forEach(function(s){ s.style.textShadow = outlineShadowP3; s.style.webkitPrintColorAdjust = 'exact'; s.style.printColorAdjust = 'exact'; });
+                            span.querySelectorAll('span').forEach(function(s){ s.classList.add('outlined'); s.style.webkitPrintColorAdjust = 'exact'; s.style.printColorAdjust = 'exact'; });
                         }
                         d.appendChild(span);
                         break;
@@ -7132,12 +7082,11 @@ document.addEventListener('DOMContentLoaded', ()=>{
                         span.style.fontFamily = el.props.fontFamily || 'Arial, sans-serif';
                         span.style.fontSize = (el.props.fontSize || 16) + 'px';
                         span.style.color = el.props.color || '#000000';
-                        const outlineShadowP3d = getPrintTextOutlineShadow(el);
-                        if(outlineShadowP3d){
-                            span.style.textShadow = outlineShadowP3d;
+                        if(el.props.textOutlineEnabled && (Number(el.props.textOutlineWidth) || 0) > 0){
+                            span.classList.add('outlined');
                             span.style.webkitPrintColorAdjust = 'exact';
                             span.style.printColorAdjust = 'exact';
-                            span.querySelectorAll('span').forEach(function(s){ s.style.textShadow = outlineShadowP3d; s.style.webkitPrintColorAdjust = 'exact'; s.style.printColorAdjust = 'exact'; });
+                            span.querySelectorAll('span').forEach(function(s){ s.classList.add('outlined'); s.style.webkitPrintColorAdjust = 'exact'; s.style.printColorAdjust = 'exact'; });
                         }
                         d.appendChild(span);
                         break;
@@ -7256,9 +7205,8 @@ document.addEventListener('DOMContentLoaded', ()=>{
                         img.style.width='100%';
                         img.style.height='100%';
                         img.style.objectFit = el.props.objectFit || 'contain';
-                        const imageOutlineFilterP3 = getPrintImageOutlineFilter(el);
-                        if(imageOutlineFilterP3){
-                            img.style.filter = imageOutlineFilterP3;
+                        if(el.props.textOutlineEnabled && (Number(el.props.textOutlineWidth) || 0) > 0){
+                            img.classList.add('outlined');
                             img.style.webkitPrintColorAdjust = 'exact';
                             img.style.printColorAdjust = 'exact';
                         }
@@ -9415,6 +9363,20 @@ document.addEventListener('DOMContentLoaded', ()=>{
 
 }); // DOMContentLoaded
 </script>
+
+<svg width="0" height="0" style="position:absolute;overflow:hidden">
+  <defs>
+    <filter id="outline">
+      <feMorphology in="SourceAlpha" operator="dilate" radius="3" result="expanded"/>
+      <feFlood flood-color="#000000" result="color"/>
+      <feComposite in="color" in2="expanded" operator="in" result="outline"/>
+      <feMerge>
+        <feMergeNode in="outline"/>
+        <feMergeNode in="SourceGraphic"/>
+      </feMerge>
+    </filter>
+  </defs>
+</svg>
 
 </body>
 </html>
