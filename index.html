@@ -2448,6 +2448,43 @@ document.addEventListener('DOMContentLoaded', ()=>{
         return outlineString.replace(/#fff(?:fff)?\b/gi, '#fefefe');
     }
 
+    function isNearWhiteHex(hex){
+        if(!hex || typeof hex !== 'string') return false;
+        const h = hex.trim();
+        if(!/^#([0-9A-Fa-f]{3}|[0-9A-Fa-f]{6})$/.test(h)) return false;
+        const full = h.length === 4
+            ? ('#' + h[1] + h[1] + h[2] + h[2] + h[3] + h[3])
+            : h;
+        const r = parseInt(full.slice(1,3), 16);
+        const g = parseInt(full.slice(3,5), 16);
+        const b = parseInt(full.slice(5,7), 16);
+        return r >= 250 && g >= 250 && b >= 250;
+    }
+
+    function getPrintTextOutlineShadow(el){
+        if(!el || !el.props || !el.props.textOutlineEnabled) return '';
+        const w1 = Math.max(0, Number(el.props.textOutlineWidth) || 0);
+        const w2 = Math.max(0, Number(el.props.textOutline2Width) || 0);
+        const c1 = String(el.props.textOutlineColor || '#000000');
+        const c2 = String(el.props.textOutline2Color || '#ffffff');
+        const parts = [];
+        if(w1 > 0 && !isNearWhiteHex(c1)) parts.push(getTextOutlineShadow(w1, c1, 0));
+        if(el.props.textOutline2Enabled && w2 > 0 && !isNearWhiteHex(c2)) parts.push(getTextOutlineShadow(w2, c2, w1));
+        return parts.filter(Boolean).join(', ');
+    }
+
+    function getPrintImageOutlineFilter(el){
+        if(!el || !el.props || !el.props.textOutlineEnabled) return '';
+        const w1 = Math.max(0, Number(el.props.textOutlineWidth) || 0);
+        const w2 = Math.max(0, Number(el.props.textOutline2Width) || 0);
+        const c1 = String(el.props.textOutlineColor || '#000000');
+        const c2 = String(el.props.textOutline2Color || '#ffffff');
+        const parts = [];
+        if(w1 > 0 && !isNearWhiteHex(c1)) parts.push(getImageOutlineFilter(w1, c1, 0));
+        if(el.props.textOutline2Enabled && w2 > 0 && !isNearWhiteHex(c2)) parts.push(getImageOutlineFilter(w2, c2, w1));
+        return parts.filter(Boolean).join(' ');
+    }
+
     // Helper function to set text content with regex formatting
     function setTextWithRegexFormatting(element, text, elementRules){
         // Combine global rules with element-specific rules
@@ -5712,7 +5749,7 @@ document.addEventListener('DOMContentLoaded', ()=>{
                             }
                             span.style.lineHeight = el.props.lineHeight !== undefined ? String(el.props.lineHeight) : '1.2';
                             span.style.color = el.props.color || '#000000';
-                            const outlineShadowP1 = outlineForPrint(getCombinedTextOutlineShadow(el));
+                            const outlineShadowP1 = getPrintTextOutlineShadow(el);
                             if(outlineShadowP1){
                                 span.style.textShadow = outlineShadowP1;
                                 span.style.webkitPrintColorAdjust = 'exact';
@@ -5753,7 +5790,7 @@ document.addEventListener('DOMContentLoaded', ()=>{
                             }
                             span.style.lineHeight = el.props.lineHeight !== undefined ? String(el.props.lineHeight) : '1.2';
                             span.style.color = el.props.color || '#000000';
-                            const outlineShadowP1d = outlineForPrint(getCombinedTextOutlineShadow(el));
+                            const outlineShadowP1d = getPrintTextOutlineShadow(el);
                             if(outlineShadowP1d){
                                 span.style.textShadow = outlineShadowP1d;
                                 span.style.webkitPrintColorAdjust = 'exact';
@@ -5901,7 +5938,7 @@ document.addEventListener('DOMContentLoaded', ()=>{
                             img.style.width='100%';
                             img.style.height='100%';
                             img.style.objectFit = el.props.objectFit || 'contain';
-                            const imageOutlineFilterP1 = outlineForPrint(getCombinedImageOutlineFilter(el));
+                            const imageOutlineFilterP1 = getPrintImageOutlineFilter(el);
                             if(imageOutlineFilterP1){
                                 img.style.filter = imageOutlineFilterP1;
                                 img.style.webkitPrintColorAdjust = 'exact';
@@ -6405,7 +6442,7 @@ document.addEventListener('DOMContentLoaded', ()=>{
                             }
                             span.style.lineHeight = el.props.lineHeight !== undefined ? String(el.props.lineHeight) : '1.2';
                             span.style.color = el.props.color || '#000000';
-                            const outlineShadowP1 = outlineForPrint(getCombinedTextOutlineShadow(el));
+                            const outlineShadowP1 = getPrintTextOutlineShadow(el);
                             if(outlineShadowP1){
                                 span.style.textShadow = outlineShadowP1;
                                 span.style.webkitPrintColorAdjust = 'exact';
@@ -6446,7 +6483,7 @@ document.addEventListener('DOMContentLoaded', ()=>{
                             }
                             span.style.lineHeight = el.props.lineHeight !== undefined ? String(el.props.lineHeight) : '1.2';
                             span.style.color = el.props.color || '#000000';
-                            const outlineShadowP1d = outlineForPrint(getCombinedTextOutlineShadow(el));
+                            const outlineShadowP1d = getPrintTextOutlineShadow(el);
                             if(outlineShadowP1d){
                                 span.style.textShadow = outlineShadowP1d;
                                 span.style.webkitPrintColorAdjust = 'exact';
@@ -6593,7 +6630,7 @@ document.addEventListener('DOMContentLoaded', ()=>{
                             img.style.width='100%';
                             img.style.height='100%';
                             img.style.objectFit = el.props.objectFit || 'contain';
-                            const imageOutlineFilterP1 = outlineForPrint(getCombinedImageOutlineFilter(el));
+                            const imageOutlineFilterP1 = getPrintImageOutlineFilter(el);
                             if(imageOutlineFilterP1){
                                 img.style.filter = imageOutlineFilterP1;
                                 img.style.webkitPrintColorAdjust = 'exact';
@@ -7062,7 +7099,7 @@ document.addEventListener('DOMContentLoaded', ()=>{
                         span.style.fontFamily = el.props.fontFamily || 'Arial, sans-serif';
                         span.style.fontSize = (el.props.fontSize || 16) + 'px';
                         span.style.color = el.props.color || '#000000';
-                        const outlineShadowP3 = outlineForPrint(getCombinedTextOutlineShadow(el));
+                        const outlineShadowP3 = getPrintTextOutlineShadow(el);
                         if(outlineShadowP3){
                             span.style.textShadow = outlineShadowP3;
                             span.style.webkitPrintColorAdjust = 'exact';
@@ -7095,7 +7132,7 @@ document.addEventListener('DOMContentLoaded', ()=>{
                         span.style.fontFamily = el.props.fontFamily || 'Arial, sans-serif';
                         span.style.fontSize = (el.props.fontSize || 16) + 'px';
                         span.style.color = el.props.color || '#000000';
-                        const outlineShadowP3d = outlineForPrint(getCombinedTextOutlineShadow(el));
+                        const outlineShadowP3d = getPrintTextOutlineShadow(el);
                         if(outlineShadowP3d){
                             span.style.textShadow = outlineShadowP3d;
                             span.style.webkitPrintColorAdjust = 'exact';
@@ -7219,7 +7256,7 @@ document.addEventListener('DOMContentLoaded', ()=>{
                         img.style.width='100%';
                         img.style.height='100%';
                         img.style.objectFit = el.props.objectFit || 'contain';
-                        const imageOutlineFilterP3 = outlineForPrint(getCombinedImageOutlineFilter(el));
+                        const imageOutlineFilterP3 = getPrintImageOutlineFilter(el);
                         if(imageOutlineFilterP3){
                             img.style.filter = imageOutlineFilterP3;
                             img.style.webkitPrintColorAdjust = 'exact';
