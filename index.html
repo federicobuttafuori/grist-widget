@@ -94,10 +94,17 @@
         .status-message{position:fixed;top:60px;right:20px;padding:12px 16px;background:#4CAF50;color:#fff;border-radius:4px;box-shadow:0 2px 8px rgba(0,0,0,.2);z-index:1000;animation:slideIn .3s ease-out}
         @keyframes slideIn{from{transform:translateX(400px);opacity:0}to{transform:translateX(0);opacity:1}}
         .status-message.error{background:#f44336}
-            #mini-toolbar{display:none;gap:8px;background:#fff;padding:8px;border-bottom:1px solid #e0e0e0;flex-direction:row;align-items:center;justify-content:flex-start;flex-shrink:0;flex-wrap:nowrap;overflow-x:auto;overflow-y:hidden}
-            #mini-toolbar .mini-toolbar-inner{display:flex;flex-direction:row;align-items:center;gap:8px;flex-wrap:nowrap;min-width:min-content}
-            #mini-toolbar button{padding:8px 12px;font-size:14px;flex-shrink:0}
-            #mini-toolbar select{padding:6px 8px;font-size:13px;border:1px solid #ccc;border-radius:4px;background:#fff;min-width:100px;max-width:150px;flex-shrink:0}
+            #mini-toolbar{display:none;gap:0;background:#fff;padding:6px 8px;border-bottom:1px solid #e0e0e0;flex-direction:column;align-items:stretch;justify-content:flex-start;flex-shrink:0;overflow-x:auto;overflow-y:hidden}
+            #mini-toolbar .mini-toolbar-inner{display:grid;grid-template-columns:auto minmax(0,1fr) auto;grid-template-rows:auto auto;gap:6px 10px;align-items:center;min-width:0;width:100%;max-width:100%}
+            #mini-toolbar .mini-tb-print{grid-column:1;grid-row:1}
+            #mini-toolbar .mini-tb-profile{grid-column:2;grid-row:1;min-width:0}
+            #mini-toolbar .mini-tb-print1{grid-column:1;grid-row:2}
+            #mini-toolbar .mini-tb-design{grid-column:2;grid-row:2;min-width:0}
+            #mini-toolbar .mini-toolbar-col3{grid-column:3;grid-row:1 / span 2;display:flex;flex-direction:column;justify-content:center;gap:6px;align-self:stretch;min-width:0}
+            #mini-toolbar .mini-tb-print button,#mini-toolbar .mini-tb-print1 button{padding:6px 10px;font-size:13px;white-space:nowrap}
+            #mini-toolbar .mini-tb-profile select,#mini-toolbar .mini-tb-design select{width:100%;padding:4px 8px;font-size:12px;border:1px solid #ccc;border-radius:4px;background:#fff;box-sizing:border-box}
+            #mini-toolbar .mini-toolbar-col3 select{width:100%;min-width:7em;padding:4px 8px;font-size:12px;border:1px solid #ccc;border-radius:4px;background:#fff;box-sizing:border-box}
+            #mini-toolbar .mini-toolbar-col3 button{padding:6px 10px;font-size:13px;white-space:nowrap;align-self:stretch}
             .widget-mode #canvas-container .label-element{pointer-events:none;cursor:default}
             .widget-mode #canvas-container{cursor:default}
         .column-mention-dropdown{position:fixed;z-index:10000;background:#fff;border:1px solid #ccc;border-radius:4px;box-shadow:0 4px 12px rgba(0,0,0,.15);max-height:200px;overflow-y:auto;min-width:160px;display:none}
@@ -2357,75 +2364,7 @@ document.addEventListener('DOMContentLoaded', ()=>{
         return str.replace(/\*\*sequence\*\*/g, String(sequenceIndex)).replace(/@sequence@/g, String(sequenceIndex));
     }
 
-    /**
-     * Contorno testo (text outline):
-     * - Problema: l'utente non vedeva alcun contorno attorno alle lettere nonostante l'opzione attiva.
-     * - Causa: -webkit-text-stroke non è supportato in modo affidabile su tutti i browser e non
-     *   si applica correttamente agli span figli creati dalle Regex Formatting Rules; inoltre
-     *   updateProps() nei listener ricostruiva il pannello e faceva tornare lo scroll in alto.
-     * - Soluzione: contorno realizzato con text-shadow (ombre multiple in 8 direzioni per ogni
-     *   pixel di spessore); applicazione dello stesso textShadow al contenitore e a tutti gli
-     *   span interni; rimozione di updateProps() dai listener del contorno per evitare il salto scroll.
-     */
-    function getTextOutlineShadow(widthPx, color, startRadius){
-        if(!widthPx || widthPx <= 0) return '';
-        const w = Math.min(20, Math.max(0.1, Number(widthPx)));
-        const start = Number(startRadius) || 0;
-        const steps = Math.max(1, Math.ceil(w));
-        const stepSize = w / steps;
-        const parts = [];
-        for(let i = 1; i <= steps; i++){
-            const r = start + stepSize * i;
-            for(let a = 0; a < 360; a += 45){
-                const rad = a * Math.PI / 180;
-                const x = Math.round(r * Math.cos(rad) * 100) / 100;
-                const y = Math.round(r * Math.sin(rad) * 100) / 100;
-                parts.push(x + 'px ' + y + 'px 0 ' + color);
-            }
-        }
-        return parts.join(', ');
-    }
-
-    function getCombinedTextOutlineShadow(el){
-        if(!el.props.textOutlineEnabled) return '';
-        const w1 = Math.max(0, Number(el.props.textOutlineWidth) || 0);
-        if(w1 <= 0) return '';
-        const primary = getTextOutlineShadow(w1, el.props.textOutlineColor || '#000000', 0);
-        const w2 = Math.max(0, Number(el.props.textOutline2Width) || 0);
-        if(!el.props.textOutline2Enabled || w2 <= 0) return primary;
-        return primary + ', ' + getTextOutlineShadow(w2, el.props.textOutline2Color || '#ffffff', w1);
-    }
-
-    /** Contorno immagine: drop-shadow segue il bordo alpha (contorno reale), non il container. */
-    function getImageOutlineFilter(widthPx, color, startRadius){
-        if(!widthPx || widthPx <= 0) return '';
-        const w = Math.min(20, Math.max(0.1, Number(widthPx)));
-        const start = Number(startRadius) || 0;
-        const steps = Math.max(1, Math.ceil(w));
-        const stepSize = w / steps;
-        const parts = [];
-        for(let i = 1; i <= steps; i++){
-            const r = start + stepSize * i;
-            for(let a = 0; a < 360; a += 45){
-                const rad = a * Math.PI / 180;
-                const x = Math.round(r * Math.cos(rad) * 100) / 100;
-                const y = Math.round(r * Math.sin(rad) * 100) / 100;
-                parts.push('drop-shadow(' + x + 'px ' + y + 'px 0 ' + color + ')');
-            }
-        }
-        return parts.join(' ');
-    }
-
-    function getCombinedImageOutlineFilter(el){
-        if(!el.props.textOutlineEnabled) return '';
-        const w1 = Math.max(0, Number(el.props.textOutlineWidth) || 0);
-        if(w1 <= 0) return '';
-        const primary = getImageOutlineFilter(w1, el.props.textOutlineColor || '#000000', 0);
-        const w2 = Math.max(0, Number(el.props.textOutline2Width) || 0);
-        if(!el.props.textOutline2Enabled || w2 <= 0) return primary;
-        return primary + ' ' + getImageOutlineFilter(w2, el.props.textOutline2Color || '#ffffff', w1);
-    }
-
+    /** Contorno testo/immagine: filtri SVG (feMorphology + feFlood) generati per spessore/colore; vedi docs/debug-learnings.md */
     const OUTLINE_FILTER_NS = 'http://www.w3.org/2000/svg';
     function normalizeOutlineColorHex(hex, fallback){
         const s = String(hex || '').trim();
@@ -8924,7 +8863,7 @@ document.addEventListener('DOMContentLoaded', ()=>{
                 // Aggiungi classe widget-mode al body per disabilitare interazioni
                 document.body.classList.add('widget-mode');
                 
-                // Mini toolbar: Print, Scelta dimensione, Scelta design, Scelta canvas, Rotate, Print single; scroll orizzontale, allineata a sinistra
+                // Mini toolbar: col1 Print/Print1, col2 Profilo/Design, col3 Canvas+Rotate (stack)
                 let miniToolbar = document.getElementById('mini-toolbar');
                 if (!miniToolbar) {
                     miniToolbar = document.createElement('div');
@@ -8935,46 +8874,58 @@ document.addEventListener('DOMContentLoaded', ()=>{
                     const btnPrint = document.getElementById('btn-print').cloneNode(true);
                     btnPrint.id = 'mini-btn-print';
                     btnPrint.addEventListener('click', () => document.getElementById('btn-print').click());
-                    
+                    const wrapPrint = document.createElement('div');
+                    wrapPrint.className = 'mini-tb-print';
+                    wrapPrint.appendChild(btnPrint);
+
                     const profileSelect = document.createElement('select');
                     profileSelect.id = 'mini-profile-selector';
-                    profileSelect.style.cssText = 'padding:6px 8px;font-size:13px;border:1px solid #ccc;border-radius:4px;background:#fff;min-width:100px;max-width:150px';
                     profileSelect.addEventListener('change', (e) => {
                         profileSelector.value = e.target.value;
                         profileSelector.dispatchEvent(new Event('change'));
                     });
-                    
-                    const designSelect = document.createElement('select');
-                    designSelect.id = 'mini-design-selector';
-                    designSelect.style.cssText = 'padding:6px 8px;font-size:13px;border:1px solid #ccc;border-radius:4px;background:#fff;min-width:100px;max-width:150px';
-                    designSelect.addEventListener('change', (e) => {
-                        designSelector.value = e.target.value;
-                        designSelector.dispatchEvent(new Event('change'));
-                    });
-                    
+                    const wrapProfile = document.createElement('div');
+                    wrapProfile.className = 'mini-tb-profile';
+                    wrapProfile.appendChild(profileSelect);
+
                     const canvasSelect = document.createElement('select');
                     canvasSelect.id = 'mini-canvas-selector';
-                    canvasSelect.style.cssText = 'padding:6px 8px;font-size:13px;border:1px solid #ccc;border-radius:4px;background:#fff;min-width:80px;max-width:120px;display:none';
+                    canvasSelect.style.display = 'none';
                     canvasSelect.innerHTML = '<option value="1">Canvas 1</option><option value="2">Canvas 2</option>';
                     canvasSelect.addEventListener('change', (e) => {
                         canvasSelector.value = e.target.value;
                         canvasSelector.dispatchEvent(new Event('change'));
                     });
-                    
                     const btnRotate = document.getElementById('btn-rotate-canvas').cloneNode(true);
                     btnRotate.id = 'mini-btn-rotate';
                     btnRotate.addEventListener('click', () => document.getElementById('btn-rotate-canvas').click());
+                    const col3 = document.createElement('div');
+                    col3.className = 'mini-toolbar-col3';
+                    col3.appendChild(canvasSelect);
+                    col3.appendChild(btnRotate);
 
                     const btnPrintSingle = document.getElementById('btn-print-single').cloneNode(true);
                     btnPrintSingle.id = 'mini-btn-print-single';
                     btnPrintSingle.addEventListener('click', () => document.getElementById('btn-print-single').click());
+                    const wrapPrint1 = document.createElement('div');
+                    wrapPrint1.className = 'mini-tb-print1';
+                    wrapPrint1.appendChild(btnPrintSingle);
 
-                    inner.appendChild(btnPrint);
-                    inner.appendChild(profileSelect);
-                    inner.appendChild(designSelect);
-                    inner.appendChild(canvasSelect);
-                    inner.appendChild(btnRotate);
-                    inner.appendChild(btnPrintSingle);
+                    const designSelect = document.createElement('select');
+                    designSelect.id = 'mini-design-selector';
+                    designSelect.addEventListener('change', (e) => {
+                        designSelector.value = e.target.value;
+                        designSelector.dispatchEvent(new Event('change'));
+                    });
+                    const wrapDesign = document.createElement('div');
+                    wrapDesign.className = 'mini-tb-design';
+                    wrapDesign.appendChild(designSelect);
+
+                    inner.appendChild(wrapPrint);
+                    inner.appendChild(wrapProfile);
+                    inner.appendChild(col3);
+                    inner.appendChild(wrapPrint1);
+                    inner.appendChild(wrapDesign);
                     miniToolbar.appendChild(inner);
                     mainContent.insertBefore(miniToolbar, canvasContainer);
                 }
