@@ -130,7 +130,7 @@
         <button id="btn-clear" title="Clear Layout">🗑️ Clear</button>
         <div class="divider"></div>
         <button id="btn-print" title="Print Label">🖨️ Print</button>
-        <button id="btn-print-single" title="Print Single Label">🖨️ Print Single</button>
+        <button id="btn-print-single" title="Single Print  Label">🖨️ Single Print </button>
             <div class="divider"></div>
             <button id="btn-rotate-canvas" title="Rotate Canvas 90° (temporary, not for print)">🔄 Rotate</button>
         <div class="divider"></div>
@@ -1244,6 +1244,97 @@ document.addEventListener('DOMContentLoaded', ()=>{
         return base;
     }
 
+    // Preprocess image for consistent B&W: contrast stretch + shadow lift + gamma per evitare stampa troppo scura.
+    function normalizeImageForBw(img){
+        try {
+            if(!img.complete || img.naturalWidth === 0 || img.naturalHeight === 0) return;
+            const w = img.naturalWidth, h = img.naturalHeight;
+            const canvas = document.createElement('canvas');
+            canvas.width = w;
+            canvas.height = h;
+            const ctx = canvas.getContext('2d');
+            ctx.drawImage(img, 0, 0);
+            const imageData = ctx.getImageData(0, 0, w, h);
+            const data = imageData.data;
+            const len = data.length;
+            const lum = [];
+            for(let i = 0; i < len; i += 4){
+                const y = 0.299 * data[i] + 0.587 * data[i+1] + 0.114 * data[i+2];
+                lum.push(y);
+            }
+            lum.sort((a,b) => a - b);
+            const n = lum.length;
+            const pLow = lum[Math.floor(n * 0.005)] ?? lum[0];
+            const pHigh = lum[Math.min(Math.floor(n * 0.995), n - 1)] ?? lum[n - 1];
+            const span = Math.max(pHigh - pLow, 1);
+            const shadowLift = 50;
+            const gamma = 0.85;
+            for(let i = 0; i < len; i += 4){
+                let y = 0.299 * data[i] + 0.587 * data[i+1] + 0.114 * data[i+2];
+                let v = (y - pLow) / span * 255;
+                v = Math.max(0, Math.min(255, v));
+                v = shadowLift + (255 - shadowLift) * (v / 255);
+                v = Math.pow(v / 255, gamma) * 255;
+                v = Math.round(Math.max(0, Math.min(255, v)));
+                data[i] = data[i+1] = data[i+2] = v;
+            }
+            ctx.putImageData(imageData, 0, 0);
+            img.src = canvas.toDataURL('image/png');
+        } catch(e) { /* CORS or canvas security: leave img unchanged */ }
+    }
+
+    /** Wait for print img load (incl. fallback URL), then run Normalize for B&W if data-normalize-for-bw is set.
+     *  Cached images are often complete immediately; resolving early skipped normalization before print. */
+    function waitForPrintImageLoad(img){
+        return new Promise((resolve) => {
+            let settled = false;
+            const t = setTimeout(() => finish(), 5000);
+            function finish(){
+                if(settled) return;
+                settled = true;
+                clearTimeout(t);
+                resolve();
+            }
+            let fallbackTried = false;
+            const fallbackLink = img.dataset.fallbackLink || '';
+
+            function tryNormalizeThenFinish(){
+                const needsNorm = img.dataset.normalizeForBw === '1';
+                if(needsNorm && img.src && !img.src.startsWith('data:') && img.naturalWidth > 0){
+                    try {
+                        normalizeImageForBw(img);
+                    } catch(e) { /* CORS / taint: leave unchanged */ }
+                    if(img.complete && img.src.startsWith('data:')){
+                        finish();
+                        return;
+                    }
+                    img.onload = finish;
+                    img.onerror = finish;
+                    return;
+                }
+                finish();
+            }
+
+            function onInitialError(){
+                if(!fallbackTried && fallbackLink && img.src !== fallbackLink){
+                    fallbackTried = true;
+                    img.src = fallbackLink;
+                    img.onload = tryNormalizeThenFinish;
+                    img.onerror = finish;
+                } else {
+                    finish();
+                }
+            }
+
+            if(img.complete && img.naturalWidth > 0){
+                tryNormalizeThenFinish();
+            } else {
+                img.onload = tryNormalizeThenFinish;
+                img.onerror = onInitialError;
+            }
+        });
+    }
+
     // ---------- Rendering ----------
     function render(){
         lc.innerHTML = '';
@@ -1264,50 +1355,6 @@ document.addEventListener('DOMContentLoaded', ()=>{
             countToRender = Math.min(count, MAX_PREVIEW_LABELS);
         }
         
-        // Preprocess image for consistent B&W: contrast stretch + shadow lift + gamma per evitare stampa troppo scura.
-        function normalizeImageForBw(img){
-            try {
-                if(!img.complete || img.naturalWidth === 0 || img.naturalHeight === 0) return;
-                const w = img.naturalWidth, h = img.naturalHeight;
-                const canvas = document.createElement('canvas');
-                canvas.width = w;
-                canvas.height = h;
-                const ctx = canvas.getContext('2d');
-                ctx.drawImage(img, 0, 0);
-                const imageData = ctx.getImageData(0, 0, w, h);
-                const data = imageData.data;
-                const len = data.length;
-                const lum = [];
-                for(let i = 0; i < len; i += 4){
-                    const y = 0.299 * data[i] + 0.587 * data[i+1] + 0.114 * data[i+2];
-                    lum.push(y);
-                }
-                lum.sort((a,b) => a - b);
-                const n = lum.length;
-                // Percentili più estremi per stretch più aggressivo (immagini molto scure)
-                const pLow = lum[Math.floor(n * 0.005)] ?? lum[0];
-                const pHigh = lum[Math.min(Math.floor(n * 0.995), n - 1)] ?? lum[n - 1];
-                const span = Math.max(pHigh - pLow, 1);
-                // Shadow lift: il nero minimo non va sotto 50 (evita etichette quasi tutte nere in stampa)
-                const shadowLift = 50;
-                // Gamma < 1 schiarisce mezzitoni e ombre
-                const gamma = 0.85;
-                for(let i = 0; i < len; i += 4){
-                    let y = 0.299 * data[i] + 0.587 * data[i+1] + 0.114 * data[i+2];
-                    let v = (y - pLow) / span * 255;
-                    v = Math.max(0, Math.min(255, v));
-                    // Shadow lift: mappa [0,255] -> [shadowLift, 255]
-                    v = shadowLift + (255 - shadowLift) * (v / 255);
-                    // Gamma per schiarire ancora
-                    v = Math.pow(v / 255, gamma) * 255;
-                    v = Math.round(Math.max(0, Math.min(255, v)));
-                    data[i] = data[i+1] = data[i+2] = v;
-                }
-                ctx.putImageData(imageData, 0, 0);
-                img.src = canvas.toDataURL('image/png');
-            } catch(e) { /* CORS or canvas security: leave img unchanged */ }
-        }
-
         // Helper function to render elements for a specific canvas and sequence index
         function renderElementsForCanvas(canvasData, sequenceIndex, baseOffsetY, waveContext = null){
             const sorted = canvasData.map(normalizeElement).slice().sort((a,b)=> (a.zIndex||0) - (b.zIndex||0));
@@ -2189,7 +2236,7 @@ document.addEventListener('DOMContentLoaded', ()=>{
         // Helper function to get column value as number (for math calculations)
         function getColumnValueAsNumber(columnId, waveContext = null){
             const trimmedColumnId = columnId.trim();
-            // Print single: override weight column with user-entered weight
+            // Single Print : override weight column with user-entered weight
             if(waveContext && waveContext.overrideWeight !== undefined && packWaves.some(wave => wave.weightColumn === trimmedColumnId)){
                 const num = parseFloat(waveContext.overrideWeight);
                 return isNaN(num) ? null : num;
@@ -2327,7 +2374,7 @@ document.addEventListener('DOMContentLoaded', ()=>{
             const replacer = (match, columnId) => {
                 const trimmedColumnId = (columnId || '').trim();
                 if(!trimmedColumnId) return match;
-                // Print single: override weight column with user-entered weight
+                // Single Print : override weight column with user-entered weight
                 if(waveContext && waveContext.overrideWeight !== undefined && packWaves.some(wave => wave.weightColumn === trimmedColumnId)){
                     let v = waveContext.overrideWeight;
                     if(v === null || v === undefined) return '';
@@ -2680,7 +2727,7 @@ document.addEventListener('DOMContentLoaded', ()=>{
             
             // Handle boundColumn (legacy support) - only if **column** syntax wasn't used in text itself
             // For text fields, we can use boundColumn even if prefix/suffix have **column** syntax
-            // Print single: use overrideWeight when boundColumn is a weight column
+            // Single Print : use overrideWeight when boundColumn is a weight column
             const boundIsWeightColumn = boundColumnToUse && packWaves.some(wave => wave.weightColumn === boundColumnToUse);
             const useOverrideForBound = waveContext && waveContext.overrideWeight !== undefined && boundIsWeightColumn;
             const hasBoundValue = useOverrideForBound || (R && Object.prototype.hasOwnProperty.call(R, boundColumnToUse));
@@ -5933,11 +5980,10 @@ document.addEventListener('DOMContentLoaded', ()=>{
                             }
                             
                             if(imageUrl){
-                                img.onload = function(){
-                                    if(el.props.normalizeForBw && img.src && !img.src.startsWith('data:')){
-                                        normalizeImageForBw(img);
-                                    }
-                                };
+                                if(el.props.normalizeForBw) img.dataset.normalizeForBw = '1';
+                                if(el.props.fallbackLink){
+                                    img.dataset.fallbackLink = String(el.props.fallbackLink).trim();
+                                }
                                 if(!imageUrl.startsWith('data:')) img.crossOrigin = 'anonymous';
                                 img.src = imageUrl;
                                 let fallbackTried = false;
@@ -5968,11 +6014,7 @@ document.addEventListener('DOMContentLoaded', ()=>{
                                 // No column selected, but fallback link available - use it directly
                                 const fallbackUrl = String(el.props.fallbackLink).trim();
                                 if(fallbackUrl){
-                                    img.onload = function(){
-                                        if(el.props.normalizeForBw && img.src && !img.src.startsWith('data:')){
-                                            normalizeImageForBw(img);
-                                        }
-                                    };
+                                    if(el.props.normalizeForBw) img.dataset.normalizeForBw = '1';
                                     if(!fallbackUrl.startsWith('data:')) img.crossOrigin = 'anonymous';
                                     img.src = fallbackUrl;
                                     img.onerror = function(){
@@ -6103,45 +6145,9 @@ document.addEventListener('DOMContentLoaded', ()=>{
                 });
             });
             
-            // Wait for all images to load (including fallbacks)
+            // Wait for all images (incl. cache + Normalize for B&W data URLs) before printing
             const allImages = printContainer.querySelectorAll('img');
-            const imagePromises = Array.from(allImages).map(img => {
-                // If image is already loaded (complete), resolve immediately
-                if(img.complete && img.naturalWidth > 0){
-                    return Promise.resolve();
-                }
-                // Otherwise wait for load or error, including fallback
-                return new Promise((resolve) => {
-                    let resolved = false;
-                    const resolveOnce = () => {
-                        if(!resolved){
-                            resolved = true;
-                            resolve();
-                        }
-                    };
-                    
-                    let fallbackTried = false;
-                    const fallbackLink = img.dataset.fallbackLink;
-                    
-                    img.onload = resolveOnce;
-                    img.onerror = () => {
-                        // If there's a fallback link and we haven't tried it yet
-                        if(!fallbackTried && fallbackLink && img.src !== fallbackLink){
-                            fallbackTried = true;
-                            img.src = fallbackLink;
-                            // Wait for fallback to load or fail
-                            img.onload = resolveOnce;
-                            img.onerror = resolveOnce;
-                        } else {
-                            // No fallback or fallback also failed
-                            resolveOnce();
-                        }
-                    };
-                    
-                    // Timeout after 5 seconds to prevent hanging
-                    setTimeout(resolveOnce, 5000);
-                });
-            });
+            const imagePromises = Array.from(allImages).map(img => waitForPrintImageLoad(img));
             
             Promise.all(imagePromises).then(() => {
                 // Update print CSS
@@ -6612,11 +6618,7 @@ document.addEventListener('DOMContentLoaded', ()=>{
                                 if(el.props.fallbackLink){
                                     img.dataset.fallbackLink = String(el.props.fallbackLink).trim();
                                 }
-                                img.onload = function(){
-                                    if(el.props.normalizeForBw && img.src && !img.src.startsWith('data:')){
-                                        normalizeImageForBw(img);
-                                    }
-                                };
+                                if(el.props.normalizeForBw) img.dataset.normalizeForBw = '1';
                                 if(!imageUrl.startsWith('data:')) img.crossOrigin = 'anonymous';
                                 img.src = imageUrl;
                                 let fallbackTried = false;
@@ -6647,11 +6649,7 @@ document.addEventListener('DOMContentLoaded', ()=>{
                                 // No column selected, but fallback link available - use it directly
                                 const fallbackUrl = String(el.props.fallbackLink).trim();
                                 if(fallbackUrl){
-                                    img.onload = function(){
-                                        if(el.props.normalizeForBw && img.src && !img.src.startsWith('data:')){
-                                            normalizeImageForBw(img);
-                                        }
-                                    };
+                                    if(el.props.normalizeForBw) img.dataset.normalizeForBw = '1';
                                     if(!fallbackUrl.startsWith('data:')) img.crossOrigin = 'anonymous';
                                     img.src = fallbackUrl;
                                     img.onerror = function(){
@@ -6777,45 +6775,9 @@ document.addEventListener('DOMContentLoaded', ()=>{
                 });
             });
             
-            // Wait for all images to load before printing (including fallbacks)
+            // Wait for all images (incl. cache + Normalize for B&W data URLs) before printing
             const allImages = printContainer.querySelectorAll('img');
-            const imagePromises = Array.from(allImages).map(img => {
-                // If image is already loaded (complete), resolve immediately
-                if(img.complete && img.naturalWidth > 0){
-                    return Promise.resolve();
-                }
-                // Otherwise wait for load or error, including fallback
-                return new Promise((resolve) => {
-                    let resolved = false;
-                    const resolveOnce = () => {
-                        if(!resolved){
-                            resolved = true;
-                            resolve();
-                        }
-                    };
-                    
-                    let fallbackTried = false;
-                    const fallbackLink = img.dataset.fallbackLink;
-                    
-                    img.onload = resolveOnce;
-                    img.onerror = () => {
-                        // If there's a fallback link and we haven't tried it yet
-                        if(!fallbackTried && fallbackLink && img.src !== fallbackLink){
-                            fallbackTried = true;
-                            img.src = fallbackLink;
-                            // Wait for fallback to load or fail
-                            img.onload = resolveOnce;
-                            img.onerror = resolveOnce;
-                        } else {
-                            // No fallback or fallback also failed
-                            resolveOnce();
-                        }
-                    };
-                    
-                    // Timeout after 5 seconds to prevent hanging
-                    setTimeout(resolveOnce, 5000);
-                });
-            });
+            const imagePromises = Array.from(allImages).map(img => waitForPrintImageLoad(img));
             
             // Wait for all images, then proceed with print
             Promise.all(imagePromises).then(() => {
@@ -7215,11 +7177,7 @@ document.addEventListener('DOMContentLoaded', ()=>{
                             if(el.props.fallbackLink){
                                 img.dataset.fallbackLink = String(el.props.fallbackLink).trim();
                             }
-                            img.onload = function(){
-                                if(el.props.normalizeForBw && img.src && !img.src.startsWith('data:')){
-                                    normalizeImageForBw(img);
-                                }
-                            };
+                            if(el.props.normalizeForBw) img.dataset.normalizeForBw = '1';
                             if(!imageUrl.startsWith('data:')) img.crossOrigin = 'anonymous';
                             img.src = imageUrl;
                             let fallbackTried = false;
@@ -7240,11 +7198,7 @@ document.addEventListener('DOMContentLoaded', ()=>{
                             // No column selected, but fallback link available - use it directly
                             const fallbackUrl = String(el.props.fallbackLink).trim();
                             if(fallbackUrl){
-                                img.onload = function(){
-                                    if(el.props.normalizeForBw && img.src && !img.src.startsWith('data:')){
-                                        normalizeImageForBw(img);
-                                    }
-                                };
+                                if(el.props.normalizeForBw) img.dataset.normalizeForBw = '1';
                                 if(!fallbackUrl.startsWith('data:')) img.crossOrigin = 'anonymous';
                                 img.src = fallbackUrl;
                                 img.onerror = function(){
@@ -7276,7 +7230,7 @@ document.addEventListener('DOMContentLoaded', ()=>{
         // Add print container to DOM first so measurements work correctly
         document.body.appendChild(printContainer);
         
-        // Build waveContext for print single: override weight column if user entered a weight
+        // Build waveContext for Single Print : override weight column if user entered a weight
         const singlePrintContext = overrideWeight !== undefined ? { overrideWeight } : null;
         
         // Add canvas 1 with specified sequence index
@@ -7316,45 +7270,9 @@ document.addEventListener('DOMContentLoaded', ()=>{
             });
         });
         
-        // Wait for all images to load before printing (including fallbacks)
+        // Wait for all images (incl. cache + Normalize for B&W data URLs) before printing
         const allImages = printContainer.querySelectorAll('img');
-        const imagePromises = Array.from(allImages).map(img => {
-            // If image is already loaded (complete), resolve immediately
-            if(img.complete && img.naturalWidth > 0){
-                return Promise.resolve();
-            }
-            // Otherwise wait for load or error, including fallback
-            return new Promise((resolve) => {
-                let resolved = false;
-                const resolveOnce = () => {
-                    if(!resolved){
-                        resolved = true;
-                        resolve();
-                    }
-                };
-                
-                let fallbackTried = false;
-                const fallbackLink = img.dataset.fallbackLink;
-                
-                img.onload = resolveOnce;
-                img.onerror = () => {
-                    // If there's a fallback link and we haven't tried it yet
-                    if(!fallbackTried && fallbackLink && img.src !== fallbackLink){
-                        fallbackTried = true;
-                        img.src = fallbackLink;
-                        // Wait for fallback to load or fail
-                        img.onload = resolveOnce;
-                        img.onerror = resolveOnce;
-                    } else {
-                        // No fallback or fallback also failed
-                        resolveOnce();
-                    }
-                };
-                
-                // Timeout after 5 seconds to prevent hanging
-                setTimeout(resolveOnce, 5000);
-            });
-        });
+        const imagePromises = Array.from(allImages).map(img => waitForPrintImageLoad(img));
         
         // Wait for all images, then proceed with print
         Promise.all(imagePromises).then(() => {
