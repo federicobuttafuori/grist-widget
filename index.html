@@ -1244,6 +1244,94 @@ document.addEventListener('DOMContentLoaded', ()=>{
         return base;
     }
 
+    // Preprocess image for consistent B&W: contrast stretch + shadow lift + gamma per evitare stampa troppo scura.
+    function normalizeImageForBw(img){
+        try {
+            if(!img.complete || img.naturalWidth === 0 || img.naturalHeight === 0) return;
+            const w = img.naturalWidth, h = img.naturalHeight;
+            const canvas = document.createElement('canvas');
+            canvas.width = w;
+            canvas.height = h;
+            const ctx = canvas.getContext('2d');
+            ctx.drawImage(img, 0, 0);
+            const imageData = ctx.getImageData(0, 0, w, h);
+            const data = imageData.data;
+            const len = data.length;
+            const lum = [];
+            for(let i = 0; i < len; i += 4){
+                const y = 0.299 * data[i] + 0.587 * data[i+1] + 0.114 * data[i+2];
+                lum.push(y);
+            }
+            lum.sort((a,b) => a - b);
+            const n = lum.length;
+            const pLow = lum[Math.floor(n * 0.005)] ?? lum[0];
+            const pHigh = lum[Math.min(Math.floor(n * 0.995), n - 1)] ?? lum[n - 1];
+            const span = Math.max(pHigh - pLow, 1);
+            const shadowLift = 50;
+            const gamma = 0.85;
+            for(let i = 0; i < len; i += 4){
+                let y = 0.299 * data[i] + 0.587 * data[i+1] + 0.114 * data[i+2];
+                let v = (y - pLow) / span * 255;
+                v = Math.max(0, Math.min(255, v));
+                v = shadowLift + (255 - shadowLift) * (v / 255);
+                v = Math.pow(v / 255, gamma) * 255;
+                v = Math.round(Math.max(0, Math.min(255, v)));
+                data[i] = data[i+1] = data[i+2] = v;
+            }
+            ctx.putImageData(imageData, 0, 0);
+            img.src = canvas.toDataURL('image/png');
+        } catch(e) { /* CORS or canvas security: leave img unchanged */ }
+    }
+
+    /** Wait for print <img> nodes: decode remote URL, optional B&amp;W normalize (second decode for data: URL), fallbacks. */
+    function waitForPrintImages(printRoot){
+        const imgs = printRoot ? Array.from(printRoot.querySelectorAll('img')) : [];
+        return Promise.all(imgs.map(img => new Promise((resolve) => {
+            let resolved = false;
+            const resolveOnce = () => {
+                if(!resolved){
+                    resolved = true;
+                    resolve();
+                }
+            };
+            const existingOnload = img.onload;
+            const runAfterRemoteReady = function(){
+                const srcBefore = img.src;
+                if(typeof existingOnload === 'function'){
+                    existingOnload.call(img);
+                }
+                const srcAfter = img.src;
+                if(srcAfter.startsWith('data:') && srcBefore !== srcAfter){
+                    img.addEventListener('load', resolveOnce, { once: true });
+                    img.addEventListener('error', resolveOnce, { once: true });
+                    setTimeout(resolveOnce, 2000);
+                } else {
+                    resolveOnce();
+                }
+            };
+            let fallbackTried = false;
+            const fallbackLink = (img.dataset.fallbackLink || '').trim();
+            if(img.complete && img.naturalWidth > 0){
+                runAfterRemoteReady();
+            } else if(img.complete){
+                resolveOnce();
+            } else {
+                img.onload = runAfterRemoteReady;
+                img.onerror = () => {
+                    if(!fallbackTried && fallbackLink && img.src !== fallbackLink){
+                        fallbackTried = true;
+                        img.src = fallbackLink;
+                        img.onload = runAfterRemoteReady;
+                        img.onerror = resolveOnce;
+                    } else {
+                        resolveOnce();
+                    }
+                };
+            }
+            setTimeout(resolveOnce, 5000);
+        })));
+    }
+
     // ---------- Rendering ----------
     function render(){
         lc.innerHTML = '';
@@ -1262,50 +1350,6 @@ document.addEventListener('DOMContentLoaded', ()=>{
             const countRaw = R[sequenceCountColumn];
             const count = Math.max(0, Math.floor(Number(countRaw)));
             countToRender = Math.min(count, MAX_PREVIEW_LABELS);
-        }
-        
-        // Preprocess image for consistent B&W: contrast stretch + shadow lift + gamma per evitare stampa troppo scura.
-        function normalizeImageForBw(img){
-            try {
-                if(!img.complete || img.naturalWidth === 0 || img.naturalHeight === 0) return;
-                const w = img.naturalWidth, h = img.naturalHeight;
-                const canvas = document.createElement('canvas');
-                canvas.width = w;
-                canvas.height = h;
-                const ctx = canvas.getContext('2d');
-                ctx.drawImage(img, 0, 0);
-                const imageData = ctx.getImageData(0, 0, w, h);
-                const data = imageData.data;
-                const len = data.length;
-                const lum = [];
-                for(let i = 0; i < len; i += 4){
-                    const y = 0.299 * data[i] + 0.587 * data[i+1] + 0.114 * data[i+2];
-                    lum.push(y);
-                }
-                lum.sort((a,b) => a - b);
-                const n = lum.length;
-                // Percentili più estremi per stretch più aggressivo (immagini molto scure)
-                const pLow = lum[Math.floor(n * 0.005)] ?? lum[0];
-                const pHigh = lum[Math.min(Math.floor(n * 0.995), n - 1)] ?? lum[n - 1];
-                const span = Math.max(pHigh - pLow, 1);
-                // Shadow lift: il nero minimo non va sotto 50 (evita etichette quasi tutte nere in stampa)
-                const shadowLift = 50;
-                // Gamma < 1 schiarisce mezzitoni e ombre
-                const gamma = 0.85;
-                for(let i = 0; i < len; i += 4){
-                    let y = 0.299 * data[i] + 0.587 * data[i+1] + 0.114 * data[i+2];
-                    let v = (y - pLow) / span * 255;
-                    v = Math.max(0, Math.min(255, v));
-                    // Shadow lift: mappa [0,255] -> [shadowLift, 255]
-                    v = shadowLift + (255 - shadowLift) * (v / 255);
-                    // Gamma per schiarire ancora
-                    v = Math.pow(v / 255, gamma) * 255;
-                    v = Math.round(Math.max(0, Math.min(255, v)));
-                    data[i] = data[i+1] = data[i+2] = v;
-                }
-                ctx.putImageData(imageData, 0, 0);
-                img.src = canvas.toDataURL('image/png');
-            } catch(e) { /* CORS or canvas security: leave img unchanged */ }
         }
 
         // Helper function to render elements for a specific canvas and sequence index
@@ -3210,6 +3254,8 @@ document.addEventListener('DOMContentLoaded', ()=>{
                 h += `<div class="${grid1Cls}"><label class="${labelClass('props.normalizeForBw')}" title="Stabilize brightness and contrast for consistent black-and-white printing">Normalize for B&amp;W</label><input type="checkbox" data-prop="props.normalizeForBw" ${normalizeForBwVal?'checked':''}>${syncBtn('props.normalizeForBw')}</div>`;
                 const mT = valueFor('props.marginTop'), mR = valueFor('props.marginRight'), mB = valueFor('props.marginBottom'), mL = valueFor('props.marginLeft');
                 h += `<hr><div style="margin-top:8px"><label style="font-size:12px;display:block;margin-bottom:6px">Margini (cm)</label><div class="${grid1Cls}"><label>Su</label><input type="number" step="0.01" data-prop="props.marginTop" value="${Number(mT||0).toFixed(2)}" min="0"><label>Destra</label><input type="number" step="0.01" data-prop="props.marginRight" value="${Number(mR||0).toFixed(2)}" min="0"><label>Giu</label><input type="number" step="0.01" data-prop="props.marginBottom" value="${Number(mB||0).toFixed(2)}" min="0"><label>Sinistra</label><input type="number" step="0.01" data-prop="props.marginLeft" value="${Number(mL||0).toFixed(2)}" min="0"></div></div>`;
+                const rotImgVal = valueFor('props.rotation');
+                h += `<hr><div class="${grid1Cls}"><label class="${labelClass('props.rotation')}">Rotation°</label><input type="number" step="1" data-prop="props.rotation" value="${rotImgVal || 0}">${syncBtn('props.rotation')}</div>`;
             }
 
             if(el.type==='text' || el.type==='data'){
@@ -5911,6 +5957,7 @@ document.addEventListener('DOMContentLoaded', ()=>{
                             img.style.height='100%';
                             img.style.objectFit = el.props.objectFit || 'contain';
                             applySvgOutlineToImage(el, img);
+                            if(el.props.fallbackLink) img.dataset.fallbackLink = String(el.props.fallbackLink).trim();
                             
                             // Build Imgur URL from Grist column value
                             let imageUrl = '';
@@ -6103,60 +6150,7 @@ document.addEventListener('DOMContentLoaded', ()=>{
                 });
             });
             
-            // Wait for all images to load (including fallbacks)
-            const allImages = printContainer.querySelectorAll('img');
-            const imagePromises = Array.from(allImages).map(img => {
-                // If image is already loaded (complete), resolve immediately
-                if(img.complete && img.naturalWidth > 0){
-                    return Promise.resolve();
-                }
-                // Otherwise wait for load or error, including fallback and B&W normalization
-                return new Promise((resolve) => {
-                    let resolved = false;
-                    const resolveOnce = () => {
-                        if(!resolved){
-                            resolved = true;
-                            resolve();
-                        }
-                    };
-                    
-                    const existingOnload = img.onload;
-                    const loadHandler = function(){
-                        const srcBefore = img.src;
-                        if(existingOnload) existingOnload.call(this);
-                        const srcAfter = img.src;
-                        if(srcAfter.startsWith('data:') && srcBefore !== srcAfter){
-                            img.addEventListener('load', resolveOnce, { once: true });
-                            setTimeout(resolveOnce, 2000);
-                        } else {
-                            resolveOnce();
-                        }
-                    };
-                    
-                    let fallbackTried = false;
-                    const fallbackLink = img.dataset.fallbackLink;
-                    
-                    img.onload = loadHandler;
-                    img.onerror = () => {
-                        // If there's a fallback link and we haven't tried it yet
-                        if(!fallbackTried && fallbackLink && img.src !== fallbackLink){
-                            fallbackTried = true;
-                            img.src = fallbackLink;
-                            // Wait for fallback to load or fail
-                            img.onload = loadHandler;
-                            img.onerror = resolveOnce;
-                        } else {
-                            // No fallback or fallback also failed
-                            resolveOnce();
-                        }
-                    };
-                    
-                    // Timeout after 5 seconds to prevent hanging
-                    setTimeout(resolveOnce, 5000);
-                });
-            });
-            
-            Promise.all(imagePromises).then(() => {
+            waitForPrintImages(printContainer).then(() => {
                 // Update print CSS
                 const styleId = 'dynamic-print-css';
                 let styleEl = document.getElementById(styleId);
@@ -6599,6 +6593,7 @@ document.addEventListener('DOMContentLoaded', ()=>{
                             img.style.height='100%';
                             img.style.objectFit = el.props.objectFit || 'contain';
                             applySvgOutlineToImage(el, img);
+                            if(el.props.fallbackLink) img.dataset.fallbackLink = String(el.props.fallbackLink).trim();
                             
                             // Build Imgur URL from Grist column value
                             let imageUrl = '';
@@ -6621,10 +6616,6 @@ document.addEventListener('DOMContentLoaded', ()=>{
                             }
                             
                             if(imageUrl){
-                                // Save fallback link as data attribute for print waiting logic
-                                if(el.props.fallbackLink){
-                                    img.dataset.fallbackLink = String(el.props.fallbackLink).trim();
-                                }
                                 img.onload = function(){
                                     if(el.props.normalizeForBw && img.src && !img.src.startsWith('data:')){
                                         normalizeImageForBw(img);
@@ -6790,61 +6781,7 @@ document.addEventListener('DOMContentLoaded', ()=>{
                 });
             });
             
-            // Wait for all images to load before printing (including fallbacks)
-            const allImages = printContainer.querySelectorAll('img');
-            const imagePromises = Array.from(allImages).map(img => {
-                // If image is already loaded (complete), resolve immediately
-                if(img.complete && img.naturalWidth > 0){
-                    return Promise.resolve();
-                }
-                // Otherwise wait for load or error, including fallback and B&W normalization
-                return new Promise((resolve) => {
-                    let resolved = false;
-                    const resolveOnce = () => {
-                        if(!resolved){
-                            resolved = true;
-                            resolve();
-                        }
-                    };
-                    
-                    const existingOnload = img.onload;
-                    const loadHandler = function(){
-                        const srcBefore = img.src;
-                        if(existingOnload) existingOnload.call(this);
-                        const srcAfter = img.src;
-                        if(srcAfter.startsWith('data:') && srcBefore !== srcAfter){
-                            img.addEventListener('load', resolveOnce, { once: true });
-                            setTimeout(resolveOnce, 2000);
-                        } else {
-                            resolveOnce();
-                        }
-                    };
-                    
-                    let fallbackTried = false;
-                    const fallbackLink = img.dataset.fallbackLink;
-                    
-                    img.onload = loadHandler;
-                    img.onerror = () => {
-                        // If there's a fallback link and we haven't tried it yet
-                        if(!fallbackTried && fallbackLink && img.src !== fallbackLink){
-                            fallbackTried = true;
-                            img.src = fallbackLink;
-                            // Wait for fallback to load or fail
-                            img.onload = loadHandler;
-                            img.onerror = resolveOnce;
-                        } else {
-                            // No fallback or fallback also failed
-                            resolveOnce();
-                        }
-                    };
-                    
-                    // Timeout after 5 seconds to prevent hanging
-                    setTimeout(resolveOnce, 5000);
-                });
-            });
-            
-            // Wait for all images, then proceed with print
-            Promise.all(imagePromises).then(() => {
+            waitForPrintImages(printContainer).then(() => {
                 // Update print CSS for multiple pages
                 const styleId = 'dynamic-print-css';
                 let styleEl = document.getElementById(styleId);
@@ -7221,6 +7158,7 @@ document.addEventListener('DOMContentLoaded', ()=>{
                         img.style.height='100%';
                         img.style.objectFit = el.props.objectFit || 'contain';
                         applySvgOutlineToImage(el, img);
+                        if(el.props.fallbackLink) img.dataset.fallbackLink = String(el.props.fallbackLink).trim();
                         let imageUrl = '';
                         if(el.props.boundColumn && R && Object.prototype.hasOwnProperty.call(R, el.props.boundColumn)){
                             const imgurId = R[el.props.boundColumn];
@@ -7237,10 +7175,6 @@ document.addEventListener('DOMContentLoaded', ()=>{
                             }
                         }
                         if(imageUrl){
-                            // Save fallback link as data attribute for print waiting logic
-                            if(el.props.fallbackLink){
-                                img.dataset.fallbackLink = String(el.props.fallbackLink).trim();
-                            }
                             img.onload = function(){
                                 if(el.props.normalizeForBw && img.src && !img.src.startsWith('data:')){
                                     normalizeImageForBw(img);
@@ -7342,61 +7276,7 @@ document.addEventListener('DOMContentLoaded', ()=>{
             });
         });
         
-        // Wait for all images to load before printing (including fallbacks)
-        const allImages = printContainer.querySelectorAll('img');
-        const imagePromises = Array.from(allImages).map(img => {
-            // If image is already loaded (complete), resolve immediately
-            if(img.complete && img.naturalWidth > 0){
-                return Promise.resolve();
-            }
-            // Otherwise wait for load or error, including fallback and B&W normalization
-            return new Promise((resolve) => {
-                let resolved = false;
-                const resolveOnce = () => {
-                    if(!resolved){
-                        resolved = true;
-                        resolve();
-                    }
-                };
-                
-                const existingOnload = img.onload;
-                const loadHandler = function(){
-                    const srcBefore = img.src;
-                    if(existingOnload) existingOnload.call(this);
-                    const srcAfter = img.src;
-                    if(srcAfter.startsWith('data:') && srcBefore !== srcAfter){
-                        img.addEventListener('load', resolveOnce, { once: true });
-                        setTimeout(resolveOnce, 2000);
-                    } else {
-                        resolveOnce();
-                    }
-                };
-                
-                let fallbackTried = false;
-                const fallbackLink = img.dataset.fallbackLink;
-                
-                img.onload = loadHandler;
-                img.onerror = () => {
-                    // If there's a fallback link and we haven't tried it yet
-                    if(!fallbackTried && fallbackLink && img.src !== fallbackLink){
-                        fallbackTried = true;
-                        img.src = fallbackLink;
-                        // Wait for fallback to load or fail
-                        img.onload = loadHandler;
-                        img.onerror = resolveOnce;
-                    } else {
-                        // No fallback or fallback also failed
-                        resolveOnce();
-                    }
-                };
-                
-                // Timeout after 5 seconds to prevent hanging
-                setTimeout(resolveOnce, 5000);
-            });
-        });
-        
-        // Wait for all images, then proceed with print
-        Promise.all(imagePromises).then(() => {
+        waitForPrintImages(printContainer).then(() => {
             // Update print CSS for multiple pages (identical to printBothCanvases)
             const styleId = 'dynamic-print-css';
             let styleEl = document.getElementById(styleId);
