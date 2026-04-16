@@ -1,5 +1,7 @@
 # Grist Label Designer Widget
 
+**What problem it solves:** Labels must stay tied to **live row data** in Grist (SKU, barcodes, text) while meeting **print and layout** constraints. A spreadsheet is not a label designer. This app provides a **canvas editor with column bindings** and export/print flows so one template can render many physical labels per record.
+
 A custom **Grist widget** for building and printing product labels directly from table data.
 
 This project is a single-page widget (`index.html`) that provides a visual editor with drag-and-drop elements, data binding, synchronized content blocks, import/export, and print-focused output (including thermal black-and-white preview controls).
