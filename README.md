@@ -1,76 +1,61 @@
 # Grist Label Designer Widget
 
-**What problem it solves:** Labels must stay tied to **live row data** in Grist (SKU, barcodes, text) while meeting **print and layout** constraints. A spreadsheet is not a label designer. This app provides a **canvas editor with column bindings** and export/print flows so one template can render many physical labels per record.
+Un widget personalizzato per Grist che permette di creare e stampare etichette prodotto direttamente dai dati della tabella.
 
-A custom **Grist widget** for building and printing product labels directly from table data.
+## Caratteristiche
 
-This project is a single-page widget (`index.html`) that provides a visual editor with drag-and-drop elements, data binding, synchronized content blocks, import/export, and print-focused output (including thermal black-and-white preview controls).
-
-## Highlights
-
-- Visual canvas editor with zoom and multi-select interactions.
-- Element types:
-  - Text
-  - Data field bindings (from Grist columns)
-  - Images
-  - QR codes
+### Editor Visuale
+- **Canvas editor** con drag-and-drop e zoom
+- **Elementi disponibili**:
+  - Testo
+  - Campi dati (collegati a colonne Grist)
+  - Immagini
+  - Codici QR
   - Barcodes
-  - Lines and boxes
-- Label profiles/sizes and multiple designs per profile.
-- Two-canvas workflow support (Canvas 2 can be enabled).
-- Synchronized blocks to keep content-related properties aligned across elements.
-- Global regex transformation rules for text rendering.
-- Layout export/import and snapshot export/import.
-- Print actions for full batch and single-label output.
-- Thermal-oriented black & white preview tuning (gamma/contrast/threshold controls).
+  - Linee e riquadri
+- **Profili etichetta** con dimensioni personalizzabili
+- **Multi-design** per ogni profilo
 
-## Project Structure
+### Funzionalità Avanzate
+- **Binding dati**: Collega elementi a colonne Grist per aggiornamenti automatici
+- **Import/Export**: Salva e carica layout etichette
+- **Anteprima stampa**: Preview ottimizzata per stampanti termiche
+- **Controlli stampa**: Gamma, contrasto e soglia per output bianco/nero
+- **Regole testo**: Trasformazioni regex per formattazione automatica
 
-- `index.html` – Main widget app (UI, editor logic, Grist integration, print pipeline).
-- `lib/qrcode.min.js` – Local QR utility dependency.
-- `docs/debug-learnings.md` – Notes from debugging print-outline behavior and final SVG-filter approach.
+### Stampa
+- **Stampa batch**: Stampa multiple etichette in una volta
+- **Stampa singola**: Stampa etichetta individuale
+- **Ottimizzazione termica**: Controlli specifici per stampanti termiche
 
-## Requirements
+## Installazione
 
-- A Grist document where this custom widget is embedded.
-- Browser with JavaScript enabled.
-- Network access for CDN dependencies referenced by `index.html`:
-  - `grist-plugin-api.js`
-  - `JsBarcode`
-  - `qrcodejs` (CDN reference in page)
-  - `html2canvas`
-  - Google Fonts
+1. Pubblica i file del widget su GitHub Pages o un altro hosting statico
+2. In Grist, vai su "Widget" > "Crea Widget Personalizzato"
+3. Incolla l'URL del tuo GitHub Pages nella sezione "Custom Widget URL"
+4. Il widget sarà disponibile per l'uso nei tuoi documenti Grist
 
-## Usage in Grist
+## Utilizzo
 
-1. In Grist, add a **Custom Widget**.
-2. Host this repository content (or at least `index.html`) on a reachable URL.
-3. Point the widget URL to the hosted `index.html`.
-4. Connect the widget to your table and configure access as needed.
-5. In the widget:
-   - Choose or create a label profile/design.
-   - Add elements and bind data fields to columns.
-   - Configure properties in the sidebar.
-   - Use Print / Print Single when ready.
+1. **Configura il Widget**:
+   - Seleziona la tabella Grist da utilizzare
+   - Scegli o crea un profilo etichetta
 
-## Local Development
+2. **Progetta l'Etichetta**:
+   - Aggiungi elementi al canvas
+   - Collega i campi dati alle colonne Grist
+   - Configura le proprietà nella sidebar
 
-Because this is a static page, you can run it with a simple local server:
+3. **Stampa**:
+   - Usa "Stampa" per batch di etichette
+   - Usa "Stampa Singola" per etichetta individuale
 
-```bash
-python3 -m http.server 8000
-```
+## Requisiti
 
-Then open:
+- Browser moderno con JavaScript abilitato
+- Connessione internet per le dipendenze CDN
+- Accesso a un documento Grist
 
-- `http://localhost:8000/index.html`
+## Supporto
 
-> Note: Grist-specific APIs only work fully when loaded as an actual Grist custom widget.
-
-## Printing Notes
-
-The widget includes a print-oriented contour/outline solution based on SVG filters (instead of relying only on CSS shadows), improving reliability for monochrome/thermal scenarios. See `docs/debug-learnings.md` for implementation notes and rationale.
-
-## License
-
-No license file is currently included in this repository. Add one if distribution terms are required.
+Il widget è fornito così com'è per l'uso con Grist. Per supporto o segnalazioni di problemi, contatta lo sviluppatore.
