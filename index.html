@@ -291,6 +291,9 @@ document.addEventListener('DOMContentLoaded', ()=>{
     let z = 1;
     let isManuallyEditingGroupScale = false; // Flag to prevent updateProps from overwriting user input
     let R = {}, C = [];
+    let columnCatalog = [];
+    let columnRefToRecordKey = new Map();
+    let columnLabelToRefs = new Map();
     let drag = false, resizeMode = false, ctx = {};
         let canvasRotation = 0;           // temporary canvas rotation (0, 90, 180, 270 degrees)
         let W = 8, H = 5;                 // Current dimensions (dynamic)
@@ -467,6 +470,131 @@ document.addEventListener('DOMContentLoaded', ()=>{
     }
 
     function isGristAvailable(){ return (typeof window.grist !== 'undefined' && window.grist && typeof window.grist.getOption === 'function' && typeof window.grist.setOption === 'function'); }
+
+    function normalizeColumnRef(ref){
+        if(ref === null || ref === undefined) return '';
+        return String(ref).trim();
+    }
+
+    function rebuildColumnCatalog(record, mappings){
+        const nextCatalog = [];
+        const seenRefs = new Set();
+        const recordObj = (record && typeof record === 'object') ? record : {};
+        const recordKeys = Object.keys(recordObj);
+        const recordKeySet = new Set(recordKeys);
+
+        const addEntry = (ref, label, recordKey) => {
+            const safeRef = normalizeColumnRef(ref);
+            const safeRecordKey = normalizeColumnRef(recordKey);
+            if(!safeRef || !safeRecordKey) return;
+            if(!recordKeySet.has(safeRecordKey)) return;
+            if(seenRefs.has(safeRef)) return;
+            seenRefs.add(safeRef);
+            nextCatalog.push({
+                ref: safeRef,
+                label: normalizeColumnRef(label) || safeRecordKey,
+                recordKey: safeRecordKey
+            });
+        };
+
+        recordKeys.forEach((key) => addEntry(key, key, key));
+
+        const addEntryFromMapping = (mappingEntry, keyHint) => {
+            if(!mappingEntry || typeof mappingEntry !== 'object') return;
+            const recordKeyCandidates = [
+                mappingEntry.colId,
+                mappingEntry.columnName,
+                mappingEntry.name,
+                mappingEntry.label,
+                keyHint
+            ].map(normalizeColumnRef).filter(Boolean);
+            const recordKey = recordKeyCandidates.find(candidate => recordKeySet.has(candidate));
+            if(!recordKey) return;
+            const rawId = mappingEntry.id ?? mappingEntry.colRef ?? mappingEntry.columnId ?? mappingEntry.ref;
+            if(rawId === undefined || rawId === null || rawId === '') return;
+            const label = normalizeColumnRef(mappingEntry.label) || normalizeColumnRef(mappingEntry.colId) || recordKey;
+            addEntry('id:' + String(rawId), label, recordKey);
+        };
+
+        if(Array.isArray(mappings)){
+            mappings.forEach((item) => addEntryFromMapping(item, ''));
+        } else if(mappings && typeof mappings === 'object'){
+            Object.entries(mappings).forEach(([key, value]) => {
+                if(value && typeof value === 'object'){
+                    addEntryFromMapping(value, key);
+                    return;
+                }
+                const keyName = normalizeColumnRef(key);
+                if((typeof value === 'number' || typeof value === 'string') && keyName && recordKeySet.has(keyName)){
+                    addEntry('id:' + String(value), keyName, keyName);
+                }
+            });
+        }
+
+        nextCatalog.sort((a, b) => a.label.localeCompare(b.label, undefined, { sensitivity: 'base' }));
+        columnCatalog = nextCatalog;
+        columnRefToRecordKey = new Map();
+        columnLabelToRefs = new Map();
+        columnCatalog.forEach((entry) => {
+            columnRefToRecordKey.set(entry.ref, entry.recordKey);
+            if(!columnLabelToRefs.has(entry.label)) columnLabelToRefs.set(entry.label, []);
+            columnLabelToRefs.get(entry.label).push(entry.ref);
+        });
+        C = columnCatalog.map(entry => entry.label);
+    }
+
+    function resolveColumnRecordKey(columnRef){
+        const ref = normalizeColumnRef(columnRef);
+        if(!ref) return '';
+        const mappedRecordKey = columnRefToRecordKey.get(ref);
+        if(mappedRecordKey) return mappedRecordKey;
+        if(R && typeof R === 'object' && Object.prototype.hasOwnProperty.call(R, ref)) return ref;
+        const refsByLabel = columnLabelToRefs.get(ref);
+        if(refsByLabel && refsByLabel.length === 1){
+            const byLabelRecordKey = columnRefToRecordKey.get(refsByLabel[0]);
+            if(byLabelRecordKey) return byLabelRecordKey;
+        }
+        return '';
+    }
+
+    function getRecordValueByColumnRef(columnRef){
+        const recordKey = resolveColumnRecordKey(columnRef);
+        if(!recordKey || !R || typeof R !== 'object') return { found: false, value: undefined, recordKey: '' };
+        if(!Object.prototype.hasOwnProperty.call(R, recordKey)) return { found: false, value: undefined, recordKey };
+        return { found: true, value: R[recordKey], recordKey };
+    }
+
+    function hasRecordColumnRef(columnRef){
+        return getRecordValueByColumnRef(columnRef).found;
+    }
+
+    function areSameColumnRef(leftRef, rightRef){
+        const leftKey = resolveColumnRecordKey(leftRef) || normalizeColumnRef(leftRef);
+        const rightKey = resolveColumnRecordKey(rightRef) || normalizeColumnRef(rightRef);
+        return !!leftKey && !!rightKey && leftKey === rightKey;
+    }
+
+    function getColumnEntryByLabel(label){
+        const labelValue = normalizeColumnRef(label);
+        if(!labelValue) return null;
+        return columnCatalog.find(entry => entry.label === labelValue) || null;
+    }
+
+    function getColumnOptionsHtml(selectedRef, entries){
+        const safeSelectedRef = normalizeColumnRef(selectedRef);
+        const list = Array.isArray(entries) ? entries : columnCatalog;
+        let html = '<option value="">-- Select Column --</option>';
+        let hasSelection = false;
+        list.forEach((entry) => {
+            const selected = safeSelectedRef && (entry.ref === safeSelectedRef || entry.recordKey === safeSelectedRef);
+            if(selected) hasSelection = true;
+            html += `<option value="${escapeHtml(entry.ref)}" ${selected ? 'selected' : ''}>${escapeHtml(entry.label)}</option>`;
+        });
+        if(safeSelectedRef && !hasSelection){
+            html += `<option value="${escapeHtml(safeSelectedRef)}" selected>${escapeHtml(safeSelectedRef)} (missing)</option>`;
+        }
+        return html;
+    }
 
         // Snap to pixel precision: convert cm to px, round to nearest pixel, convert back to cm
         const PIXELS_PER_CM = 37.795276; // 96 DPI
@@ -1346,8 +1474,9 @@ document.addEventListener('DOMContentLoaded', ()=>{
         const MAX_PREVIEW_LABELS = 50;
         const labelSpacing = 1.0; // cm spacing between labels (increased for better visibility)
         
-        if(sequenceCountColumn && R && Object.prototype.hasOwnProperty.call(R, sequenceCountColumn)){
-            const countRaw = R[sequenceCountColumn];
+        const sequenceCountValue = getRecordValueByColumnRef(sequenceCountColumn);
+        if(sequenceCountColumn && sequenceCountValue.found){
+            const countRaw = sequenceCountValue.value;
             const count = Math.max(0, Math.floor(Number(countRaw)));
             countToRender = Math.min(count, MAX_PREVIEW_LABELS);
         }
@@ -1659,8 +1788,9 @@ document.addEventListener('DOMContentLoaded', ()=>{
                         
                         // Build Imgur URL from Grist column value
                         let imageUrl = '';
-                        if(el.props.boundColumn && R && Object.prototype.hasOwnProperty.call(R, el.props.boundColumn)){
-                            const imgurId = R[el.props.boundColumn];
+                        const boundImageValue = getRecordValueByColumnRef(el.props.boundColumn);
+                        if(el.props.boundColumn && boundImageValue.found){
+                            const imgurId = boundImageValue.value;
                             if(imgurId){
                                 const id = String(imgurId).trim();
                                 if(id){
@@ -2234,20 +2364,21 @@ document.addEventListener('DOMContentLoaded', ()=>{
         function getColumnValueAsNumber(columnId, waveContext = null){
             const trimmedColumnId = columnId.trim();
             // Print single: override weight column with user-entered weight
-            if(waveContext && waveContext.overrideWeight !== undefined && packWaves.some(wave => wave.weightColumn === trimmedColumnId)){
+            if(waveContext && waveContext.overrideWeight !== undefined && packWaves.some(wave => areSameColumnRef(wave.weightColumn, trimmedColumnId))){
                 const num = parseFloat(waveContext.overrideWeight);
                 return isNaN(num) ? null : num;
             }
             if(!R || typeof R !== 'object') return null;
             let columnToUse = trimmedColumnId;
             if(waveContext && waveContext.weightColumn){
-                const matchesAnyWaveWeight = packWaves.some(wave => wave.weightColumn === trimmedColumnId);
+                const matchesAnyWaveWeight = packWaves.some(wave => areSameColumnRef(wave.weightColumn, trimmedColumnId));
                 if(matchesAnyWaveWeight){
                     columnToUse = waveContext.weightColumn;
                 }
             }
-            if(Object.prototype.hasOwnProperty.call(R, columnToUse)){
-                let v = R[columnToUse];
+            const columnValue = getRecordValueByColumnRef(columnToUse);
+            if(columnValue.found){
+                let v = columnValue.value;
                 if(v === null || v === undefined) return null;
                 const num = parseFloat(v);
                 return isNaN(num) ? null : num;
@@ -2372,7 +2503,7 @@ document.addEventListener('DOMContentLoaded', ()=>{
                 const trimmedColumnId = (columnId || '').trim();
                 if(!trimmedColumnId) return match;
                 // Print single: override weight column with user-entered weight
-                if(waveContext && waveContext.overrideWeight !== undefined && packWaves.some(wave => wave.weightColumn === trimmedColumnId)){
+                if(waveContext && waveContext.overrideWeight !== undefined && packWaves.some(wave => areSameColumnRef(wave.weightColumn, trimmedColumnId))){
                     let v = waveContext.overrideWeight;
                     if(v === null || v === undefined) return '';
                     const num = parseFloat(v);
@@ -2386,13 +2517,14 @@ document.addEventListener('DOMContentLoaded', ()=>{
                 if(!hasR) return match;
                 let columnToUse = trimmedColumnId;
                 if(waveContext && waveContext.weightColumn){
-                    const matchesAnyWaveWeight = packWaves.some(wave => wave.weightColumn === trimmedColumnId);
+                    const matchesAnyWaveWeight = packWaves.some(wave => areSameColumnRef(wave.weightColumn, trimmedColumnId));
                     if(matchesAnyWaveWeight){
                         columnToUse = waveContext.weightColumn;
                     }
                 }
-                if(Object.prototype.hasOwnProperty.call(R, columnToUse)){
-                    let v = R[columnToUse];
+                const columnValue = getRecordValueByColumnRef(columnToUse);
+                if(columnValue.found){
+                    let v = columnValue.value;
                     if(v === null || v === undefined) return '';
                     if(el && el.type === 'data' && typeof v === 'number' && !isDateValue(v)){
                         const dec = (el.props.decimals !== undefined) ? Number(el.props.decimals) : 2;
@@ -2665,7 +2797,7 @@ document.addEventListener('DOMContentLoaded', ()=>{
             let boundColumnToUse = el.props.boundColumn;
             if(waveContext && waveContext.weightColumn && el.props.boundColumn){
                 // Check if boundColumn matches any wave weight column
-                const matchesWaveWeight = packWaves.some(wave => wave.weightColumn === el.props.boundColumn);
+                const matchesWaveWeight = packWaves.some(wave => areSameColumnRef(wave.weightColumn, el.props.boundColumn));
                 if(matchesWaveWeight){
                     boundColumnToUse = waveContext.weightColumn;
                 }
@@ -2673,7 +2805,7 @@ document.addEventListener('DOMContentLoaded', ()=>{
             
             // Check if prefix and suffix contain a math expression that surrounds boundColumn value
             // This must be checked BEFORE processing prefix/suffix separately
-            if(!hasColumnSyntaxInText && boundColumnToUse && R && Object.prototype.hasOwnProperty.call(R, boundColumnToUse) && (el.type === 'text' || el.type === 'data')){
+            if(!hasColumnSyntaxInText && boundColumnToUse && hasRecordColumnRef(boundColumnToUse) && (el.type === 'text' || el.type === 'data')){
                 // Check if prefix contains $$ (math expression start) and suffix contains $$ or $number$ (math expression end)
                 const prefixHasMath = originalPrefix.includes('$$');
                 const suffixHasMath = originalSuffix.includes('$$') || /\$\d+\$/.test(originalSuffix);
@@ -2725,11 +2857,12 @@ document.addEventListener('DOMContentLoaded', ()=>{
             // Handle boundColumn (legacy support) - only if **column** syntax wasn't used in text itself
             // For text fields, we can use boundColumn even if prefix/suffix have **column** syntax
             // Print single: use overrideWeight when boundColumn is a weight column
-            const boundIsWeightColumn = boundColumnToUse && packWaves.some(wave => wave.weightColumn === boundColumnToUse);
+            const boundIsWeightColumn = boundColumnToUse && packWaves.some(wave => areSameColumnRef(wave.weightColumn, boundColumnToUse));
             const useOverrideForBound = waveContext && waveContext.overrideWeight !== undefined && boundIsWeightColumn;
-            const hasBoundValue = useOverrideForBound || (R && Object.prototype.hasOwnProperty.call(R, boundColumnToUse));
+            const hasBoundValue = useOverrideForBound || hasRecordColumnRef(boundColumnToUse);
             if(!hasColumnSyntaxInText && boundColumnToUse && hasBoundValue){
-                let v = useOverrideForBound ? waveContext.overrideWeight : R[boundColumnToUse];
+                const boundValueResult = getRecordValueByColumnRef(boundColumnToUse);
+                let v = useOverrideForBound ? waveContext.overrideWeight : boundValueResult.value;
                 if(el.type === 'data' && (typeof v === 'number' || (typeof v === 'string' && !isNaN(parseFloat(v)))) && !isDateValue(v)){
                     const dec = (el.props.decimals !== undefined) ? Number(el.props.decimals) : 2;
                     const pct = !!el.props.asPercent;
@@ -2756,17 +2889,17 @@ document.addEventListener('DOMContentLoaded', ()=>{
             if(el.type === 'barcode' || el.type === 'qr'){
                 let boundColumnToUse = el.props.boundColumn;
                 if(waveContext && waveContext.weightColumn && el.props.boundColumn){
-                    const matchesWaveWeight = packWaves.some(wave => wave.weightColumn === el.props.boundColumn);
+                    const matchesWaveWeight = packWaves.some(wave => areSameColumnRef(wave.weightColumn, el.props.boundColumn));
                     if(matchesWaveWeight){
                         boundColumnToUse = waveContext.weightColumn;
                     }
                 }
-                const boundIsWeightCol = boundColumnToUse && packWaves.some(wave => wave.weightColumn === boundColumnToUse);
+                const boundIsWeightCol = boundColumnToUse && packWaves.some(wave => areSameColumnRef(wave.weightColumn, boundColumnToUse));
                 if(!text && boundColumnToUse && (boundIsWeightCol && waveContext && waveContext.overrideWeight !== undefined)){
                     return String(waveContext.overrideWeight);
                 }
-                if(!text && boundColumnToUse && R && Object.prototype.hasOwnProperty.call(R, boundColumnToUse)){
-                    return String(R[boundColumnToUse]);
+                if(!text && boundColumnToUse && hasRecordColumnRef(boundColumnToUse)){
+                    return String(getRecordValueByColumnRef(boundColumnToUse).value);
                 }
                 return text;
             }
@@ -2874,19 +3007,16 @@ document.addEventListener('DOMContentLoaded', ()=>{
             // Get current count value
             let countValue = '';
             let countDisplay = '—';
-            if(globalSequenceCountColumn && R && Object.prototype.hasOwnProperty.call(R, globalSequenceCountColumn)){
-                const countRaw = R[globalSequenceCountColumn];
+            const globalCountValue = getRecordValueByColumnRef(globalSequenceCountColumn);
+            if(globalSequenceCountColumn && globalCountValue.found){
+                const countRaw = globalCountValue.value;
                 const count = Math.max(0, Math.floor(Number(countRaw)));
                 countValue = count;
                 countDisplay = count > 0 ? String(count) : '0 (invalid)';
             }
             
             // Build column options
-            let columnOptions = '<option value="">-- Select Column --</option>';
-            C.forEach(col => {
-                const selected = col === globalSequenceCountColumn ? 'selected' : '';
-                columnOptions += `<option value="${col}" ${selected}>${col}</option>`;
-            });
+            const columnOptions = getColumnOptionsHtml(globalSequenceCountColumn);
             
             let h = '<div style="padding:12px;">';
             
@@ -2905,18 +3035,10 @@ document.addEventListener('DOMContentLoaded', ()=>{
             } else {
                 packWaves.forEach((wave, index) => {
                     // Build count column options
-                    let countColumnOptions = '<option value="">-- Select Column --</option>';
-                    C.forEach(col => {
-                        const selected = col === wave.countColumn ? 'selected' : '';
-                        countColumnOptions += `<option value="${col}" ${selected}>${col}</option>`;
-                    });
+                    const countColumnOptions = getColumnOptionsHtml(wave.countColumn);
                     
                     // Build weight column options
-                    let weightColumnOptions = '<option value="">-- Select Column --</option>';
-                    C.forEach(col => {
-                        const selected = col === wave.weightColumn ? 'selected' : '';
-                        weightColumnOptions += `<option value="${col}" ${selected}>${col}</option>`;
-                    });
+                    const weightColumnOptions = getColumnOptionsHtml(wave.weightColumn);
                     
                     h += `<div style="margin-bottom:12px;padding:10px;background:#f5f5f5;border-radius:4px;border:1px solid #e0e0e0;">`;
                     h += `<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;">`;
@@ -2941,8 +3063,9 @@ document.addEventListener('DOMContentLoaded', ()=>{
                 if(countDisplayEl && sequenceColumnSelect){
                     let display = '—';
                     const selectedColumn = sequenceColumnSelect.value || '';
-                    if(selectedColumn && R && Object.prototype.hasOwnProperty.call(R, selectedColumn)){
-                        const countRaw = R[selectedColumn];
+                    const selectedCountValue = getRecordValueByColumnRef(selectedColumn);
+                    if(selectedColumn && selectedCountValue.found){
+                        const countRaw = selectedCountValue.value;
                         const count = Math.max(0, Math.floor(Number(countRaw)));
                         display = count > 0 ? String(count) : '0 (invalid)';
                     }
@@ -3180,7 +3303,7 @@ document.addEventListener('DOMContentLoaded', ()=>{
         let bindHtml = '';
         if(C && C.length){
             const boundVal = valueFor('props.boundColumn');
-            bindHtml = `<div style="display:flex;gap:8px;margin-bottom:8px"><input type="text" placeholder="Search columns..." data-prop="bind_search" style="flex:1"><select data-prop="props.boundColumn" style="flex:1"><option value="">-- Select Column --</option>${C.map(col=>`<option value="${col}" ${boundVal===col?'selected':''}>${col}</option>`).join('')}</select></div>`;
+            bindHtml = `<div style="display:flex;gap:8px;margin-bottom:8px"><input type="text" placeholder="Search columns..." data-prop="bind_search" style="flex:1"><select data-prop="props.boundColumn" style="flex:1">${getColumnOptionsHtml(boundVal)}</select></div>`;
         } else {
             bindHtml = `<select data-prop="props.boundColumn"><option value="">-- No columns --</option></select>`;
         }
@@ -5440,10 +5563,12 @@ document.addEventListener('DOMContentLoaded', ()=>{
             
             // Build wave list with weight and count info
             packWaves.forEach((wave, index) => {
-                const count = (wave.countColumn && R && Object.prototype.hasOwnProperty.call(R, wave.countColumn)) ? 
-                    Math.max(0, Math.floor(Number(R[wave.countColumn]))) : 0;
-                const weight = (wave.weightColumn && R && Object.prototype.hasOwnProperty.call(R, wave.weightColumn)) ? 
-                    R[wave.weightColumn] : null;
+                const countValue = getRecordValueByColumnRef(wave.countColumn);
+                const weightValue = getRecordValueByColumnRef(wave.weightColumn);
+                const count = (wave.countColumn && countValue.found) ?
+                    Math.max(0, Math.floor(Number(countValue.value))) : 0;
+                const weight = (wave.weightColumn && weightValue.found) ?
+                    weightValue.value : null;
                 
                 // Calculate total labels for this wave (considering canvas2Flag)
                 const totalLabels = canvas2Flag ? count * 2 : count;
@@ -5608,8 +5733,9 @@ document.addEventListener('DOMContentLoaded', ()=>{
             let totalPages = 0;
             selectedWaveIndices.forEach(waveIndex => {
                 const wave = packWaves[waveIndex];
-                if(wave && wave.countColumn && R && Object.prototype.hasOwnProperty.call(R, wave.countColumn)){
-                    const count = Math.max(0, Math.floor(Number(R[wave.countColumn])));
+                const countValue = wave ? getRecordValueByColumnRef(wave.countColumn) : { found: false, value: 0 };
+                if(wave && wave.countColumn && countValue.found){
+                    const count = Math.max(0, Math.floor(Number(countValue.value)));
                     totalPages += canvas2Flag ? count * 2 : count;
                 }
             });
@@ -5961,8 +6087,9 @@ document.addEventListener('DOMContentLoaded', ()=>{
                             
                             // Build Imgur URL from Grist column value
                             let imageUrl = '';
-                            if(el.props.boundColumn && R && Object.prototype.hasOwnProperty.call(R, el.props.boundColumn)){
-                                const imgurId = R[el.props.boundColumn];
+                            const boundImageValue = getRecordValueByColumnRef(el.props.boundColumn);
+                            if(el.props.boundColumn && boundImageValue.found){
+                                const imgurId = boundImageValue.value;
                                 if(imgurId){
                                     const id = String(imgurId).trim();
                                     if(id){
@@ -6092,11 +6219,12 @@ document.addEventListener('DOMContentLoaded', ()=>{
             let pageIndex = 0;
             selectedWaveIndices.forEach(waveIndex => {
                 const wave = packWaves[waveIndex];
-                if(!wave || !wave.countColumn || !R || !Object.prototype.hasOwnProperty.call(R, wave.countColumn)){
+                const waveCountValue = wave ? getRecordValueByColumnRef(wave.countColumn) : { found: false, value: 0 };
+                if(!wave || !wave.countColumn || !waveCountValue.found){
                     return;
                 }
                 
-                const count = Math.max(0, Math.floor(Number(R[wave.countColumn])));
+                const count = Math.max(0, Math.floor(Number(waveCountValue.value)));
                 if(count <= 0) return;
                 
                 // For each sequence index in this wave (resets to 1 for each wave)
@@ -6230,13 +6358,14 @@ document.addEventListener('DOMContentLoaded', ()=>{
                 msg('Error: No count column selected. Please select a column in Design Settings.', true);
                 return;
             }
-            if(!R || !Object.prototype.hasOwnProperty.call(R, globalSequenceCountColumn)){
+            const globalCountValue = getRecordValueByColumnRef(globalSequenceCountColumn);
+            if(!globalCountValue.found){
                 msg('Error: Count column not found in current record', true);
                 return;
             }
             
             // Calculate count for sequence mode (always enabled)
-            const countRaw = R[globalSequenceCountColumn];
+            const countRaw = globalCountValue.value;
             const count = Math.max(0, Math.floor(Number(countRaw)));
             if(count <= 0){
                 msg('Warning: Count value is 0 or invalid, no labels will be printed', true);
@@ -6597,8 +6726,9 @@ document.addEventListener('DOMContentLoaded', ()=>{
                             
                             // Build Imgur URL from Grist column value
                             let imageUrl = '';
-                            if(el.props.boundColumn && R && Object.prototype.hasOwnProperty.call(R, el.props.boundColumn)){
-                                const imgurId = R[el.props.boundColumn];
+                            const boundImageValue = getRecordValueByColumnRef(el.props.boundColumn);
+                            if(el.props.boundColumn && boundImageValue.found){
+                                const imgurId = boundImageValue.value;
                                 if(imgurId){
                                     const id = String(imgurId).trim();
                                     if(id){
@@ -7160,8 +7290,9 @@ document.addEventListener('DOMContentLoaded', ()=>{
                         applySvgOutlineToImage(el, img);
                         if(el.props.fallbackLink) img.dataset.fallbackLink = String(el.props.fallbackLink).trim();
                         let imageUrl = '';
-                        if(el.props.boundColumn && R && Object.prototype.hasOwnProperty.call(R, el.props.boundColumn)){
-                            const imgurId = R[el.props.boundColumn];
+                        const boundImageValue = getRecordValueByColumnRef(el.props.boundColumn);
+                        if(el.props.boundColumn && boundImageValue.found){
+                            const imgurId = boundImageValue.value;
                             if(imgurId){
                                 const id = String(imgurId).trim();
                                 if(id){
@@ -7962,14 +8093,15 @@ document.addEventListener('DOMContentLoaded', ()=>{
                 searchDebounceTimer = setTimeout(() => {
                     if(!query){
                         // No query - show all columns
-                        select.innerHTML = `<option value="">-- Select Column --</option>${C.map(col => `<option value="${col}" ${select.value===col?'selected':''}>${col}</option>`).join('')}`;
+                        select.innerHTML = getColumnOptionsHtml(select.value);
                     } else {
                         // Use improved search
                         const results = searchColumns(query, C);
                         if(results.length === 0){
                             select.innerHTML = `<option value="">-- No matches found --</option>`;
                         } else {
-                            select.innerHTML = `<option value="">-- Select Column (${results.length} found) --</option>${results.map(({col}) => `<option value="${col}" ${select.value===col?'selected':''}>${col}</option>`).join('')}`;
+                            const filteredEntries = results.map(({col}) => getColumnEntryByLabel(col)).filter(Boolean);
+                            select.innerHTML = `<option value="">-- Select Column (${filteredEntries.length} found) --</option>${filteredEntries.map(entry => `<option value="${escapeHtml(entry.ref)}" ${select.value===entry.ref || select.value===entry.recordKey?'selected':''}>${escapeHtml(entry.label)}</option>`).join('')}`;
                         }
                     }
                 }, 150); // 150ms debounce
@@ -8896,7 +9028,7 @@ document.addEventListener('DOMContentLoaded', ()=>{
             if(typeof window.grist.onRecord === 'function'){
                 window.grist.onRecord(function(record,mappings){ 
                     R = record||{}; 
-                    C = Object.keys(R); 
+                    rebuildColumnCatalog(R, mappings);
                     // Always update props when columns are loaded, because pack waves need columns
                     // even when no elements are selected
                     updateProps(); 
@@ -8915,7 +9047,7 @@ document.addEventListener('DOMContentLoaded', ()=>{
                 window.grist.onOptions(function(options){ /* no-op */ });
             }
         }catch(e){}
-    } else { R = {}; C = []; }
+    } else { R = {}; C = []; rebuildColumnCatalog(R, null); }
 
         // ---------- Initial setup & history init ----------
         // Load from localStorage on startup
