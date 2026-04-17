@@ -62,6 +62,9 @@
         .prop-sync-btn:hover{background:#e8e8e8}
         .prop-sync-btn.synced{color:#2e7d32;border-color:#2e7d32;background:#e8f5e8;}
         .prop-sync-btn.override{color:#1565c0;border-color:#1565c0;background:#e8f0fe;}
+        .prop-aspect-link-btn{width:28px;height:28px;padding:0;border:1px solid #ccc;border-radius:4px;cursor:pointer;font-size:14px;line-height:1;display:inline-flex;align-items:center;justify-content:center;background:#f5f5f5;flex-shrink:0}
+        .prop-aspect-link-btn:hover{background:#e8e8e8}
+        .prop-aspect-link-btn.active{color:#1565c0;border-color:#1565c0;background:#e8f0fe}
         #properties-panel{font-size:14px}
         .prop-border-sides{display:grid;grid-template-columns:1fr 26px 1fr 26px;gap:8px;align-items:center;margin-top:8px}
         .prop-border-sides label{font-size:12px;font-weight:normal;display:flex;align-items:center;gap:4px;min-width:0}
@@ -137,6 +140,8 @@
         <button id="btn-duplicate" title="Duplicate Selected Elements" disabled>📋 Duplicate</button>
         <button id="btn-bring-front" title="Bring to Front" disabled>⬆️ Front</button>
         <button id="btn-send-back" title="Send to Back" disabled>⬇️ Back</button>
+        <button id="btn-align-center-h" title="Center selection horizontally in label" disabled>↔</button>
+        <button id="btn-align-center-v" title="Center selection vertically in label" disabled>↕</button>
         <div class="divider"></div>
         <label for="canvas-selector" style="font-size:14px;margin:0;white-space:nowrap">Canvas:</label>
         <select id="canvas-selector" style="width:auto;padding:4px 8px;font-size:14px">
@@ -1295,7 +1300,7 @@ document.addEventListener('DOMContentLoaded', ()=>{
         const defaults = {
             id: `el_${Date.now()}`,
             type: 'text',
-            x: 0.5, y: 0.5, width: 1.5, height: 0.5, zIndex: 0,
+            x: 0.5, y: 0.5, width: 1.5, height: 0.5, zIndex: 0, lockAspectRatio: false,
             props: {
                 text: 'Sample Text',
                 fontSize: 16, fontWeight: 'normal', fontFamily: 'Arial, sans-serif',
@@ -1309,7 +1314,8 @@ document.addEventListener('DOMContentLoaded', ()=>{
                 thickness:2, format:'CODE128', displayValue:true,
                     fillColor:'transparent', decimals:2, asPercent:false,
                     lineHeight: 1.2, textOverflow: 'clip',
-                qrErrorCorrectLevel: 'M', qrColorDark: '#000000', qrColorLight: '#ffffff'
+                qrErrorCorrectLevel: 'M', qrColorDark: '#000000', qrColorLight: '#ffffff',
+                imageOpacity: 100
             }
         };
 
@@ -1348,6 +1354,7 @@ document.addEventListener('DOMContentLoaded', ()=>{
         base.width = Number(base.width) || 1;
         base.height = Number(base.height) || 1;
         base.zIndex = Number(base.zIndex) || 0;
+        base.lockAspectRatio = !!base.lockAspectRatio;
         base.props.fontSize = Number(base.props.fontSize) || 16;
             base.props.lineHeight = Number(base.props.lineHeight) || 1.2;
         base.props.decimals = Number(base.props.decimals) || 0;
@@ -1377,7 +1384,17 @@ document.addEventListener('DOMContentLoaded', ()=>{
                 base.props.borderBottom = false;
                 base.props.borderLeft = false;
             }
+        const io = base.props.imageOpacity;
+        if(io === undefined || io === null || io === '') base.props.imageOpacity = 100;
+        else base.props.imageOpacity = Math.max(0, Math.min(100, Number(io)));
         return base;
+    }
+
+    function getImageOpacityCss(el){
+        if(!el || el.type !== 'image') return '1';
+        const p = Number(el.props && el.props.imageOpacity);
+        const pct = Number.isFinite(p) ? Math.max(0, Math.min(100, p)) : 100;
+        return String(pct / 100);
     }
 
     // Preprocess image for consistent B&W: contrast stretch + shadow lift + gamma per evitare stampa troppo scura.
@@ -1793,6 +1810,7 @@ document.addEventListener('DOMContentLoaded', ()=>{
                         img.style.height='100%';
                         img.style.objectFit = el.props.objectFit || 'contain';
                         applySvgOutlineToImage(el, img);
+                        img.style.opacity = getImageOpacityCss(el);
                         
                         // Build Imgur URL from Grist column value
                         let imageUrl = '';
@@ -1845,6 +1863,7 @@ document.addEventListener('DOMContentLoaded', ()=>{
                                 errorDiv.style.color = '#999';
                                 errorDiv.style.fontSize = '12px';
                                 errorDiv.textContent = 'Image not found';
+                                errorDiv.style.opacity = getImageOpacityCss(el);
                                 d.appendChild(errorDiv);
                             };
                         } else if(el.props.fallbackLink){
@@ -1869,6 +1888,7 @@ document.addEventListener('DOMContentLoaded', ()=>{
                                     errorDiv.style.color = '#999';
                                     errorDiv.style.fontSize = '12px';
                                     errorDiv.textContent = 'Image not found';
+                                    errorDiv.style.opacity = getImageOpacityCss(el);
                                     d.appendChild(errorDiv);
                                 };
                             }
@@ -1885,6 +1905,7 @@ document.addEventListener('DOMContentLoaded', ()=>{
                             placeholder.style.fontSize = '12px';
                             placeholder.style.border = '1px dashed #ccc';
                             placeholder.textContent = 'No image';
+                            placeholder.style.opacity = getImageOpacityCss(el);
                             d.appendChild(placeholder);
                         }
                         d.appendChild(img);
@@ -2956,6 +2977,10 @@ document.addEventListener('DOMContentLoaded', ()=>{
     function updateBtns(){
         const has = selectedIds.length>0;
         bd.disabled = !has; bf.disabled = !has; bs.disabled = !has;
+        const btnAlignH = document.getElementById('btn-align-center-h');
+        const btnAlignV = document.getElementById('btn-align-center-v');
+        if(btnAlignH) btnAlignH.disabled = !has;
+        if(btnAlignV) btnAlignV.disabled = !has;
         
         // Update synchronize/desynchronize buttons
         const btnSynchronize = document.getElementById('btn-synchronize');
@@ -3320,6 +3345,7 @@ document.addEventListener('DOMContentLoaded', ()=>{
         let h = `<div class="${grid1Cls}"><label class="${labelClass('x')}">X</label><input type="number" step="0.01" data-prop="x" value="${(Number(valueFor('x'))||0).toFixed(2)}">${syncBtn('x')}</div>`;
         h += `<div class="${grid1Cls}"><label class="${labelClass('y')}">Y</label><input type="number" step="0.01" data-prop="y" value="${(Number(valueFor('y'))||0).toFixed(2)}">${syncBtn('y')}</div>`;
         h += `<div class="${grid1Cls}"><label class="${labelClass('width')}">Width</label><input type="number" step="0.01" data-prop="width" value="${(Number(valueFor('width'))||0).toFixed(2)}">${syncBtn('width')}</div>`;
+        h += `<div style="display:flex;justify-content:center;align-items:center;margin:2px 0 6px;padding-left:90px;gap:8px"><span style="font-size:11px;color:#666">Proporzioni</span><button type="button" class="prop-aspect-link-btn ${el.lockAspectRatio ? 'active' : ''}" id="prop-aspect-link-toggle" title="Se attivo, modifica larghezza o altezza e l&apos;altra dimensione segue (anche trascinando l&apos;angolo)">🔗</button></div>`;
         h += `<div class="${grid1Cls}"><label class="${labelClass('height')}">Height</label><input type="number" step="0.01" data-prop="height" value="${(Number(valueFor('height'))||0).toFixed(2)}">${syncBtn('height')}</div><hr>`;
 
         if(el.type==='text'){
@@ -3380,7 +3406,11 @@ document.addEventListener('DOMContentLoaded', ()=>{
             if(el.type==='image'){
                 const objFitVal = valueFor('props.objectFit'); const fallbackVal = valueFor('props.fallbackLink');
                 const normalizeForBwVal = valueFor('props.normalizeForBw');
+                const opRaw = valueFor('props.imageOpacity');
+                const opNum = Number(opRaw);
+                const opShow = Number.isFinite(opNum) ? Math.max(0, Math.min(100, opNum)) : 100;
                 h += `<hr><div class="${grid1Cls}"><label class="${labelClass('props.objectFit')}">Object Fit</label><select data-prop="props.objectFit"><option value="contain" ${(objFitVal||'contain')==='contain'?'selected':''}>Contain</option><option value="cover" ${objFitVal==='cover'?'selected':''}>Cover</option><option value="fill" ${objFitVal==='fill'?'selected':''}>Fill</option><option value="none" ${objFitVal==='none'?'selected':''}>None</option><option value="scale-down" ${objFitVal==='scale-down'?'selected':''}>Scale Down</option></select>${syncBtn('props.objectFit')}</div>`;
+                h += `<div class="${grid1Cls}"><label class="${labelClass('props.imageOpacity')}">Opacità</label><div style="display:flex;align-items:center;gap:8px;min-width:0"><input type="range" data-prop="props.imageOpacity" min="0" max="100" step="1" value="${opShow}" style="flex:1;min-width:0"><span class="image-opacity-pct" style="min-width:40px;font-size:12px;text-align:right">${opShow}%</span></div>${syncBtn('props.imageOpacity')}</div>`;
                 h += `<div class="${grid1Cls}"><label class="${labelClass('props.fallbackLink')}">Fallback Link</label><input type="text" data-prop="props.fallbackLink" placeholder="https://..." value="${escapeHtml(String(fallbackVal||''))}">${syncBtn('props.fallbackLink')}</div>`;
                 h += `<div class="${grid1Cls}"><label class="${labelClass('props.normalizeForBw')}" title="Stabilize brightness and contrast for consistent black-and-white printing">Normalize for B&amp;W</label><input type="checkbox" data-prop="props.normalizeForBw" ${normalizeForBwVal?'checked':''}>${syncBtn('props.normalizeForBw')}</div>`;
                 const mT = valueFor('props.marginTop'), mR = valueFor('props.marginRight'), mB = valueFor('props.marginBottom'), mL = valueFor('props.marginLeft');
@@ -3475,23 +3505,48 @@ document.addEventListener('DOMContentLoaded', ()=>{
                 h += `<hr><div class="prop-block"><div class="prop-block-title">Sfondo</div><label class="prop-block-check"><input type="checkbox" class="enable-background-cb" ${hasBg?'checked':''}> Abilita sfondo</label><div class="${grid1Cls}" style="margin-top:6px"><label>Colore</label><input type="color" class="background-color-input" data-prop="props.backgroundColor" value="${bgHex}" ${!hasBg?'disabled':''}></div></div>`;
             }
             if(el.type==='text' || el.type==='data' || el.type==='image'){
-                const outlineW = Math.max(0, Number(el.props.textOutlineWidth)||0);
-                const outlineColor = /^#[0-9A-Fa-f]{6}$/.test(String(el.props.textOutlineColor||'')) ? String(el.props.textOutlineColor) : '#000000';
-                const outline2W = Math.max(0, Number(el.props.textOutline2Width)||0);
-                const outline2Color = /^#[0-9A-Fa-f]{6}$/.test(String(el.props.textOutline2Color||'')) ? String(el.props.textOutline2Color) : '#ffffff';
-                const outlineEnabled = !!el.props.textOutlineEnabled;
-                const outline2Enabled = !!el.props.textOutline2Enabled;
+                const outlineW = Math.max(0, Number(valueFor('props.textOutlineWidth'))||0);
+                const outlineColorRaw = valueFor('props.textOutlineColor');
+                const outlineColor = /^#[0-9A-Fa-f]{6}$/.test(String(outlineColorRaw)) ? String(outlineColorRaw) : '#000000';
+                const outline2W = Math.max(0, Number(valueFor('props.textOutline2Width'))||0);
+                const outline2ColorRaw = valueFor('props.textOutline2Color');
+                const outline2Color = /^#[0-9A-Fa-f]{6}$/.test(String(outline2ColorRaw)) ? String(outline2ColorRaw) : '#ffffff';
+                const outlineEnabled = !!valueFor('props.textOutlineEnabled');
+                const outline2Enabled = !!valueFor('props.textOutline2Enabled');
                 const outlineBlockTitle = el.type==='image' ? 'Contorno' : 'Contorno Testo';
-                h += `<hr><div class="${grid1Cls}"><label>${outlineBlockTitle}</label><input type="checkbox" class="text-outline-cb" ${outlineEnabled?'checked':''}></div>`;
-                h += `<div class="${grid1Cls}"><label>Spessore</label><div style="display:flex;align-items:center;gap:4px"><input type="number" class="text-outline-width-input" value="${outlineW}" min="0" max="20" step="0.1" ${!outlineEnabled?'disabled':''} style="width:56px"><span style="font-size:13px">px</span></div></div>`;
-                h += `<div class="${grid1Cls}"><label>Colore</label><input type="color" class="text-outline-color-input" value="${outlineColor}" ${!outlineEnabled?'disabled':''}></div>`;
-                h += `<div class="${grid1Cls}" style="margin-top:8px"><label>Contorno secondario</label><input type="checkbox" class="text-outline2-cb" ${outline2Enabled?'checked':''} ${!outlineEnabled?'disabled':''}></div>`;
-                h += `<div class="${grid1Cls}"><label>Spessore 2</label><div style="display:flex;align-items:center;gap:4px"><input type="number" class="text-outline2-width-input" value="${outline2W}" min="0" max="20" step="0.1" ${!outlineEnabled||!outline2Enabled?'disabled':''} style="width:56px"><span style="font-size:13px">px</span></div></div>`;
-                h += `<div class="${grid1Cls}"><label>Colore 2</label><input type="color" class="text-outline2-color-input" value="${outline2Color}" ${!outlineEnabled||!outline2Enabled?'disabled':''}></div>`;
+                h += `<hr><div class="${grid1Cls}"><label class="${labelClass('props.textOutlineEnabled')}">${outlineBlockTitle}</label><input type="checkbox" data-prop="props.textOutlineEnabled" ${outlineEnabled?'checked':''}>${syncBtn('props.textOutlineEnabled')}</div>`;
+                h += `<div class="${grid1Cls}"><label class="${labelClass('props.textOutlineWidth')}">Spessore</label><div style="display:flex;align-items:center;gap:4px"><input type="number" data-prop="props.textOutlineWidth" value="${outlineW}" min="0" max="20" step="0.1" ${!outlineEnabled?'disabled':''} style="width:56px"><span style="font-size:13px">px</span></div>${syncBtn('props.textOutlineWidth')}</div>`;
+                h += `<div class="${grid1Cls}"><label class="${labelClass('props.textOutlineColor')}">Colore</label><input type="color" data-prop="props.textOutlineColor" value="${outlineColor}" ${!outlineEnabled?'disabled':''}>${syncBtn('props.textOutlineColor')}</div>`;
+                h += `<div class="${grid1Cls}" style="margin-top:8px"><label class="${labelClass('props.textOutline2Enabled')}">Contorno secondario (ombra)</label><input type="checkbox" data-prop="props.textOutline2Enabled" ${outline2Enabled?'checked':''} ${!outlineEnabled?'disabled':''}>${syncBtn('props.textOutline2Enabled')}</div>`;
+                h += `<div class="${grid1Cls}"><label class="${labelClass('props.textOutline2Width')}">Spessore 2</label><div style="display:flex;align-items:center;gap:4px"><input type="number" data-prop="props.textOutline2Width" value="${outline2W}" min="0" max="20" step="0.1" ${!outlineEnabled||!outline2Enabled?'disabled':''} style="width:56px"><span style="font-size:13px">px</span></div>${syncBtn('props.textOutline2Width')}</div>`;
+                h += `<div class="${grid1Cls}"><label class="${labelClass('props.textOutline2Color')}">Colore 2</label><input type="color" data-prop="props.textOutline2Color" value="${outline2Color}" ${!outlineEnabled||!outline2Enabled?'disabled':''}>${syncBtn('props.textOutline2Color')}</div>`;
             }
         h += `<hr><button id="btn-delete">Delete Element</button>`;
         pp.innerHTML = h;
             
+            const aspectLinkBtn = pp.querySelector('#prop-aspect-link-toggle');
+            if(aspectLinkBtn){
+                aspectLinkBtn.addEventListener('click', function(ev){
+                    ev.preventDefault();
+                    ev.stopPropagation();
+                    pushBeforeChange();
+                    el.lockAspectRatio = !el.lockAspectRatio;
+                    saveCurrentDesign();
+                    render();
+                    updateProps();
+                });
+            }
+
+            if(el.type === 'image'){
+                const opRange = pp.querySelector('input[data-prop="props.imageOpacity"]');
+                const opPct = pp.querySelector('.image-opacity-pct');
+                if(opRange && opPct){
+                    opRange.addEventListener('input', function(){
+                        opPct.textContent = this.value + '%';
+                    });
+                }
+            }
+
             // Add listener to update weight options when font family changes
             if(el.type === 'text' || el.type === 'data'){
                 const fontFamilySelect = pp.querySelector(`#font-family-select-${el.id}`);
@@ -3720,63 +3775,6 @@ document.addEventListener('DOMContentLoaded', ()=>{
                     });
                 }
             }
-            // Contorno testo / immagine: listener per checkbox, spessore e colore (senza updateProps per evitare salto scroll)
-            if(el.type === 'text' || el.type === 'data' || el.type === 'image'){
-                const outlineCb = pp.querySelector('.text-outline-cb');
-                const outlineWidthInput = pp.querySelector('.text-outline-width-input');
-                const outlineColorInput = pp.querySelector('.text-outline-color-input');
-                const outline2Cb = pp.querySelector('.text-outline2-cb');
-                const outline2WidthInput = pp.querySelector('.text-outline2-width-input');
-                const outline2ColorInput = pp.querySelector('.text-outline2-color-input');
-                if(outlineCb && outlineWidthInput && outlineColorInput){
-                    outlineCb.addEventListener('change', function(){
-                        pushBeforeChange();
-                        el.props.textOutlineEnabled = !!this.checked;
-                        outlineWidthInput.disabled = !this.checked;
-                        outlineColorInput.disabled = !this.checked;
-                        if(!this.checked){
-                            el.props.textOutline2Enabled = false;
-                            if(outline2Cb){ outline2Cb.checked = false; outline2Cb.disabled = true; }
-                            if(outline2WidthInput) outline2WidthInput.disabled = true;
-                            if(outline2ColorInput) outline2ColorInput.disabled = true;
-                        } else {
-                            if(outline2Cb){ outline2Cb.disabled = false; if(outline2Cb.checked){ outline2WidthInput.disabled = false; outline2ColorInput.disabled = false; } }
-                        }
-                        render(); saveCurrentDesign();
-                    });
-                    outlineWidthInput.addEventListener('input', function(){
-                        pushBeforeChange();
-                        const v = Math.max(0, Math.min(20, parseFloat(this.value) || 0));
-                        el.props.textOutlineWidth = v;
-                        render(); saveCurrentDesign();
-                    });
-                    outlineColorInput.addEventListener('input', function(){
-                        pushBeforeChange();
-                        el.props.textOutlineColor = (this.value && /^#[0-9A-Fa-f]{6}$/.test(this.value)) ? this.value : '#000000';
-                        render(); saveCurrentDesign();
-                    });
-                }
-                if(outline2Cb && outline2WidthInput && outline2ColorInput){
-                    outline2Cb.addEventListener('change', function(){
-                        pushBeforeChange();
-                        el.props.textOutline2Enabled = !!this.checked;
-                        outline2WidthInput.disabled = !this.checked || !(outlineCb && outlineCb.checked);
-                        outline2ColorInput.disabled = !this.checked || !(outlineCb && outlineCb.checked);
-                        render(); saveCurrentDesign();
-                    });
-                    outline2WidthInput.addEventListener('input', function(){
-                        pushBeforeChange();
-                        const v = Math.max(0, Math.min(20, parseFloat(this.value) || 0));
-                        el.props.textOutline2Width = v;
-                        render(); saveCurrentDesign();
-                    });
-                    outline2ColorInput.addEventListener('input', function(){
-                        pushBeforeChange();
-                        el.props.textOutline2Color = (this.value && /^#[0-9A-Fa-f]{6}$/.test(this.value)) ? this.value : '#ffffff';
-                        render(); saveCurrentDesign();
-                    });
-                }
-            }
             // Formato Data/Ora: select + custom input (senza data-prop per gestione custom)
             if(el.type === 'text' || el.type === 'data'){
                 const dtSelect = pp.querySelector('.date-time-format-select');
@@ -3847,7 +3845,10 @@ document.addEventListener('DOMContentLoaded', ()=>{
             const commonWeight = common('props.fontWeight') || 'normal';
         let h = `<div style="font-weight:600;margin-bottom:6px">${elems.length} elements selected</div>`;
             h += `<div class="prop-grid"><label>X</label><input type="number" step="0.01" data-prop="multi.x" value="${common('x')}"><label>Y</label><input type="number" step="0.01" data-prop="multi.y" value="${common('y')}"></div>`;
-            h += `<div class="prop-grid"><label>Width</label><input type="number" step="0.01" data-prop="multi.width" value="${common('width')}"><label>Height</label><input type="number" step="0.01" data-prop="multi.height" value="${common('height')}"></div><hr>`;
+            const allLockedAspect = elems.length > 0 && elems.every(e => e.lockAspectRatio);
+            h += `<div class="prop-grid"><label>Width</label><input type="number" step="0.01" data-prop="multi.width" value="${common('width')}"></div>`;
+            h += `<div style="display:flex;justify-content:center;align-items:center;margin:2px 0 6px;padding-left:90px;gap:8px"><span style="font-size:11px;color:#666">Proporzioni</span><button type="button" class="prop-aspect-link-btn ${allLockedAspect ? 'active' : ''}" id="multi-prop-aspect-link-toggle" title="Blocca/sblocca proporzioni su tutti gli elementi selezionati">🔗</button></div>`;
+            h += `<div class="prop-grid"><label>Height</label><input type="number" step="0.01" data-prop="multi.height" value="${common('height')}"></div><hr>`;
                 h += `<div class="prop-grid"><label>Font Size</label><input type="number" step="0.1" data-prop="multi.props.fontSize" value="${common('props.fontSize')}" min="6"><label>Font Family</label><div style="display:flex;gap:4px;align-items:center"><select data-prop="multi.props.fontFamily" id="multi-font-family-select" style="flex:1">${generateFontOptions(commonFontFamily)}</select><button type="button" id="multi-font-favorite-btn" style="padding:4px 8px;font-size:16px;background:transparent;border:1px solid #ccc;border-radius:4px;cursor:pointer;flex-shrink:0" title="${fontFavorites.includes(commonFontFamily) ? 'Remove from favorites' : 'Add to favorites'}">${fontFavorites.includes(commonFontFamily) ? '⭐' : '☆'}</button></div></div>`;
             h += `<div class="prop-grid"><label>Font Weight</label><select data-prop="multi.props.fontWeight" id="multi-font-weight-select">${generateWeightOptions(commonFontFamily, commonWeight)}</select><label>Line Height</label><input type="number" step="0.1" data-prop="multi.props.lineHeight" value="${common('props.lineHeight')}" min="0.5" max="3"></div>`;
             h += `<div class="prop-grid"><label>H. Align</label><select data-prop="multi.props.textAlign"><option value="">—</option><option value="left" ${common('props.textAlign')==='left'?'selected':''}>Left</option><option value="center" ${common('props.textAlign')==='center'?'selected':''}>Center</option><option value="right" ${common('props.textAlign')==='right'?'selected':''}>Right</option></select><label>V. Align</label><select data-prop="multi.props.valign"><option value="">—</option><option value="top" ${common('props.valign')==='top'?'selected':''}>Top</option><option value="middle" ${common('props.valign')==='middle'?'selected':''}>Middle</option><option value="bottom" ${common('props.valign')==='bottom'?'selected':''}>Bottom</option></select></div>`;
@@ -3882,6 +3883,20 @@ document.addEventListener('DOMContentLoaded', ()=>{
         h += `<hr><button id="btn-delete">Delete Selected</button>`;
         pp.innerHTML = h;
             
+            const multiAspectBtn = pp.querySelector('#multi-prop-aspect-link-toggle');
+            if(multiAspectBtn && elems.length){
+                multiAspectBtn.addEventListener('click', function(ev){
+                    ev.preventDefault();
+                    ev.stopPropagation();
+                    pushBeforeChange();
+                    const setAll = !elems.every(e => e.lockAspectRatio);
+                    elems.forEach(elem => { elem.lockAspectRatio = setAll; });
+                    saveCurrentDesign();
+                    render();
+                    updateProps();
+                });
+            }
+
             // Add listener to update weight options when font family changes (multi-select)
             const multiFontFamilySelect = pp.querySelector('#multi-font-family-select');
             const multiWeightSelect = pp.querySelector('#multi-font-weight-select');
@@ -4476,6 +4491,49 @@ document.addEventListener('DOMContentLoaded', ()=>{
             }
             
             render(); saveCurrentDesign();
+    }
+
+    function getSelectedElementsAxisBounds(){
+        const els = selectedIds.map(id => S.find(e => e.id === id)).filter(Boolean);
+        if(els.length === 0) return null;
+        let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
+        els.forEach(el => {
+            minX = Math.min(minX, el.x);
+            minY = Math.min(minY, el.y);
+            maxX = Math.max(maxX, el.x + el.width);
+            maxY = Math.max(maxY, el.y + el.height);
+        });
+        return { minX, minY, maxX, maxY, els };
+    }
+
+    function alignSelectedCenterHorizontally(){
+        if(selectedIds.length === 0) return;
+        const b = getSelectedElementsAxisBounds();
+        if(!b) return;
+        const cx = (b.minX + b.maxX) / 2;
+        const deltaX = W / 2 - cx;
+        if(Math.abs(deltaX) < 1e-9) return;
+        pushBeforeChange();
+        b.els.forEach(el => {
+            el.x = snapToPixel(Math.max(0, Math.min(el.x + deltaX, W - el.width)));
+        });
+        render(); updateProps(); updateBtns();
+        saveCurrentDesign();
+    }
+
+    function alignSelectedCenterVertically(){
+        if(selectedIds.length === 0) return;
+        const b = getSelectedElementsAxisBounds();
+        if(!b) return;
+        const cy = (b.minY + b.maxY) / 2;
+        const deltaY = H / 2 - cy;
+        if(Math.abs(deltaY) < 1e-9) return;
+        pushBeforeChange();
+        b.els.forEach(el => {
+            el.y = snapToPixel(Math.max(0, Math.min(el.y + deltaY, H - el.height)));
+        });
+        render(); updateProps(); updateBtns();
+        saveCurrentDesign();
     }
 
     function deleteSelected(){
@@ -6091,6 +6149,7 @@ document.addEventListener('DOMContentLoaded', ()=>{
                             img.style.height='100%';
                             img.style.objectFit = el.props.objectFit || 'contain';
                             applySvgOutlineToImage(el, img);
+                            img.style.opacity = getImageOpacityCss(el);
                             if(el.props.fallbackLink) img.dataset.fallbackLink = String(el.props.fallbackLink).trim();
                             
                             // Build Imgur URL from Grist column value
@@ -6144,6 +6203,7 @@ document.addEventListener('DOMContentLoaded', ()=>{
                                     errorDiv.style.color = '#999';
                                     errorDiv.style.fontSize = '12px';
                                     errorDiv.textContent = 'Image not found';
+                                    errorDiv.style.opacity = getImageOpacityCss(el);
                                     d.appendChild(errorDiv);
                                 };
                             } else if(el.props.fallbackLink){
@@ -6168,6 +6228,7 @@ document.addEventListener('DOMContentLoaded', ()=>{
                                         errorDiv.style.color = '#999';
                                         errorDiv.style.fontSize = '12px';
                                         errorDiv.textContent = 'Image not found';
+                                        errorDiv.style.opacity = getImageOpacityCss(el);
                                         d.appendChild(errorDiv);
                                     };
                                 }
@@ -6184,6 +6245,7 @@ document.addEventListener('DOMContentLoaded', ()=>{
                                 placeholder.style.fontSize = '12px';
                                 placeholder.style.border = '1px dashed #ccc';
                                 placeholder.textContent = 'No image';
+                                placeholder.style.opacity = getImageOpacityCss(el);
                                 d.appendChild(placeholder);
                             }
                             d.appendChild(img);
@@ -7700,8 +7762,12 @@ document.addEventListener('DOMContentLoaded', ()=>{
         const my = (e.clientY - cr.top) / cr.height * H;
 
         if(drag && ctx && ctx.items){
-            const dx = mx - ctx.baseMouseX;
-            const dy = my - ctx.baseMouseY;
+            let dx = mx - ctx.baseMouseX;
+            let dy = my - ctx.baseMouseY;
+            if(e.shiftKey){
+                if(Math.abs(dx) >= Math.abs(dy)) dy = 0;
+                else dx = 0;
+            }
             ctx.items.forEach(it=>{
                 const el = S.find(s=>s.id===it.id);
                 if(!el) return;
@@ -7802,6 +7868,11 @@ document.addEventListener('DOMContentLoaded', ()=>{
             const dy = my - ctx.startMouseY;
             let nw = ctx.startWidth + dx;
             let nh = ctx.startHeight + dy;
+            if(ctx.el.lockAspectRatio && ctx.startWidth > 0 && ctx.startHeight > 0){
+                const scale = nw / ctx.startWidth;
+                nw = ctx.startWidth * scale;
+                nh = ctx.startHeight * scale;
+            }
                 
                 // Get current rotation
                 const rotation = Number(ctx.el.props.rotation) || 0;
@@ -8069,7 +8140,7 @@ document.addEventListener('DOMContentLoaded', ()=>{
         if(p.includes('.')){
             const [o,k] = p.split('.');
             if(!el[o]) el[o] = {};
-                if(['fontSize','decimals','thickness','borderWidth','rotation','paddingTop','paddingRight','paddingBottom','paddingLeft','marginTop','marginRight','marginBottom','marginLeft','textOutlineWidth','textOutline2Width','x','y','width','height','borderRadiusTopLeft','borderRadiusTopRight','borderRadiusBottomRight','borderRadiusBottomLeft'].includes(k)) el[o][k] = Number(v);
+                if(['fontSize','decimals','thickness','borderWidth','rotation','paddingTop','paddingRight','paddingBottom','paddingLeft','marginTop','marginRight','marginBottom','marginLeft','textOutlineWidth','textOutline2Width','imageOpacity','x','y','width','height','borderRadiusTopLeft','borderRadiusTopRight','borderRadiusBottomRight','borderRadiusBottomLeft'].includes(k)) el[o][k] = Number(v);
                 else if(['showBorder','displayValue','asPercent','borderTop','borderRight','borderBottom','borderLeft','textOutlineEnabled','textOutline2Enabled'].includes(k)) el[o][k] = !!v;
                 else if(k === 'fontWeight'){
                     // Handle fontWeight: can be number (100-900) or string ('normal', 'bold')
@@ -8231,7 +8302,16 @@ document.addEventListener('DOMContentLoaded', ()=>{
                         }
                     else el[o][k] = value;
                 } else {
-                    if(['x','y','width','height','zIndex'].includes(keyPath)) el[keyPath] = Number(value);
+                    if(keyPath === 'width' || keyPath === 'height'){
+                        const prevW = Number(el.width), prevH = Number(el.height);
+                        const numVal = Number(value);
+                        if(keyPath === 'width') el.width = numVal;
+                        else el.height = numVal;
+                        if(el.lockAspectRatio && prevW > 0 && prevH > 0){
+                            if(keyPath === 'width') el.height = snapToPixel(numVal * (prevH / prevW));
+                            else el.width = snapToPixel(numVal * (prevW / prevH));
+                        }
+                    } else if(['x','y','zIndex'].includes(keyPath)) el[keyPath] = Number(value);
                     else el[keyPath] = value;
                 }
             });
@@ -8279,17 +8359,52 @@ document.addEventListener('DOMContentLoaded', ()=>{
         if(applyToAll){
             selectedIds.forEach(id=>{
                 const el = S.find(s=>s.id===id); if(!el) return;
+                const prevW = Number(el.width), prevH = Number(el.height);
                 applyPropToElement(el, prop, parsedValue);
+                if(el.lockAspectRatio && (prop === 'width' || prop === 'height') && prevW > 0 && prevH > 0){
+                    if(prop === 'width'){
+                        const nw = Number(el.width);
+                        el.height = snapToPixel(nw * (prevH / prevW));
+                    } else {
+                        const nh = Number(el.height);
+                        el.width = snapToPixel(nh * (prevW / prevH));
+                    }
+                }
+                if(prop === 'props.textOutlineEnabled' && parsedValue === false && el.props.textOutline2Enabled){
+                    el.props.textOutline2Enabled = false;
+                }
             });
         } else {
             const id = selectedIds[0];
             const el = S.find(s=>s.id===id);
             if(el) {
+                const prevW = Number(el.width), prevH = Number(el.height);
                 applyPropToElement(el, prop, parsedValue);
+                if(el.lockAspectRatio && (prop === 'width' || prop === 'height') && prevW > 0 && prevH > 0){
+                    if(prop === 'width'){
+                        const nw = Number(el.width);
+                        el.height = snapToPixel(nw * (prevH / prevW));
+                    } else {
+                        const nh = Number(el.height);
+                        el.width = snapToPixel(nh * (prevW / prevH));
+                    }
+                }
                 if(el.masterThreadId && !isDeferredTextInput){
                     const thread = getMasterThread(el.masterThreadId);
-                    if(thread && isPropSynced(thread, prop) && !isPropOverridden(el, prop)){
-                        syncPropertyToThread(el.masterThreadId, prop, parsedValue);
+                    if(thread){
+                        if(prop === 'width' || prop === 'height'){
+                            if(isPropSynced(thread, 'width') && !isPropOverridden(el, 'width')) syncPropertyToThread(el.masterThreadId, 'width', el.width);
+                            if(isPropSynced(thread, 'height') && !isPropOverridden(el, 'height')) syncPropertyToThread(el.masterThreadId, 'height', el.height);
+                        } else if(isPropSynced(thread, prop) && !isPropOverridden(el, prop)){
+                            syncPropertyToThread(el.masterThreadId, prop, parsedValue);
+                        }
+                    }
+                }
+                if(prop === 'props.textOutlineEnabled' && parsedValue === false && el.props.textOutline2Enabled){
+                    el.props.textOutline2Enabled = false;
+                    const thread2 = el.masterThreadId ? getMasterThread(el.masterThreadId) : null;
+                    if(thread2 && isPropSynced(thread2, 'props.textOutline2Enabled') && !isPropOverridden(el, 'props.textOutline2Enabled')){
+                        syncPropertyToThread(el.masterThreadId, 'props.textOutline2Enabled', false);
                     }
                 }
             }
@@ -8690,6 +8805,8 @@ document.addEventListener('DOMContentLoaded', ()=>{
     bd.addEventListener('click', dupSelected);
     bf.addEventListener('click', bringToFront);
     bs.addEventListener('click', sendToBack);
+    document.getElementById('btn-align-center-h').addEventListener('click', alignSelectedCenterHorizontally);
+    document.getElementById('btn-align-center-v').addEventListener('click', alignSelectedCenterVertically);
     document.getElementById('btn-zoom-in').addEventListener('click', ()=> setZoom(z*1.25));
     document.getElementById('btn-zoom-out').addEventListener('click', ()=> setZoom(z/1.25));
     document.getElementById('btn-zoom-fit').addEventListener('click', fit);
