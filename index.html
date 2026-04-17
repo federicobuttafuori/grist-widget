@@ -47,6 +47,9 @@
         .profile-section{background:#f5f5f5;padding:10px;border-radius:6px;border:1px solid #e0e0e0}
         .profile-section select{margin-bottom:8px}
         .sidebar-section .add-buttons{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+        .prop-panel-align-row{display:flex;gap:8px;align-items:center;margin-bottom:10px;flex-wrap:wrap}
+        .prop-panel-align-row button{flex:1;min-width:0;padding:6px 10px;font-size:14px;border:1px solid #ccc;border-radius:4px;background:#f8f8f8;cursor:pointer;box-sizing:border-box}
+        .prop-panel-align-row button:disabled{opacity:0.45;cursor:not-allowed}
         .prop-grid{display:grid;grid-template-columns:90px 1fr;gap:8px;align-items:center}
         .prop-grid.prop-grid-sync{grid-template-columns:90px 1fr 26px}
         .prop-grid.prop-grid-sync-1{grid-template-columns:90px 1fr 26px}
@@ -140,8 +143,6 @@
         <button id="btn-duplicate" title="Duplicate Selected Elements" disabled>📋 Duplicate</button>
         <button id="btn-bring-front" title="Bring to Front" disabled>⬆️ Front</button>
         <button id="btn-send-back" title="Send to Back" disabled>⬇️ Back</button>
-        <button id="btn-align-center-h" title="Center selection horizontally in label" disabled>↔</button>
-        <button id="btn-align-center-v" title="Center selection vertically in label" disabled>↕</button>
         <div class="divider"></div>
         <label for="canvas-selector" style="font-size:14px;margin:0;white-space:nowrap">Canvas:</label>
         <select id="canvas-selector" style="width:auto;padding:4px 8px;font-size:14px">
@@ -200,6 +201,10 @@
             <hr>
             <div class="sidebar-section">
                 <h3>Properties</h3>
+                <div class="prop-panel-align-row" aria-label="Align selection in label">
+                    <button type="button" id="btn-align-center-h" title="Center selection horizontally in label" disabled>↔</button>
+                    <button type="button" id="btn-align-center-v" title="Center selection vertically in label" disabled>↕</button>
+                </div>
                 <div id="properties-panel">Select an element to edit its properties.</div>
             </div>
             <hr>
