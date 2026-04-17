@@ -772,7 +772,7 @@ document.addEventListener('DOMContentLoaded', ()=>{
                         #main-content{width:${bleedWidth}cm!important;height:${bleedHeight}cm!important;overflow:visible!important;display:block!important;padding:0!important;margin:0!important}
                         #canvas-container{width:${bleedWidth}cm!important;height:${bleedHeight}cm!important;padding:0!important;margin:0!important;overflow:visible!important;background:${bleedBgColor}!important;display:block!important;position:static!important}
                         #canvas-wrapper{position:static!important;width:${bleedWidth}cm!important;height:${bleedHeight}cm!important;margin:0!important;padding:0!important;transform:none!important;display:block!important}
-                        #label-canvas{position:static!important;width:cm!important;height:cm!important;transform:none!important;box-shadow:none!important;display:block!important;overflow:visible!important;background:${bleedBgColor}!important;left:${bleedEnabled ? bleedSize + 'cm' : '0'}!important;top:${bleedEnabled ? bleedSize + 'cm' : '0'}!important}
+                        #label-canvas{position:static!important;width:profile.widthcm!important;height:profile.heightcm!important;transform:none!important;box-shadow:none!important;display:block!important;overflow:visible!important;background:${bleedBgColor}!important;left:${bleedEnabled ? bleedSize + 'cm' : '0'}!important;top:${bleedEnabled ? bleedSize + 'cm' : '0'}!important}
                             .label-element{page-break-inside:avoid!important;-webkit-print-color-adjust:exact!important;print-color-adjust:exact!important}
                         .label-element.selected{border:1px solid transparent!important;box-shadow:none!important}
                         .resize-handle{display:none!important}
@@ -6542,7 +6542,7 @@ document.addEventListener('DOMContentLoaded', ()=>{
                         }
                         html,body{margin:0!important;padding:0!important;background:!important;width:${profile.width}cm!important;height:auto!important}
                         #toolbar,#sidebar,#marquee,.status-message{display:none!important}
-                        .print-page{width:cm!important;height:cm!important;page-break-inside:avoid!important;overflow:visible!important;background:!important;position:relative!important;margin:0!important;padding:0!important;display:block!important;box-sizing:border-box!important}
+                        .print-page{width:profile.widthcm!important;height:profile.heightcm!important;page-break-inside:avoid!important;overflow:visible!important;background:!important;position:relative!important;margin:0!important;padding:0!important;display:block!important;box-sizing:border-box!important}
                         .print-page:not(:last-child){page-break-after:always!important}
                         .print-page:last-child{page-break-after:auto!important}
                         .print-container{display:block!important;position:static!important;left:auto!important;top:auto!important}
@@ -7178,7 +7178,7 @@ document.addEventListener('DOMContentLoaded', ()=>{
                         }
                         html,body{margin:0!important;padding:0!important;background:!important;width:${profile.width}cm!important;height:auto!important}
                         #toolbar,#sidebar,#marquee,.status-message{display:none!important}
-                        .print-page{width:cm!important;height:cm!important;page-break-inside:avoid!important;overflow:visible!important;background:!important;position:relative!important;margin:0!important;padding:0!important;display:block!important;box-sizing:border-box!important}
+                        .print-page{width:profile.widthcm!important;height:profile.heightcm!important;page-break-inside:avoid!important;overflow:visible!important;background:!important;position:relative!important;margin:0!important;padding:0!important;display:block!important;box-sizing:border-box!important}
                         .print-page:not(:last-child){page-break-after:always!important}
                         .print-page:last-child{page-break-after:auto!important}
                         .print-container{display:block!important;position:static!important;left:auto!important;top:auto!important}
@@ -7668,7 +7668,7 @@ document.addEventListener('DOMContentLoaded', ()=>{
                     }
                     html,body{margin:0!important;padding:0!important;background:!important;width:${profile.width}cm!important;height:auto!important}
                     #toolbar,#sidebar,#marquee,.status-message{display:none!important}
-                    .print-page{width:cm!important;height:cm!important;page-break-inside:avoid!important;overflow:visible!important;background:!important;position:relative!important;margin:0!important;padding:0!important;display:block!important;box-sizing:border-box!important}
+                    .print-page{width:profile.widthcm!important;height:profile.heightcm!important;page-break-inside:avoid!important;overflow:visible!important;background:!important;position:relative!important;margin:0!important;padding:0!important;display:block!important;box-sizing:border-box!important}
                     .print-page:not(:last-child){page-break-after:always!important}
                     .print-page:last-child{page-break-after:auto!important}
                     .print-container{display:block!important;position:static!important;left:auto!important;top:auto!important}
@@ -9802,3 +9802,4 @@ document.addEventListener('DOMContentLoaded', ()=>{
 
 </body>
 </html>
+
