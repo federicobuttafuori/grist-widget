@@ -138,8 +138,9 @@
         <button id="btn-print" title="Print Label">🖨️ Print</button>
         <button id="btn-print-single" title="Print Single Label">🖨️ Print Single</button>
         <div class="divider"></div>
-        <input type="checkbox" id="print-bleed-enabled" style="width:auto;margin:0" title="Bleed 1 cm per lato; imposta sfondo etichetta e margine stampa sul colore bleed (costante PRINT_BLEED_COLOR nel codice)">
+        <input type="checkbox" id="print-bleed-enabled" style="width:auto;margin:0" title="Bleed 1 cm per lato; sfondo etichetta e margini stampa usano il colore accanto">
         <label for="print-bleed-enabled" style="font-size:12px;margin:0;white-space:nowrap;cursor:pointer">Bleed</label>
+        <input type="color" id="print-bleed-color" value="#ffffff" title="Colore bleed e sfondo etichetta (con Bleed attivo)" style="width:28px;height:22px;padding:0;border:1px solid #ccc;border-radius:3px;cursor:pointer;vertical-align:middle;box-sizing:border-box"/>
             <div class="divider"></div>
             <button id="btn-rotate-canvas" title="Rotate Canvas 90° (temporary, not for print)">🔄 Rotate</button>
         <div class="divider"></div>
@@ -328,10 +329,30 @@ document.addEventListener('DOMContentLoaded', ()=>{
         let bwPreviewDpi = 203;
         const FONT_FAVORITES_KEY = 'grist_label_font_favorites'; // Key for font favorites
         const PRINT_BLEED_STORAGE_KEY = 'grist_label_print_bleed';
+        const PRINT_BLEED_COLOR_STORAGE_KEY = 'grist_label_print_bleed_color';
         /** Larghezza bleed su ogni lato (cm). Pagina stampa = formato etichetta + 2× questo valore. */
         const PRINT_BLEED_CM = 1;
-        /** Unico colore per area bleed e sfondo etichetta quando la spunta Bleed è attiva (modifica qui se serve un altro colore marca). */
-        const PRINT_BLEED_COLOR = '#ffffff';
+        const PRINT_BLEED_COLOR_DEFAULT = '#ffffff';
+
+        function getPrintBleedColor(){
+            const el = document.getElementById('print-bleed-color');
+            if(!el || typeof el.value !== 'string') return PRINT_BLEED_COLOR_DEFAULT;
+            const v = el.value.trim();
+            if(/^#[0-9A-Fa-f]{6}$/.test(v)) return v.toLowerCase();
+            return PRINT_BLEED_COLOR_DEFAULT;
+        }
+
+        function savePrintBleedColor(){
+            try {
+                localStorage.setItem(PRINT_BLEED_COLOR_STORAGE_KEY, getPrintBleedColor());
+            } catch (e) {}
+        }
+
+        function syncMiniPrintBleedColor(){
+            const main = document.getElementById('print-bleed-color');
+            const mini = document.getElementById('mini-print-bleed-color');
+            if (mini && main) mini.value = main.value;
+        }
     const MAX_HISTORY = 100;
 
         // All available fonts for labels
@@ -706,7 +727,7 @@ document.addEventListener('DOMContentLoaded', ()=>{
             const bleedEl = document.getElementById('print-bleed-enabled');
             const bleedOn = !!(bleedEl && bleedEl.checked);
             if(!lc) return;
-            if(bleedOn) lc.style.backgroundColor = PRINT_BLEED_COLOR;
+            if(bleedOn) lc.style.backgroundColor = getPrintBleedColor();
             else lc.style.removeProperty('background-color');
         }
 
@@ -728,7 +749,7 @@ document.addEventListener('DOMContentLoaded', ()=>{
                 const pageW = W + extraCm;
                 const pageH = H + extraCm;
                 const bleedAtRule = bleedOn ? `bleed: ${PRINT_BLEED_CM}cm;` : 'bleed: 0;';
-                const pageBg = bleedOn ? PRINT_BLEED_COLOR : '#ffffff';
+                const pageBg = bleedOn ? getPrintBleedColor() : '#ffffff';
                 styleEl.textContent = `
                     @media print{
                         @page{
@@ -8950,6 +8971,13 @@ document.addEventListener('DOMContentLoaded', ()=>{
         if (miniBleed) miniBleed.checked = document.getElementById('print-bleed-enabled').checked;
         updatePrintCSS();
     });
+    function onPrintBleedColorPicked(){
+        savePrintBleedColor();
+        syncMiniPrintBleedColor();
+        updatePrintCSS();
+    }
+    document.getElementById('print-bleed-color').addEventListener('input', onPrintBleedColorPicked);
+    document.getElementById('print-bleed-color').addEventListener('change', onPrintBleedColorPicked);
         document.getElementById('btn-rotate-canvas').addEventListener('click', ()=>{
             canvasRotation = (canvasRotation + 90) % 360;
             applyCanvasRotation();
@@ -9268,13 +9296,32 @@ document.addEventListener('DOMContentLoaded', ()=>{
                     const miniBleedChk = document.createElement('input');
                     miniBleedChk.type = 'checkbox';
                     miniBleedChk.id = 'mini-print-bleed';
-                    miniBleedChk.title = 'Bleed 1 cm per lato; sfondo etichetta = colore bleed (PRINT_BLEED_COLOR)';
+                    miniBleedChk.title = 'Bleed 1 cm per lato';
                     const mainBleedChk = document.getElementById('print-bleed-enabled');
+                    const mainBleedColor = document.getElementById('print-bleed-color');
                     miniBleedChk.checked = mainBleedChk ? mainBleedChk.checked : false;
                     miniBleedChk.addEventListener('change', (e) => {
                         if (mainBleedChk) {
                             mainBleedChk.checked = e.target.checked;
                             mainBleedChk.dispatchEvent(new Event('change'));
+                        }
+                    });
+                    const miniBleedColor = document.createElement('input');
+                    miniBleedColor.type = 'color';
+                    miniBleedColor.id = 'mini-print-bleed-color';
+                    miniBleedColor.title = 'Colore bleed';
+                    if (mainBleedColor) miniBleedColor.value = mainBleedColor.value;
+                    Object.assign(miniBleedColor.style, { width: '24px', height: '20px', padding: '0', border: '1px solid #ccc', borderRadius: '3px', cursor: 'pointer', boxSizing: 'border-box' });
+                    miniBleedColor.addEventListener('input', (e) => {
+                        if (mainBleedColor) {
+                            mainBleedColor.value = e.target.value;
+                            mainBleedColor.dispatchEvent(new Event('input'));
+                        }
+                    });
+                    miniBleedColor.addEventListener('change', (e) => {
+                        if (mainBleedColor) {
+                            mainBleedColor.value = e.target.value;
+                            mainBleedColor.dispatchEvent(new Event('change'));
                         }
                     });
                     const miniBleedLbl = document.createElement('label');
@@ -9285,6 +9332,7 @@ document.addEventListener('DOMContentLoaded', ()=>{
                     miniBleedLbl.style.whiteSpace = 'nowrap';
                     miniBleedLbl.appendChild(miniBleedChk);
                     miniBleedLbl.appendChild(document.createTextNode('Bleed'));
+                    miniBleedLbl.appendChild(miniBleedColor);
                     const col3 = document.createElement('div');
                     col3.className = 'mini-toolbar-col3';
                     col3.appendChild(canvasSelect);
@@ -9584,6 +9632,9 @@ document.addEventListener('DOMContentLoaded', ()=>{
         try {
             const bleedChk = document.getElementById('print-bleed-enabled');
             if (bleedChk && localStorage.getItem(PRINT_BLEED_STORAGE_KEY) === '1') bleedChk.checked = true;
+            const bleedCol = document.getElementById('print-bleed-color');
+            const savedHex = localStorage.getItem(PRINT_BLEED_COLOR_STORAGE_KEY);
+            if (bleedCol && savedHex && /^#[0-9A-Fa-f]{6}$/.test(savedHex)) bleedCol.value = savedHex.toLowerCase();
         } catch (e) {}
         
         // Initialize canvas size immediately
