@@ -137,10 +137,6 @@
         <div class="divider"></div>
         <button id="btn-print" title="Print Label">🖨️ Print</button>
         <button id="btn-print-single" title="Print Single Label">🖨️ Print Single</button>
-        <div class="divider"></div>
-        <input type="checkbox" id="print-bleed-enabled" style="width:auto;margin:0" title="Bleed 1 cm per lato; sfondo etichetta e margini stampa usano il colore accanto">
-        <label for="print-bleed-enabled" style="font-size:12px;margin:0;white-space:nowrap;cursor:pointer">Bleed</label>
-        <input type="color" id="print-bleed-color" value="#ffffff" title="Colore bleed e sfondo etichetta (con Bleed attivo)" style="width:28px;height:22px;padding:0;border:1px solid #ccc;border-radius:3px;cursor:pointer;vertical-align:middle;box-sizing:border-box"/>
             <div class="divider"></div>
             <button id="btn-rotate-canvas" title="Rotate Canvas 90° (temporary, not for print)">🔄 Rotate</button>
         <div class="divider"></div>
@@ -328,77 +324,6 @@ document.addEventListener('DOMContentLoaded', ()=>{
         let bwHalftoneSize = 8;
         let bwPreviewDpi = 203;
         const FONT_FAVORITES_KEY = 'grist_label_font_favorites'; // Key for font favorites
-        const PRINT_BLEED_STORAGE_KEY = 'grist_label_print_bleed';
-        const PRINT_BLEED_COLOR_STORAGE_KEY = 'grist_label_print_bleed_color';
-        /** Larghezza bleed su ogni lato (cm). Pagina stampa = formato etichetta + 2× questo valore. */
-        const PRINT_BLEED_CM = 1;
-        const PRINT_BLEED_COLOR_DEFAULT = '#ffffff';
-
-        function getPrintBleedColor(){
-            const el = document.getElementById('print-bleed-color');
-            if(!el || typeof el.value !== 'string') return PRINT_BLEED_COLOR_DEFAULT;
-            const v = el.value.trim();
-            if(/^#[0-9A-Fa-f]{6}$/.test(v)) return v.toLowerCase();
-            return PRINT_BLEED_COLOR_DEFAULT;
-        }
-
-        function savePrintBleedColor(){
-            try {
-                localStorage.setItem(PRINT_BLEED_COLOR_STORAGE_KEY, getPrintBleedColor());
-            } catch (e) {}
-        }
-
-        function syncMiniPrintBleedColor(){
-            const main = document.getElementById('print-bleed-color');
-            const mini = document.getElementById('mini-print-bleed-color');
-            if (mini && main) mini.value = main.value;
-        }
-
-        function isPrintBleedEnabled(){
-            const el = document.getElementById('print-bleed-enabled');
-            return !!(el && el.checked);
-        }
-
-        function getBleedLayoutForProfile(profile){
-            const W = profile.width;
-            const H = profile.height;
-            const bleedOn = isPrintBleedEnabled();
-            const extraCm = bleedOn ? PRINT_BLEED_CM * 2 : 0;
-            return {
-                W,
-                H,
-                bleedOn,
-                pageW: W + extraCm,
-                pageH: H + extraCm,
-                bleedAtRule: bleedOn ? `bleed: ${PRINT_BLEED_CM}cm;` : 'bleed: 0;',
-                pageBg: bleedOn ? getPrintBleedColor() : '#ffffff'
-            };
-        }
-
-        /** CSS per stampa multi-pagina (.print-container / .print-page): stesso bleed dell’anteprima. */
-        function buildMultiPagePrintStylesheet(profile){
-            const { W, H, pageW, pageH, bleedAtRule, pageBg } = getBleedLayoutForProfile(profile);
-            return `
-                    @media print{
-                        @page{
-                            size: ${pageW}cm ${pageH}cm;
-                            margin: 0;
-                            padding: 0;
-                            marks: none;
-                            ${bleedAtRule}
-                        }
-                        html,body{margin:0!important;padding:0!important;background:${pageBg}!important;width:${pageW}cm!important;height:auto!important}
-                        #toolbar,#sidebar,#marquee,.status-message{display:none!important}
-                        .print-page{width:${pageW}cm!important;height:${pageH}cm!important;page-break-inside:avoid!important;overflow:visible!important;background:${pageBg}!important;position:relative!important;margin:0!important;padding:0!important;display:flex!important;flex-direction:row!important;justify-content:center!important;align-items:center!important;box-sizing:border-box!important}
-                        .print-page-trim{width:${W}cm!important;height:${H}cm!important;position:relative!important;overflow:hidden!important;flex-shrink:0!important;background:transparent!important}
-                        .print-page:not(:last-child){page-break-after:always!important}
-                        .print-page:last-child{page-break-after:auto!important}
-                        .print-container{display:block!important;position:static!important;left:auto!important;top:auto!important}
-                        #main-content,#canvas-container,#canvas-wrapper,#label-canvas{display:none!important}
-                        .label-element{print-color-adjust:exact!important;-webkit-print-color-adjust:exact!important}
-                    }
-                `;
-        }
     const MAX_HISTORY = 100;
 
         // All available fonts for labels
@@ -769,14 +694,6 @@ document.addEventListener('DOMContentLoaded', ()=>{
             // Don't call fit() here - it will be called after rendering
         }
 
-        function applyPrintBleedLabelBackground(){
-            const bleedEl = document.getElementById('print-bleed-enabled');
-            const bleedOn = !!(bleedEl && bleedEl.checked);
-            if(!lc) return;
-            if(bleedOn) lc.style.backgroundColor = getPrintBleedColor();
-            else lc.style.removeProperty('background-color');
-        }
-
         function updatePrintCSS(){
             const styleId = 'dynamic-print-css';
             let styleEl = document.getElementById(styleId);
@@ -787,30 +704,21 @@ document.addEventListener('DOMContentLoaded', ()=>{
             }
             const profile = profiles[currentProfile];
             if(profile){
-                const W = profile.width;
-                const H = profile.height;
-                const bleedEl = document.getElementById('print-bleed-enabled');
-                const bleedOn = !!(bleedEl && bleedEl.checked);
-                const extraCm = bleedOn ? PRINT_BLEED_CM * 2 : 0;
-                const pageW = W + extraCm;
-                const pageH = H + extraCm;
-                const bleedAtRule = bleedOn ? `bleed: ${PRINT_BLEED_CM}cm;` : 'bleed: 0;';
-                const pageBg = bleedOn ? getPrintBleedColor() : '#ffffff';
                 styleEl.textContent = `
                     @media print{
                         @page{
-                            size: ${pageW}cm ${pageH}cm;
+                            size: ${profile.width}cm ${profile.height}cm;
                             margin: 0;
                             padding: 0;
                             marks: none;
-                            ${bleedAtRule}
+                            bleed: 0;
                         }
-                        html,body{margin:0!important;padding:0!important;width:${pageW}cm!important;height:${pageH}cm!important;overflow:visible!important;background:${pageBg}!important}
+                        html,body{margin:0!important;padding:0!important;width:${profile.width}cm!important;height:${profile.height}cm!important;overflow:visible!important;background:#fff!important}
                         #toolbar,#sidebar,#marquee,.status-message{display:none!important}
-                        #main-content{width:${pageW}cm!important;height:${pageH}cm!important;overflow:visible!important;display:block!important;padding:0!important;margin:0!important;background:${pageBg}!important}
-                        #canvas-container{width:${pageW}cm!important;height:${pageH}cm!important;padding:0!important;margin:0!important;overflow:visible!important;background:${pageBg}!important;display:flex!important;flex-direction:row!important;justify-content:center!important;align-items:center!important;position:static!important}
-                        #canvas-wrapper{position:static!important;width:${W}cm!important;height:${H}cm!important;margin:0!important;padding:0!important;transform:none!important;display:block!important;flex-shrink:0!important;background:transparent!important}
-                        #label-canvas{position:static!important;width:${W}cm!important;height:${H}cm!important;transform:none!important;box-shadow:none!important;display:block!important;overflow:visible!important;background:${pageBg}!important}
+                        #main-content{width:${profile.width}cm!important;height:${profile.height}cm!important;overflow:visible!important;display:block!important;padding:0!important;margin:0!important}
+                        #canvas-container{width:${profile.width}cm!important;height:${profile.height}cm!important;padding:0!important;margin:0!important;overflow:visible!important;background:#fff!important;display:block!important;position:static!important}
+                        #canvas-wrapper{position:static!important;width:${profile.width}cm!important;height:${profile.height}cm!important;margin:0!important;padding:0!important;transform:none!important;display:block!important}
+                        #label-canvas{position:static!important;width:${profile.width}cm!important;height:${profile.height}cm!important;transform:none!important;box-shadow:none!important;display:block!important;overflow:visible!important;background:#fff!important}
                             .label-element{page-break-inside:avoid!important;-webkit-print-color-adjust:exact!important;print-color-adjust:exact!important}
                         .label-element.selected{border:1px solid transparent!important;box-shadow:none!important}
                         .resize-handle{display:none!important}
@@ -819,7 +727,6 @@ document.addEventListener('DOMContentLoaded', ()=>{
                     }
                 `;
             }
-            applyPrintBleedLabelBackground();
         }
 
         function updateProfileSelector(){
@@ -5999,7 +5906,7 @@ document.addEventListener('DOMContentLoaded', ()=>{
             printContainer.style.position = 'absolute';
             printContainer.style.left = '-9999px';
             printContainer.style.top = '0';
-            printContainer.style.width = `${getBleedLayoutForProfile(profile).pageW}cm`;
+            printContainer.style.width = `${profile.width}cm`;
             printContainer.style.height = 'auto';
             
             // Calculate total pages across all selected waves
@@ -6025,29 +5932,10 @@ document.addEventListener('DOMContentLoaded', ()=>{
                 
                 const page = document.createElement('div');
                 page.className = 'print-page';
-                const bleedLayout = getBleedLayoutForProfile(profile);
-                const W = bleedLayout.W;
-                const H = bleedLayout.H;
-                const trim = document.createElement('div');
-                trim.className = 'print-page-trim';
-                trim.style.width = `${W}cm`;
-                trim.style.height = `${H}cm`;
-                trim.style.position = 'relative';
-                trim.style.overflow = 'hidden';
-                trim.style.flexShrink = '0';
-                if(bleedLayout.bleedOn){
-                    page.style.width = `${bleedLayout.pageW}cm`;
-                    page.style.height = `${bleedLayout.pageH}cm`;
-                    page.style.display = 'flex';
-                    page.style.alignItems = 'center';
-                    page.style.justifyContent = 'center';
-                    page.style.background = bleedLayout.pageBg;
-                } else {
-                    page.style.width = `${W}cm`;
-                    page.style.height = `${H}cm`;
-                    page.style.background = '#ffffff';
-                }
+                page.style.width = `${profile.width}cm`;
+                page.style.height = `${profile.height}cm`;
                 page.style.position = 'relative';
+                page.style.background = '#fff';
                 page.style.overflow = 'hidden';
                 // Set pageBreakAfter only for last page - let CSS handle the rest
                 if(isLastPage){
@@ -6472,11 +6360,11 @@ document.addEventListener('DOMContentLoaded', ()=>{
                         }
                     }
                     
-                    trim.appendChild(d);
+                    page.appendChild(d);
                 });
                 
                 // Ensure page has content - if no elements, add a placeholder to prevent blank pages
-                if(trim.children.length === 0){
+                if(page.children.length === 0){
                     const placeholder = document.createElement('div');
                     placeholder.style.width = '100%';
                     placeholder.style.height = '100%';
@@ -6486,9 +6374,8 @@ document.addEventListener('DOMContentLoaded', ()=>{
                     placeholder.style.color = '#999';
                     placeholder.style.fontSize = '12px';
                     placeholder.textContent = 'Empty page';
-                    trim.appendChild(placeholder);
+                    page.appendChild(placeholder);
                 }
-                page.appendChild(trim);
                 
                 return page;
             }
@@ -6568,7 +6455,25 @@ document.addEventListener('DOMContentLoaded', ()=>{
                     styleEl.id = styleId;
                     document.head.appendChild(styleEl);
                 }
-                styleEl.textContent = buildMultiPagePrintStylesheet(profile);
+                styleEl.textContent = `
+                    @media print{
+                        @page{
+                            size: ${profile.width}cm ${profile.height}cm;
+                            margin: 0;
+                            padding: 0;
+                            marks: none;
+                            bleed: 0;
+                        }
+                        html,body{margin:0!important;padding:0!important;background:#fff!important;width:${profile.width}cm!important;height:auto!important}
+                        #toolbar,#sidebar,#marquee,.status-message{display:none!important}
+                        .print-page{width:${profile.width}cm!important;height:${profile.height}cm!important;page-break-inside:avoid!important;overflow:visible!important;background:#fff!important;position:relative!important;margin:0!important;padding:0!important;display:block!important;box-sizing:border-box!important}
+                        .print-page:not(:last-child){page-break-after:always!important}
+                        .print-page:last-child{page-break-after:auto!important}
+                        .print-container{display:block!important;position:static!important;left:auto!important;top:auto!important}
+                        #main-content,#canvas-container,#canvas-wrapper,#label-canvas{display:none!important}
+                        .label-element{print-color-adjust:exact!important;-webkit-print-color-adjust:exact!important}
+                    }
+                `;
                 window.print();
                 setTimeout(()=>{
                     currentCanvas = prevCanvas;
@@ -6641,7 +6546,7 @@ document.addEventListener('DOMContentLoaded', ()=>{
             printContainer.style.position = 'absolute';
             printContainer.style.left = '-9999px';
             printContainer.style.top = '0';
-            printContainer.style.width = `${getBleedLayoutForProfile(profile).pageW}cm`;
+            printContainer.style.width = `${profile.width}cm`;
             // Height is auto - pages will be stacked naturally
             printContainer.style.height = 'auto';
             
@@ -6655,29 +6560,10 @@ document.addEventListener('DOMContentLoaded', ()=>{
                 
                 const page = document.createElement('div');
                 page.className = 'print-page';
-                const bleedLayout = getBleedLayoutForProfile(profile);
-                const W = bleedLayout.W;
-                const H = bleedLayout.H;
-                const trim = document.createElement('div');
-                trim.className = 'print-page-trim';
-                trim.style.width = `${W}cm`;
-                trim.style.height = `${H}cm`;
-                trim.style.position = 'relative';
-                trim.style.overflow = 'hidden';
-                trim.style.flexShrink = '0';
-                if(bleedLayout.bleedOn){
-                    page.style.width = `${bleedLayout.pageW}cm`;
-                    page.style.height = `${bleedLayout.pageH}cm`;
-                    page.style.display = 'flex';
-                    page.style.alignItems = 'center';
-                    page.style.justifyContent = 'center';
-                    page.style.background = bleedLayout.pageBg;
-                } else {
-                    page.style.width = `${W}cm`;
-                    page.style.height = `${H}cm`;
-                    page.style.background = '#ffffff';
-                }
+                page.style.width = `${profile.width}cm`;
+                page.style.height = `${profile.height}cm`;
                 page.style.position = 'relative';
+                page.style.background = '#fff';
                 page.style.overflow = 'hidden';
                 // Set pageBreakAfter only for last page - let CSS handle the rest
                 if(isLastPage){
@@ -7097,9 +6983,8 @@ document.addEventListener('DOMContentLoaded', ()=>{
                         }
                     }
                     
-                    trim.appendChild(d);
+                    page.appendChild(d);
                 });
-                page.appendChild(trim);
                 
                 return page;
             }
@@ -7187,7 +7072,25 @@ document.addEventListener('DOMContentLoaded', ()=>{
                     styleEl.id = styleId;
                     document.head.appendChild(styleEl);
                 }
-                styleEl.textContent = buildMultiPagePrintStylesheet(profile);
+                styleEl.textContent = `
+                    @media print{
+                        @page{
+                            size: ${profile.width}cm ${profile.height}cm;
+                            margin: 0;
+                            padding: 0;
+                            marks: none;
+                            bleed: 0;
+                        }
+                        html,body{margin:0!important;padding:0!important;background:#fff!important;width:${profile.width}cm!important;height:auto!important}
+                        #toolbar,#sidebar,#marquee,.status-message{display:none!important}
+                        .print-page{width:${profile.width}cm!important;height:${profile.height}cm!important;page-break-inside:avoid!important;overflow:visible!important;background:#fff!important;position:relative!important;margin:0!important;padding:0!important;display:block!important;box-sizing:border-box!important}
+                        .print-page:not(:last-child){page-break-after:always!important}
+                        .print-page:last-child{page-break-after:auto!important}
+                        .print-container{display:block!important;position:static!important;left:auto!important;top:auto!important}
+                        #main-content,#canvas-container,#canvas-wrapper,#label-canvas{display:none!important}
+                        .label-element{print-color-adjust:exact!important;-webkit-print-color-adjust:exact!important}
+                    }
+                `;
                 
                 // Print
                 window.print();
@@ -7245,7 +7148,7 @@ document.addEventListener('DOMContentLoaded', ()=>{
         printContainer.style.position = 'absolute';
         printContainer.style.left = '-9999px';
         printContainer.style.top = '0';
-        printContainer.style.width = `${getBleedLayoutForProfile(profile).pageW}cm`;
+        printContainer.style.width = `${profile.width}cm`;
         // Height is auto - pages will be stacked naturally
         printContainer.style.height = 'auto';
         
@@ -7259,29 +7162,10 @@ document.addEventListener('DOMContentLoaded', ()=>{
             
             const page = document.createElement('div');
             page.className = 'print-page';
-            const bleedLayout = getBleedLayoutForProfile(profile);
-            const W = bleedLayout.W;
-            const H = bleedLayout.H;
-            const trim = document.createElement('div');
-            trim.className = 'print-page-trim';
-            trim.style.width = `${W}cm`;
-            trim.style.height = `${H}cm`;
-            trim.style.position = 'relative';
-            trim.style.overflow = 'hidden';
-            trim.style.flexShrink = '0';
-            if(bleedLayout.bleedOn){
-                page.style.width = `${bleedLayout.pageW}cm`;
-                page.style.height = `${bleedLayout.pageH}cm`;
-                page.style.display = 'flex';
-                page.style.alignItems = 'center';
-                page.style.justifyContent = 'center';
-                page.style.background = bleedLayout.pageBg;
-            } else {
-                page.style.width = `${W}cm`;
-                page.style.height = `${H}cm`;
-                page.style.background = '#ffffff';
-            }
+            page.style.width = `${profile.width}cm`;
+            page.style.height = `${profile.height}cm`;
             page.style.position = 'relative';
+            page.style.background = '#fff';
             page.style.overflow = 'hidden';
             // Set pageBreakAfter only for last page - let CSS handle the rest
             if(isLastPage){
@@ -7620,9 +7504,8 @@ document.addEventListener('DOMContentLoaded', ()=>{
                     }
                 }
                 
-                trim.appendChild(d);
+                page.appendChild(d);
             });
-            page.appendChild(trim);
             
             return page;
         }
@@ -7679,7 +7562,25 @@ document.addEventListener('DOMContentLoaded', ()=>{
                 styleEl.id = styleId;
                 document.head.appendChild(styleEl);
             }
-            styleEl.textContent = buildMultiPagePrintStylesheet(profile);
+            styleEl.textContent = `
+                @media print{
+                    @page{
+                        size: ${profile.width}cm ${profile.height}cm;
+                        margin: 0;
+                        padding: 0;
+                        marks: none;
+                        bleed: 0;
+                    }
+                    html,body{margin:0!important;padding:0!important;background:#fff!important;width:${profile.width}cm!important;height:auto!important}
+                    #toolbar,#sidebar,#marquee,.status-message{display:none!important}
+                    .print-page{width:${profile.width}cm!important;height:${profile.height}cm!important;page-break-inside:avoid!important;overflow:visible!important;background:#fff!important;position:relative!important;margin:0!important;padding:0!important;display:block!important;box-sizing:border-box!important}
+                    .print-page:not(:last-child){page-break-after:always!important}
+                    .print-page:last-child{page-break-after:auto!important}
+                    .print-container{display:block!important;position:static!important;left:auto!important;top:auto!important}
+                    #main-content,#canvas-container,#canvas-wrapper,#label-canvas{display:none!important}
+                    .label-element{print-color-adjust:exact!important;-webkit-print-color-adjust:exact!important}
+                }
+            `;
             
             // Print
             window.print();
@@ -9015,21 +8916,6 @@ document.addEventListener('DOMContentLoaded', ()=>{
     document.getElementById('btn-print-single').addEventListener('click', ()=>{
         printSingle();
     });
-    document.getElementById('print-bleed-enabled').addEventListener('change', ()=>{
-        try {
-            localStorage.setItem(PRINT_BLEED_STORAGE_KEY, document.getElementById('print-bleed-enabled').checked ? '1' : '0');
-        } catch (e) {}
-        const miniBleed = document.getElementById('mini-print-bleed');
-        if (miniBleed) miniBleed.checked = document.getElementById('print-bleed-enabled').checked;
-        updatePrintCSS();
-    });
-    function onPrintBleedColorPicked(){
-        savePrintBleedColor();
-        syncMiniPrintBleedColor();
-        updatePrintCSS();
-    }
-    document.getElementById('print-bleed-color').addEventListener('input', onPrintBleedColorPicked);
-    document.getElementById('print-bleed-color').addEventListener('change', onPrintBleedColorPicked);
         document.getElementById('btn-rotate-canvas').addEventListener('click', ()=>{
             canvasRotation = (canvasRotation + 90) % 360;
             applyCanvasRotation();
@@ -9345,51 +9231,10 @@ document.addEventListener('DOMContentLoaded', ()=>{
                     const btnRotate = document.getElementById('btn-rotate-canvas').cloneNode(true);
                     btnRotate.id = 'mini-btn-rotate';
                     btnRotate.addEventListener('click', () => document.getElementById('btn-rotate-canvas').click());
-                    const miniBleedChk = document.createElement('input');
-                    miniBleedChk.type = 'checkbox';
-                    miniBleedChk.id = 'mini-print-bleed';
-                    miniBleedChk.title = 'Bleed 1 cm per lato';
-                    const mainBleedChk = document.getElementById('print-bleed-enabled');
-                    const mainBleedColor = document.getElementById('print-bleed-color');
-                    miniBleedChk.checked = mainBleedChk ? mainBleedChk.checked : false;
-                    miniBleedChk.addEventListener('change', (e) => {
-                        if (mainBleedChk) {
-                            mainBleedChk.checked = e.target.checked;
-                            mainBleedChk.dispatchEvent(new Event('change'));
-                        }
-                    });
-                    const miniBleedColor = document.createElement('input');
-                    miniBleedColor.type = 'color';
-                    miniBleedColor.id = 'mini-print-bleed-color';
-                    miniBleedColor.title = 'Colore bleed';
-                    if (mainBleedColor) miniBleedColor.value = mainBleedColor.value;
-                    Object.assign(miniBleedColor.style, { width: '24px', height: '20px', padding: '0', border: '1px solid #ccc', borderRadius: '3px', cursor: 'pointer', boxSizing: 'border-box' });
-                    miniBleedColor.addEventListener('input', (e) => {
-                        if (mainBleedColor) {
-                            mainBleedColor.value = e.target.value;
-                            mainBleedColor.dispatchEvent(new Event('input'));
-                        }
-                    });
-                    miniBleedColor.addEventListener('change', (e) => {
-                        if (mainBleedColor) {
-                            mainBleedColor.value = e.target.value;
-                            mainBleedColor.dispatchEvent(new Event('change'));
-                        }
-                    });
-                    const miniBleedLbl = document.createElement('label');
-                    miniBleedLbl.style.display = 'flex';
-                    miniBleedLbl.style.alignItems = 'center';
-                    miniBleedLbl.style.gap = '4px';
-                    miniBleedLbl.style.fontSize = '11px';
-                    miniBleedLbl.style.whiteSpace = 'nowrap';
-                    miniBleedLbl.appendChild(miniBleedChk);
-                    miniBleedLbl.appendChild(document.createTextNode('Bleed'));
-                    miniBleedLbl.appendChild(miniBleedColor);
                     const col3 = document.createElement('div');
                     col3.className = 'mini-toolbar-col3';
                     col3.appendChild(canvasSelect);
                     col3.appendChild(btnRotate);
-                    col3.appendChild(miniBleedLbl);
 
                     const btnPrintSingle = document.getElementById('btn-print-single').cloneNode(true);
                     btnPrintSingle.id = 'mini-btn-print-single';
@@ -9680,14 +9525,6 @@ document.addEventListener('DOMContentLoaded', ()=>{
         } catch(e) {
             console.warn('Failed to load from localStorage:', e);
         }
-        
-        try {
-            const bleedChk = document.getElementById('print-bleed-enabled');
-            if (bleedChk && localStorage.getItem(PRINT_BLEED_STORAGE_KEY) === '1') bleedChk.checked = true;
-            const bleedCol = document.getElementById('print-bleed-color');
-            const savedHex = localStorage.getItem(PRINT_BLEED_COLOR_STORAGE_KEY);
-            if (bleedCol && savedHex && /^#[0-9A-Fa-f]{6}$/.test(savedHex)) bleedCol.value = savedHex.toLowerCase();
-        } catch (e) {}
         
         // Initialize canvas size immediately
         updateCanvasSize();
