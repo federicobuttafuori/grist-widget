@@ -144,6 +144,11 @@
         <button id="btn-bring-front" title="Bring to Front" disabled>⬆️ Front</button>
         <button id="btn-send-back" title="Send to Back" disabled>⬇️ Back</button>
         <div class="divider"></div>
+        <input type="checkbox" id="print-bleed-enabled" style="width:auto;margin:0 4px 0 8px" title="Abilita Print Bleed (1 cm per lato)">
+        <label for="print-bleed-enabled" style="font-size:14px;margin:0;white-space:nowrap;cursor:pointer">Print bleed</label>
+        <input type="color" id="print-bleed-color" style="width:30px;padding:0;height:24px;border:none;background:none;cursor:pointer" title="Colore Print Bleed" value="#c0c0c0">
+        <input type="number" id="print-bleed-cm" style="width:50px;padding:2px 4px;font-size:12px" step="0.1" min="0.1" max="3" title="Dimensione Print Bleed (cm)" value="1">
+        <div class="divider"></div>
         <label for="canvas-selector" style="font-size:14px;margin:0;white-space:nowrap">Canvas:</label>
         <select id="canvas-selector" style="width:auto;padding:4px 8px;font-size:14px">
             <option value="1">Canvas 1</option>
@@ -324,6 +329,10 @@ document.addEventListener('DOMContentLoaded', ()=>{
         let bwHalftoneSize = 8;
         let bwPreviewDpi = 203;
         const FONT_FAVORITES_KEY = 'grist_label_font_favorites'; // Key for font favorites
+        // Print bleed state
+        let printBleedEnabled = false;
+        let printBleedCm = 1;
+        let printBleedColor = '#c0c0c0';
     const MAX_HISTORY = 100;
 
         // All available fonts for labels
@@ -683,15 +692,43 @@ document.addEventListener('DOMContentLoaded', ()=>{
     function deepCopy(obj){ return JSON.parse(JSON.stringify(obj)); }
 
         // ---------- Profile Management ----------
-        function updateCanvasSize(){
-            const profile = profiles[currentProfile];
-            if(!profile) return;
-            W = profile.width;
-            H = profile.height;
-            lc.style.width = `${W}cm`;
-            lc.style.height = `${H}cm`;
-            updatePrintCSS();
-            // Don't call fit() here - it will be called after rendering
+        function createPrintPageWithBleed(profile) {
+            const bleed = (printBleedEnabled && Number(printBleedCm) > 0) ? Number(printBleedCm) : 0;
+            
+            const page = document.createElement('div');
+            page.className = 'print-page';
+            
+            if (bleed === 0) {
+                page.style.width = `${profile.width}cm`;
+                page.style.height = `${profile.height}cm`;
+                page.style.position = 'relative';
+                page.style.background = '#fff';
+                page.style.overflow = 'hidden';
+                return { page, contentRoot: page, bleed: 0, pageW: profile.width, pageH: profile.height };
+            }
+
+            const pageW = profile.width + 2 * bleed;
+            const pageH = profile.height + 2 * bleed;
+
+            page.style.width = `${pageW}cm`;
+            page.style.height = `${pageH}cm`;
+            page.style.position = 'relative';
+            page.style.background = printBleedColor;
+            page.style.overflow = 'hidden';
+
+            const contentRoot = document.createElement('div');
+            contentRoot.className = 'print-content-root';
+            contentRoot.style.position = 'absolute';
+            contentRoot.style.left = `${bleed}cm`;
+            contentRoot.style.top = `${bleed}cm`;
+            contentRoot.style.width = `${profile.width}cm`;
+            contentRoot.style.height = `${profile.height}cm`;
+            contentRoot.style.background = '#fff';
+            contentRoot.style.overflow = 'hidden';
+
+            page.appendChild(contentRoot);
+
+            return { page, contentRoot, bleed, pageW, pageH };
         }
 
         function updatePrintCSS(){
@@ -704,25 +741,30 @@ document.addEventListener('DOMContentLoaded', ()=>{
             }
             const profile = profiles[currentProfile];
             if(profile){
+                const bleed = (printBleedEnabled && Number(printBleedCm) > 0) ? Number(printBleedCm) : 0;
+                const pageW = profile.width + 2 * bleed;
+                const pageH = profile.height + 2 * bleed;
+                const pageBg = printBleedEnabled ? printBleedColor : '#fff';
+
                 styleEl.textContent = `
                     @media print{
                         @page{
-                            size: ${profile.width}cm ${profile.height}cm;
+                            size: ${pageW}cm ${pageH}cm;
                             margin: 0;
                             padding: 0;
                             marks: none;
                             bleed: 0;
                         }
-                        html,body{margin:0!important;padding:0!important;width:${profile.width}cm!important;height:${profile.height}cm!important;overflow:visible!important;background:#fff!important}
+                        html,body{margin:0!important;padding:0!important;width:${pageW}cm!important;height:${pageH}cm!important;overflow:visible!important;background:${pageBg}!important}
                         #toolbar,#sidebar,#marquee,.status-message{display:none!important}
-                        #main-content{width:${profile.width}cm!important;height:${profile.height}cm!important;overflow:visible!important;display:block!important;padding:0!important;margin:0!important}
-                        #canvas-container{width:${profile.width}cm!important;height:${profile.height}cm!important;padding:0!important;margin:0!important;overflow:visible!important;background:#fff!important;display:block!important;position:static!important}
-                        #canvas-wrapper{position:static!important;width:${profile.width}cm!important;height:${profile.height}cm!important;margin:0!important;padding:0!important;transform:none!important;display:block!important}
-                        #label-canvas{position:static!important;width:${profile.width}cm!important;height:${profile.height}cm!important;transform:none!important;box-shadow:none!important;display:block!important;overflow:visible!important;background:#fff!important}
-                            .label-element{page-break-inside:avoid!important;-webkit-print-color-adjust:exact!important;print-color-adjust:exact!important}
+                        #main-content{width:${pageW}cm!important;height:${pageH}cm!important;overflow:visible!important;display:block!important;padding:0!important;margin:0!important}
+                        #canvas-container{width:${pageW}cm!important;height:${pageH}cm!important;padding:0!important;margin:0!important;overflow:visible!important;background:${pageBg}!important;display:block!important;position:static!important}
+                        .print-page{width:${pageW}cm!important;height:${pageH}cm!important;background:${pageBg}!important;position:relative!important;overflow:hidden!important;display:block!important}
+                        .print-content-root{width:${profile.width}cm!important;height:${profile.height}cm!important;background:#fff!important;position:absolute!important;left:${bleed}cm!important;top:${bleed}cm!important;overflow:hidden!important;display:block!important}
+                        #canvas-wrapper{display:none!important}
+                        .label-element{page-break-inside:avoid!important;-webkit-print-color-adjust:exact!important;print-color-adjust:exact!important}
                         .label-element.selected{border:1px solid transparent!important;box-shadow:none!important}
                         .resize-handle{display:none!important}
-                            .label-element[style*="border"]{-webkit-print-color-adjust:exact!important;print-color-adjust:exact!important}
                         img.qr-code-img{image-rendering:pixelated!important;-webkit-image-rendering:pixelated!important}
                     }
                 `;
@@ -980,7 +1022,12 @@ document.addEventListener('DOMContentLoaded', ()=>{
                         lastCanvasByDesign: lastCanvasByDesign || {},
                         globalSequenceCountColumn: globalSequenceCountColumn,
                         packWaves: packWaves || [],
-                        masterDataThreads: masterDataThreads || []
+                        masterDataThreads: masterDataThreads || [],
+                        printBleed: {
+                            enabled: printBleedEnabled,
+                            cm: printBleedCm,
+                            color: printBleedColor
+                        }
                     };
                     localStorage.setItem(KEY, JSON.stringify(payloadObj));
                 }
@@ -1032,6 +1079,11 @@ document.addEventListener('DOMContentLoaded', ()=>{
                             dithering: bwDithering,
                             halftoneSize: bwHalftoneSize,
                             previewDpi: bwPreviewDpi
+                        },
+                        printBleed: {
+                            enabled: printBleedEnabled,
+                            cm: printBleedCm,
+                            color: printBleedColor
                         }
                 };
                 localStorage.setItem(KEY, JSON.stringify(payloadObj));
@@ -5593,17 +5645,22 @@ document.addEventListener('DOMContentLoaded', ()=>{
                 globalRegexRules: globalRegexRules || [],
                 masterDataThreads: masterDataThreads || [],
                 fontFavorites: fontFavorites || [],
-                bwPreview: {
-                    modeEnabled: bwModeEnabled,
-                    gamma: bwGamma,
-                    threshold: bwThreshold,
-                    contrast: bwContrast,
-                    dotGain: bwDotGain,
-                    brightness: bwBrightness,
-                    dithering: bwDithering,
-                    halftoneSize: bwHalftoneSize,
-                    previewDpi: bwPreviewDpi
-                }
+                    bwPreview: {
+                        modeEnabled: bwModeEnabled,
+                        gamma: bwGamma,
+                        threshold: bwThreshold,
+                        contrast: bwContrast,
+                        dotGain: bwDotGain,
+                        brightness: bwBrightness,
+                        dithering: bwDithering,
+                        halftoneSize: bwHalftoneSize,
+                        previewDpi: bwPreviewDpi
+                    },
+                    printBleed: {
+                        enabled: printBleedEnabled,
+                        cm: printBleedCm,
+                        color: printBleedColor
+                    }
             };
 
             const blob = new Blob([JSON.stringify(payloadObj, null, 2)], { type: 'application/json' });
@@ -5666,6 +5723,13 @@ document.addEventListener('DOMContentLoaded', ()=>{
                     if(typeof p.previewDpi === 'number' && p.previewDpi >= 72 && p.previewDpi <= 300) bwPreviewDpi = p.previewDpi;
                 }
 
+                if(parsed.printBleed && typeof parsed.printBleed === 'object'){
+                    const pb = parsed.printBleed;
+                    if(typeof pb.enabled === 'boolean') printBleedEnabled = pb.enabled;
+                    if(typeof pb.cm === 'number' && pb.cm > 0 && pb.cm <= 3) printBleedCm = pb.cm;
+                    if(typeof pb.color === 'string') printBleedColor = pb.color;
+                }
+
                 if(Array.isArray(parsed.fontFavorites)){
                     fontFavorites = deepCopy(parsed.fontFavorites);
                     saveFontFavorites();
@@ -5704,6 +5768,7 @@ document.addEventListener('DOMContentLoaded', ()=>{
                 updateSynchronizedBlocksUI();
                 resetHistory();
                 if(typeof syncBwControlsFromState === 'function') syncBwControlsFromState();
+                if(typeof syncPrintBleedControlsFromState === 'function') syncPrintBleedControlsFromState();
 
                 saveCurrentDesign();
                 msg('Snapshot imported');
@@ -5906,7 +5971,10 @@ document.addEventListener('DOMContentLoaded', ()=>{
             printContainer.style.position = 'absolute';
             printContainer.style.left = '-9999px';
             printContainer.style.top = '0';
-            printContainer.style.width = `${profile.width}cm`;
+            const bleedTotal = (printBleedEnabled && Number(printBleedCm) > 0) ? Number(printBleedCm) : 0;
+            const containerW = profile.width + 2 * bleedTotal;
+            printContainer.style.width = `${containerW}cm`;
+            // Height is auto - pages will be stacked naturally
             printContainer.style.height = 'auto';
             
             // Calculate total pages across all selected waves
@@ -5925,18 +5993,633 @@ document.addEventListener('DOMContentLoaded', ()=>{
                 return;
             }
             
-            // Helper function to render canvas to print page (identical to printBothCanvases)
+            // Helper function to render canvas to print page
             function renderCanvasToPage(canvasNum, sequenceIndex = 1, isLastPage = false, waveContext = null){
                 const canvasData = design[`canvas${canvasNum}`] || [];
                 const tempS = canvasData.map(normalizeElement);
                 
-                const page = document.createElement('div');
-                page.className = 'print-page';
-                page.style.width = `${profile.width}cm`;
-                page.style.height = `${profile.height}cm`;
-                page.style.position = 'relative';
-                page.style.background = '#fff';
-                page.style.overflow = 'hidden';
+                const { page, contentRoot } = createPrintPageWithBleed(profile);
+                
+                // Set pageBreakAfter only for last page - let CSS handle the rest
+                if(isLastPage){
+                    page.style.pageBreakAfter = 'auto';
+                }
+                
+                // Render elements
+                const sorted = tempS.slice().sort((a,b)=> (a.zIndex||0) - (b.zIndex||0));
+                sorted.forEach(el=>{
+                    const d = document.createElement('div');
+                    d.classList.add('label-element');
+                    d.style.position = 'absolute';
+                    d.style.left = `${el.x}cm`;
+                    d.style.top = `${el.y}cm`;
+                    // For lines, don't set height in cm initially - it will be set in px later
+                    if(el.type !== 'line'){
+                        d.style.width = `${el.width}cm`;
+                        d.style.height = `${el.height}cm`;
+                    } else {
+                        d.style.width = `${el.width}cm`;
+                        // Height will be set in px in the line case below
+                    }
+                    d.style.zIndex = el.zIndex || 0;
+                    d.style.fontSize = `${el.props.fontSize || 16}px`;
+                    const fontWeight = el.props.fontWeight;
+                    if(typeof fontWeight === 'number'){
+                        d.style.fontWeight = fontWeight;
+                    } else {
+                        d.style.fontWeight = fontWeight || 'normal';
+                    }
+                    d.style.fontFamily = el.props.fontFamily || 'Arial, sans-serif';
+                    d.style.lineHeight = el.props.lineHeight !== undefined ? String(el.props.lineHeight) : '1.2';
+                    const justifyMap = { left: 'flex-start', center: 'center', right: 'flex-end' };
+                    const alignMap = { top: 'flex-start', middle: 'center', bottom: 'flex-end' };
+                    if(el.type !== 'line'){
+                        d.style.display = 'flex';
+                        d.style.alignItems = alignMap[el.props.valign] || 'flex-start';
+                        d.style.justifyContent = justifyMap[el.props.textAlign] || 'flex-start';
+                        // Use pre-wrap to preserve line breaks from textarea
+                        if(el.type === 'text' || el.type === 'data'){
+                            d.style.whiteSpace = 'pre-wrap';
+                        } else {
+                            d.style.whiteSpace = 'normal';
+                        }
+                    } else {
+                        d.style.display = 'block';
+                        d.style.whiteSpace = '';
+                    }
+                    d.style.textAlign = el.props.textAlign || 'left';
+                    // For lines, color is handled separately via background
+                    if(el.type !== 'line'){
+                        d.style.color = el.props.color || '#000000';
+                    }
+                    d.style.boxSizing = 'border-box';
+                    const rotation = Number(el.props.rotation) || 0;
+                    d.style.transform = `rotate(${rotation}deg)`;
+                    d.style.transformOrigin = 'center center';
+                    
+                    if((el.type === 'text' || el.type === 'data')){
+                        const pt = Number.isFinite(Number(el.props.paddingTop)) ? Number(el.props.paddingTop) : 0;
+                        const pr = Number.isFinite(Number(el.props.paddingRight)) ? Number(el.props.paddingRight) : 0;
+                        const pb = Number.isFinite(Number(el.props.paddingBottom)) ? Number(el.props.paddingBottom) : 0;
+                        const pl = Number.isFinite(Number(el.props.paddingLeft)) ? Number(el.props.paddingLeft) : 0;
+                        d.style.padding = `${pt}cm ${pr}cm ${pb}cm ${pl}cm`;
+                    } else {
+                        d.style.padding = '';
+                    }
+                    
+                        // Apply borders for elements with showBorder enabled
+                    if(el.props.showBorder){
+                        const bwNum = Number(el.props.borderWidth);
+                        const borderWidth = `${Number.isFinite(bwNum) ? bwNum : 1}px`;
+                        const borderColor = el.props.borderColor || '#000';
+                        const borderStyle = 'solid';
+                        
+                        d.style.borderTop = (el.props.borderTop !== false) ? `${borderWidth} ${borderStyle} ${borderColor}` : 'none';
+                        d.style.borderRight = (el.props.borderRight !== false) ? `${borderWidth} ${borderStyle} ${borderColor}` : 'none';
+                        d.style.borderBottom = (el.props.borderBottom !== false) ? `${borderWidth} ${borderStyle} ${borderColor}` : 'none';
+                        d.style.borderLeft = (el.props.borderLeft !== false) ? `${borderWidth} ${borderStyle} ${borderColor}` : 'none';
+                            
+                            d.style.printColorAdjust = 'exact';
+                            d.style.webkitPrintColorAdjust = 'exact';
+                        
+                        const brTL = Number(el.props.borderRadiusTopLeft) || 0;
+                        const brTR = Number(el.props.borderRadiusTopRight) || 0;
+                        const brBR = Number(el.props.borderRadiusBottomRight) || 0;
+                        const brBL = Number(el.props.borderRadiusBottomLeft) || 0;
+                        if(brTL > 0 || brTR > 0 || brBR > 0 || brBL > 0){
+                            d.style.borderRadius = `${brTL}px ${brTR}px ${brBR}px ${brBL}px`;
+                        } else {
+                            d.style.borderRadius = '';
+                        }
+                        } else if(el.type === 'box'){
+                            d.style.border = 'none';
+                            const brTL = Number(el.props.borderRadiusTopLeft) || 0;
+                            const brTR = Number(el.props.borderRadiusTopRight) || 0;
+                            const brBR = Number(el.props.borderRadiusBottomRight) || 0;
+                            const brBL = Number(el.props.borderRadiusBottomLeft) || 0;
+                            if(brTL > 0 || brTR > 0 || brBR > 0 || brBL > 0){
+                                d.style.borderRadius = `${brTL}px ${brTR}px ${brBR}px ${brBL}px`;
+                            } else {
+                                d.style.borderRadius = '';
+                            }
+                        } else if(el.type !== 'line'){
+                            if(!el.props.showBorder){
+                                d.style.border = '1px solid transparent';
+                            }
+                        }
+                    
+                    // Content
+                    switch(el.type){
+                        case 'text': {
+                            const span = document.createElement('div');
+                            span.style.display='block';
+                            span.style.pointerEvents='none';
+                            
+                            // Set whiteSpace and width based on textOverflow mode
+                            const overflowMode = el.props.textOverflow || 'clip';
+                            if(overflowMode === 'squeeze'){
+                                span.style.whiteSpace = 'nowrap'; // No wrapping for squeeze
+                                span.style.width = 'auto'; // Allow natural text width for squeeze
+                                span.style.overflow = 'visible'; // Don't clip compressed text
+                                span.style.wordWrap = 'normal'; // Disable word wrapping for squeeze
+                            } else {
+                                span.style.width = '100%';
+                                span.style.overflow = 'hidden';
+                                span.style.whiteSpace = 'pre-wrap'; // Allow wrapping for clip and auto-scale
+                                span.style.wordWrap='break-word';
+                            }
+                            
+                            setTextWithRegexFormatting(span, getData(el, sequenceIndex, waveContext), el.props.regexRules);
+                            // Copy font styles to span for overflow calculation
+                            span.style.fontFamily = el.props.fontFamily || 'Arial, sans-serif';
+                            span.style.fontSize = (el.props.fontSize || 16) + 'px';
+                            const fontWeight = el.props.fontWeight;
+                            if(typeof fontWeight === 'number'){
+                                span.style.fontWeight = fontWeight;
+                            } else {
+                                span.style.fontWeight = fontWeight || 'normal';
+                            }
+                            span.style.lineHeight = el.props.lineHeight !== undefined ? String(el.props.lineHeight) : '1.2';
+                            span.style.color = el.props.color || '#000000';
+                            applySvgOutlineToTextContainer(el, span);
+                            d.appendChild(span);
+                            break;
+                        }
+                        case 'data': {
+                            const span = document.createElement('div');
+                            span.style.display='block';
+                            span.style.pointerEvents='none';
+                            
+                            // Set whiteSpace and width based on textOverflow mode
+                            const overflowMode = el.props.textOverflow || 'clip';
+                            if(overflowMode === 'squeeze'){
+                                span.style.whiteSpace = 'nowrap'; // No wrapping for squeeze
+                                span.style.width = 'auto'; // Allow natural text width for squeeze
+                                span.style.overflow = 'visible'; // Don't clip compressed text
+                                span.style.wordWrap = 'normal'; // Disable word wrapping for squeeze
+                            } else {
+                                span.style.width = '100%';
+                                span.style.overflow = 'hidden';
+                                span.style.whiteSpace = 'pre-wrap'; // Allow wrapping for clip and auto-scale
+                                span.style.wordWrap='break-word';
+                            }
+                            
+                            setTextWithRegexFormatting(span, getData(el, sequenceIndex, waveContext), el.props.regexRules);
+                            // Copy font styles to span for overflow calculation
+                            span.style.fontFamily = el.props.fontFamily || 'Arial, sans-serif';
+                            span.style.fontSize = (el.props.fontSize || 16) + 'px';
+                            const fontWeight = el.props.fontWeight;
+                            if(typeof fontWeight === 'number'){
+                                span.style.fontWeight = fontWeight;
+                            } else {
+                                span.style.fontWeight = fontWeight || 'normal';
+                            }
+                            span.style.lineHeight = el.props.lineHeight !== undefined ? String(el.props.lineHeight) : '1.2';
+                            span.style.color = el.props.color || '#000000';
+                            applySvgOutlineToTextContainer(el, span);
+                            d.appendChild(span);
+                            break;
+                        }
+                        case 'line':
+                            // For lines, use explicit background color and ensure visibility
+                            const lineColor = el.props.color || '#000000';
+                            d.style.background = lineColor;
+                            d.style.backgroundColor = lineColor;
+                            d.style.height = `${el.props.thickness || 2}px`;
+                            d.style.width = `${el.width}cm`;
+                            d.style.border = 'none';
+                            d.style.display = 'block';
+                            d.style.margin = '0';
+                            d.style.padding = '0';
+                            d.style.overflow = 'visible';
+                            d.style.minHeight = `${el.props.thickness || 2}px`;
+                            d.style.maxHeight = `${el.props.thickness || 2}px`;
+                            d.style.boxSizing = 'border-box';
+                            // Force browsers to print background colors
+                            d.style.printColorAdjust = 'exact';
+                            d.style.webkitPrintColorAdjust = 'exact';
+                            // Add a non-breaking space to ensure the div has content (invisible but ensures rendering)
+                            d.innerHTML = '&nbsp;';
+                            d.style.color = 'transparent';
+                            d.style.fontSize = '0';
+                            break;
+                        case 'box':
+                            d.style.backgroundColor = el.props.fillColor || 'transparent';
+                            break;
+                        case 'qr': {
+                            const effectiveSequenceIndex = waveContext && waveContext.waveSequenceIndex !== undefined ? waveContext.waveSequenceIndex : sequenceIndex;
+                            const c = getData(el, sequenceIndex, waveContext) || '';
+                            let prefix = el.props.prefix || '';
+                            let suffix = el.props.suffix || '';
+                            
+                            // Apply sequence placeholder to prefix and suffix
+                            prefix = replaceColumnSyntax(prefix, el, waveContext);
+                            prefix = applySequencePlaceholder(prefix, effectiveSequenceIndex);
+                            suffix = replaceColumnSyntax(suffix, el, waveContext);
+                            suffix = applySequencePlaceholder(suffix, effectiveSequenceIndex);
+                            
+                            // Combine prefix + code + suffix into the QR code value
+                            const qrValue = prefix + String(c) + suffix;
+                            
+                            const q = document.createElement('img');
+                            const dpiPrint = 118.11;
+                            const qsPrint = Math.max(50, Math.min(el.width, el.height) * dpiPrint);
+                            const qrOpts = { colorDark: el.props.qrColorDark || '#000000', colorLight: el.props.qrColorLight || '#ffffff', errorCorrectLevel: el.props.qrErrorCorrectLevel || 'M' };
+                            q.src = generateQRDataURL(qrValue, qsPrint, qrOpts) || '';
+                            q.className = 'qr-code-img';
+                            q.style.imageRendering = 'pixelated';
+                            q.style.webkitImageRendering = 'pixelated';
+                            q.style.pointerEvents='none';
+                            q.style.width='100%';
+                            q.style.height='100%';
+                            q.style.objectFit='contain';
+                            d.appendChild(q);
+                            break;
+                        }
+                        case 'barcode': {
+                            const effectiveSequenceIndex = waveContext && waveContext.waveSequenceIndex !== undefined ? waveContext.waveSequenceIndex : sequenceIndex;
+                            const c = getData(el, sequenceIndex, waveContext) || '';
+                            let prefix = el.props.prefix || '';
+                            let suffix = el.props.suffix || '';
+                            
+                            // Apply sequence placeholder to prefix and suffix
+                            prefix = replaceColumnSyntax(prefix, el, waveContext);
+                            prefix = applySequencePlaceholder(prefix, effectiveSequenceIndex);
+                            suffix = replaceColumnSyntax(suffix, el, waveContext);
+                            suffix = applySequencePlaceholder(suffix, effectiveSequenceIndex);
+                            
+                            // Combine prefix + code + suffix into the barcode value
+                            const barcodeValue = prefix + String(c) + suffix;
+                            
+                            // Calculate dimensions considering padding and borders FIRST
+                            const PIXELS_PER_CM = 37.795276;
+                            const paddingTop = (Number(el.props.paddingTop) || 0) * PIXELS_PER_CM;
+                            const paddingBottom = (Number(el.props.paddingBottom) || 0) * PIXELS_PER_CM;
+                            const paddingLeft = (Number(el.props.paddingLeft) || 0) * PIXELS_PER_CM;
+                            const paddingRight = (Number(el.props.paddingRight) || 0) * PIXELS_PER_CM;
+                            const borderWidth = (Number(el.props.thickness) || 0);
+                            
+                            const containerWidthPx = el.width * PIXELS_PER_CM;
+                            const containerHeightPx = el.height * PIXELS_PER_CM;
+                            const availableWidth = containerWidthPx - paddingLeft - paddingRight - (borderWidth * 2);
+                            const availableHeight = containerHeightPx - paddingTop - paddingBottom - (borderWidth * 2);
+                            
+                            // Create SVG for barcode - fill full container
+                            const sv = document.createElementNS('http://www.w3.org/2000/svg','svg');
+                            sv.style.pointerEvents='none';
+                            sv.style.width = '100%';
+                            sv.style.height = '100%';
+                            sv.style.display = 'block';
+                            sv.style.overflow = 'visible';
+                            d.appendChild(sv);
+                            
+                            try{
+                                const barcodeWidth = Math.max(50, availableWidth);
+                                const pxHeight = availableHeight; // Use full available height, no minimum
+                                
+                                // Calculate width per bar based on available width (estimate ~50 bars for typical barcode)
+                                const estimatedBars = 50;
+                                const widthPerBar = Math.max(1, barcodeWidth / estimatedBars);
+                                
+                                // Set explicit SVG dimensions
+                                sv.setAttribute('width', barcodeWidth.toString());
+                                sv.setAttribute('height', pxHeight.toString());
+                                sv.setAttribute('viewBox', `0 0 ${barcodeWidth} ${pxHeight}`);
+                                sv.setAttribute('preserveAspectRatio', 'none'); // No aspect ratio preservation - fill completely
+                                
+                                // Generate barcode with prefix + code + suffix included
+                                JsBarcode(sv, barcodeValue, {
+                                    format: el.props.format || "CODE128",
+                                    displayValue: el.props.displayValue !== false,
+                                    width: widthPerBar,
+                                    height: pxHeight,
+                                    margin: 0
+                                });
+                            }catch(err){
+                                sv.innerHTML = `<text x="10" y="20" fill="red" font-size="12">Invalid barcode</text>`;
+                            }
+                            break;
+                        }
+                        case 'image': {
+                            const mt = Number(el.props.marginTop) || 0, mr = Number(el.props.marginRight) || 0, mb = Number(el.props.marginBottom) || 0, ml = Number(el.props.marginLeft) || 0;
+                            if(mt || mr || mb || ml) d.style.padding = `${mt}cm ${mr}cm ${mb}cm ${ml}cm`;
+                            const img = document.createElement('img');
+                            img.style.pointerEvents='none';
+                            img.style.width='100%';
+                            img.style.height='100%';
+                            img.style.objectFit = el.props.objectFit || 'contain';
+                            applySvgOutlineToImage(el, img);
+                            img.style.opacity = getImageOpacityCss(el);
+                            if(el.props.fallbackLink) img.dataset.fallbackLink = String(el.props.fallbackLink).trim();
+                            
+                            // Build Imgur URL from Grist column value
+                            let imageUrl = '';
+                            const boundImageValue = getRecordValueByColumnRef(el.props.boundColumn);
+                            if(el.props.boundColumn && boundImageValue.found){
+                                const imgurId = boundImageValue.value;
+                                if(imgurId){
+                                    const id = String(imgurId).trim();
+                                    if(id){
+                                        // Construct Imgur URL: https://i.imgur.com/{id}.jpg
+                                        // If the value already contains http/https, use it as-is
+                                        if(id.startsWith('http://') || id.startsWith('https://')){
+                                            imageUrl = id;
+                                        } else {
+                                            // Remove any existing extension and add .jpg
+                                            const cleanId = id.replace(/\.(jpg|jpeg|png|gif|webp)$/i, '');
+                                            imageUrl = `https://i.imgur.com/${cleanId}.jpg`;
+                                        }
+                                    }
+                                }
+                            }
+                            
+                            if(imageUrl){
+                                img.onload = function(){
+                                    if(el.props.normalizeForBw && img.src && !img.src.startsWith('data:')){
+                                        normalizeImageForBw(img);
+                                    }
+                                };
+                                if(!imageUrl.startsWith('data:')) img.crossOrigin = 'anonymous';
+                                img.src = imageUrl;
+                                let fallbackTried = false;
+                                img.onerror = function(){
+                                    // Try fallback link if available
+                                    if(!fallbackTried && el.props.fallbackLink){
+                                        const fallbackUrl = String(el.props.fallbackLink).trim();
+                                        if(fallbackUrl){
+                                            fallbackTried = true;
+                                            img.src = fallbackUrl;
+                                            return; // Retry with fallback
+                                        }
+                                    }
+                                    // No fallback or fallback also failed
+                                    img.style.display = 'none';
+                                    const errorDiv = document.createElement('div');
+                                    errorDiv.style.width = '100%';
+                                    errorDiv.style.height = '100%';
+                                    errorDiv.style.display = 'flex';
+                                    errorDiv.style.alignItems = 'center';
+                                    errorDiv.style.justifyContent = 'center';
+                                    errorDiv.style.color = '#999';
+                                    errorDiv.style.fontSize = '12px';
+                                    errorDiv.textContent = 'Image not found';
+                                    errorDiv.style.opacity = getImageOpacityCss(el);
+                                    d.appendChild(errorDiv);
+                                };
+                            } else if(el.props.fallbackLink){
+                                // No column selected, but fallback link available - use it directly
+                                const fallbackUrl = String(el.props.fallbackLink).trim();
+                                if(fallbackUrl){
+                                    img.onload = function(){
+                                        if(el.props.normalizeForBw && img.src && !img.src.startsWith('data:')){
+                                            normalizeImageForBw(img);
+                                        }
+                                    };
+                                    if(!fallbackUrl.startsWith('data:')) img.crossOrigin = 'anonymous';
+                                    img.src = fallbackUrl;
+                                    img.onerror = function(){
+                                        img.style.display = 'none';
+                                        const errorDiv = document.createElement('div');
+                                        errorDiv.style.width = '100%';
+                                        errorDiv.style.height = '100%';
+                                        errorDiv.style.display = 'flex';
+                                        errorDiv.style.alignItems = 'center';
+                                        errorDiv.style.justifyContent = 'center';
+                                        errorDiv.style.color = '#999';
+                                        errorDiv.style.fontSize = '12px';
+                                        errorDiv.textContent = 'Image not found';
+                                        errorDiv.style.opacity = getImageOpacityCss(el);
+                                        d.appendChild(errorDiv);
+                                    };
+                                }
+                            } else {
+                                // Show placeholder when no image and no fallback
+                                img.style.display = 'none';
+                                const placeholder = document.createElement('div');
+                                placeholder.style.width = '100%';
+                                placeholder.style.height = '100%';
+                                placeholder.style.display = 'flex';
+                                placeholder.style.alignItems = 'center';
+                                placeholder.style.justifyContent = 'center';
+                                placeholder.style.color = '#ccc';
+                                placeholder.style.fontSize = '12px';
+                                placeholder.style.border = '1px dashed #ccc';
+                                placeholder.textContent = 'No image';
+                                placeholder.style.opacity = getImageOpacityCss(el);
+                                d.appendChild(placeholder);
+                            }
+                            d.appendChild(img);
+                            break;
+                        }
+                    }
+                    if(el.type === 'text' || el.type === 'data' || el.type === 'image'){
+                        const bg = el.props.backgroundColor;
+                        d.style.backgroundColor = (bg && bg !== 'transparent') ? bg : 'transparent';
+                        if(bg && bg !== 'transparent'){
+                            d.style.printColorAdjust = 'exact';
+                            d.style.webkitPrintColorAdjust = 'exact';
+                        }
+                    }
+                    
+                    contentRoot.appendChild(d);
+                });
+                
+                return page;
+            }
+            
+            // Add print container to DOM first so measurements work correctly
+            document.body.appendChild(printContainer);
+            
+            // Iterate over selected waves
+            let pageIndex = 0;
+            selectedWaveIndices.forEach(waveIndex => {
+                const wave = packWaves[waveIndex];
+                const waveCountValue = wave ? getRecordValueByColumnRef(wave.countColumn) : { found: false, value: 0 };
+                if(!wave || !wave.countColumn || !waveCountValue.found){
+                    return;
+                }
+                
+                const count = Math.max(0, Math.floor(Number(waveCountValue.value)));
+                if(count <= 0) return;
+                
+                // For each sequence index in this wave (resets to 1 for each wave)
+                for(let waveSequenceIndex = 1; waveSequenceIndex <= count; waveSequenceIndex++){
+                    const waveContext = { waveIndex, waveSequenceIndex, weightColumn: wave.weightColumn };
+                    
+                    // Add canvas 1
+                    pageIndex++;
+                    const isLastPage1 = pageIndex === totalPages;
+                    const page1 = renderCanvasToPage(1, waveSequenceIndex, isLastPage1, waveContext);
+                    printContainer.appendChild(page1);
+                    
+                    // Add canvas 2 if enabled
+                    if(canvas2Flag){
+                        pageIndex++;
+                        const isLastPage2 = pageIndex === totalPages;
+                        const page2 = renderCanvasToPage(2, waveSequenceIndex, isLastPage2, waveContext);
+                        printContainer.appendChild(page2);
+                    }
+                }
+            });
+            
+            // Apply text overflow handling (similar to printBothCanvases)
+            const allPages = printContainer.querySelectorAll('.print-page');
+            const canvas1Data = design.canvas1 || [];
+            const canvas2Data = design.canvas2 || [];
+            
+            allPages.forEach((page) => {
+                const pageIndex = Array.from(allPages).indexOf(page);
+                let canvasData, canvasNum;
+                if(canvas2Flag){
+                    canvasNum = (pageIndex % 2 === 0) ? 1 : 2;
+                } else {
+                    canvasNum = 1;
+                }
+                canvasData = canvasNum === 1 ? canvas1Data : canvas2Data;
+                const tempS = canvasData.map(normalizeElement);
+                const sorted = tempS.slice().sort((a,b)=> (a.zIndex||0) - (b.zIndex||0));
+                
+                // Use .print-content-root for measurements if it exists
+                const contentRoot = page.querySelector('.print-content-root') || page;
+                
+                contentRoot.querySelectorAll('.label-element').forEach((d, index) => {
+                    if(index < sorted.length){
+                        const el = sorted[index];
+                        if((el.type === 'text' || el.type === 'data') && (el.props.textOverflow === 'auto-scale' || el.props.textOverflow === 'squeeze')){
+                            const span = d.querySelector('div[style*="pointer-events: none"]');
+                            if(span){
+                                const containerWidth = d.offsetWidth;
+                                const containerHeight = d.offsetHeight;
+                                applyTextOverflow(span, el, containerWidth, containerHeight, true);
+                            }
+                        }
+                    }
+                });
+            });
+            
+            waitForPrintImages(printContainer).then(() => {
+                // Update print CSS
+                const styleId = 'dynamic-print-css';
+                let styleEl = document.getElementById(styleId);
+                if(!styleEl){
+                    styleEl = document.createElement('style');
+                    styleEl.id = styleId;
+                    document.head.appendChild(styleEl);
+                }
+                
+                const bleed = (printBleedEnabled && Number(printBleedCm) > 0) ? Number(printBleedCm) : 0;
+                const pageW = profile.width + 2 * bleed;
+                const pageH = profile.height + 2 * bleed;
+                const pageBg = printBleedEnabled ? printBleedColor : '#fff';
+
+                styleEl.textContent = `
+                    @media print{
+                        @page{
+                            size: ${pageW}cm ${pageH}cm;
+                            margin: 0;
+                            padding: 0;
+                            marks: none;
+                            bleed: 0;
+                        }
+                        html,body{margin:0!important;padding:0!important;background:${pageBg}!important;width:${pageW}cm!important;height:auto!important}
+                        #toolbar,#sidebar,#marquee,.status-message{display:none!important}
+                        .print-page{width:${pageW}cm!important;height:${pageH}cm!important;page-break-inside:avoid!important;overflow:visible!important;background:${pageBg}!important;position:relative!important;margin:0!important;padding:0!important;display:block!important;box-sizing:border-box!important}
+                        .print-content-root{width:${profile.width}cm!important;height:${profile.height}cm!important;background:#fff!important;position:absolute!important;left:${bleed}cm!important;top:${bleed}cm!important;overflow:hidden!important;display:block!important}
+                        .print-page:not(:last-child){page-break-after:always!important}
+                        .print-page:last-child{page-break-after:auto!important}
+                        .print-container{display:block!important;position:static!important;left:auto!important;top:auto!important}
+                        #main-content,#canvas-container,#canvas-wrapper,#label-canvas{display:none!important}
+                        .label-element{print-color-adjust:exact!important;-webkit-print-color-adjust:exact!important}
+                    }
+                `;
+                window.print();
+                setTimeout(()=>{
+                    currentCanvas = prevCanvas;
+                    S = prevS;
+                    selectedIds = prevSel;
+                    render();
+                    updateProps();
+                    if(printContainer.parentNode){
+                        document.body.removeChild(printContainer);
+                    }
+                    updatePrintCSS();
+                }, 100);
+            });
+        }
+        
+        function printBothCanvases(){
+            const profile = profiles[currentProfile];
+            if(!profile || !profile.designs[currentDesign]) return;
+            const design = profile.designs[currentDesign];
+            const canvas2Flag = design.canvas2Enabled || false;
+            
+            // Save current canvas
+            saveCurrentDesign();
+            
+            // Store original state
+            const prevSel = deepCopy(selectedIds);
+            const prevCanvas = currentCanvas;
+            const prevS = deepCopy(S);
+            
+            // Check if we have pack waves configured
+            if(packWaves && packWaves.length > 0){
+                // Show wave selection popup
+                showWaveSelectionPopup((selectedWaveIndices) => {
+                    if(selectedWaveIndices === null){
+                        // User cancelled
+                        return;
+                    }
+                    
+                    // Proceed with printing selected waves
+                    printSelectedWaves(selectedWaveIndices, profile, design, canvas2Flag, prevSel, prevCanvas, prevS);
+                }, canvas2Flag);
+                return;
+            }
+            
+            // No waves configured - use default behavior with globalSequenceCountColumn
+            // Sequence mode is always enabled
+            const sequenceEnabled = true;
+            // Validate sequence mode
+            if(!globalSequenceCountColumn){
+                msg('Error: No count column selected. Please select a column in Design Settings.', true);
+                return;
+            }
+            const globalCountValue = getRecordValueByColumnRef(globalSequenceCountColumn);
+            if(!globalCountValue.found){
+                msg('Error: Count column not found in current record', true);
+                return;
+            }
+            
+            // Calculate count for sequence mode (always enabled)
+            const countRaw = globalCountValue.value;
+            const count = Math.max(0, Math.floor(Number(countRaw)));
+            if(count <= 0){
+                msg('Warning: Count value is 0 or invalid, no labels will be printed', true);
+                return;
+            }
+            
+            // Create print container
+            const printContainer = document.createElement('div');
+            printContainer.className = 'print-container';
+            printContainer.style.position = 'absolute';
+            printContainer.style.left = '-9999px';
+            printContainer.style.top = '0';
+            const bleedTotal = (printBleedEnabled && Number(printBleedCm) > 0) ? Number(printBleedCm) : 0;
+            const containerW = profile.width + 2 * bleedTotal;
+            printContainer.style.width = `${containerW}cm`;
+            // Height is auto - pages will be stacked naturally
+            printContainer.style.height = 'auto';
+            
+            // Calculate total pages
+            const totalPages = canvas2Flag ? count * 2 : count;
+            
+            // Helper function to render canvas to print page
+            function renderCanvasToPage(canvasNum, sequenceIndex = 1, isLastPage = false, waveContext = null){
+                const canvasData = design[`canvas${canvasNum}`] || [];
+                const tempS = canvasData.map(normalizeElement);
+                
+                const { page, contentRoot } = createPrintPageWithBleed(profile);
+                
                 // Set pageBreakAfter only for last page - let CSS handle the rest
                 if(isLastPage){
                     page.style.pageBreakAfter = 'auto';
@@ -6350,7 +7033,6 @@ document.addEventListener('DOMContentLoaded', ()=>{
                             break;
                         }
                     }
-                    // Background only for text/data/image (box set in case 'box'; line/qr/barcode have no background)
                     if(el.type === 'text' || el.type === 'data' || el.type === 'image'){
                         const bg = el.props.backgroundColor;
                         d.style.backgroundColor = (bg && bg !== 'transparent') ? bg : 'transparent';
@@ -6360,630 +7042,7 @@ document.addEventListener('DOMContentLoaded', ()=>{
                         }
                     }
                     
-                    page.appendChild(d);
-                });
-                
-                // Ensure page has content - if no elements, add a placeholder to prevent blank pages
-                if(page.children.length === 0){
-                    const placeholder = document.createElement('div');
-                    placeholder.style.width = '100%';
-                    placeholder.style.height = '100%';
-                    placeholder.style.display = 'flex';
-                    placeholder.style.alignItems = 'center';
-                    placeholder.style.justifyContent = 'center';
-                    placeholder.style.color = '#999';
-                    placeholder.style.fontSize = '12px';
-                    placeholder.textContent = 'Empty page';
-                    page.appendChild(placeholder);
-                }
-                
-                return page;
-            }
-            
-            // Add print container to DOM first so measurements work correctly
-            document.body.appendChild(printContainer);
-            
-            // Iterate over selected waves
-            let pageIndex = 0;
-            selectedWaveIndices.forEach(waveIndex => {
-                const wave = packWaves[waveIndex];
-                const waveCountValue = wave ? getRecordValueByColumnRef(wave.countColumn) : { found: false, value: 0 };
-                if(!wave || !wave.countColumn || !waveCountValue.found){
-                    return;
-                }
-                
-                const count = Math.max(0, Math.floor(Number(waveCountValue.value)));
-                if(count <= 0) return;
-                
-                // For each sequence index in this wave (resets to 1 for each wave)
-                for(let waveSequenceIndex = 1; waveSequenceIndex <= count; waveSequenceIndex++){
-                    const waveContext = { waveIndex, waveSequenceIndex, weightColumn: wave.weightColumn };
-                    
-                    // Add canvas 1
-                    pageIndex++;
-                    const isLastPage1 = pageIndex === totalPages;
-                    const page1 = renderCanvasToPage(1, waveSequenceIndex, isLastPage1, waveContext);
-                    printContainer.appendChild(page1);
-                    
-                    // Add canvas 2 if enabled
-                    if(canvas2Flag){
-                        pageIndex++;
-                        const isLastPage2 = pageIndex === totalPages;
-                        const page2 = renderCanvasToPage(2, waveSequenceIndex, isLastPage2, waveContext);
-                        printContainer.appendChild(page2);
-                    }
-                }
-            });
-            
-            // Apply text overflow handling (similar to printBothCanvases)
-            const allPages = printContainer.querySelectorAll('.print-page');
-            const canvas1Data = design.canvas1 || [];
-            const canvas2Data = design.canvas2 || [];
-            
-            allPages.forEach((page) => {
-                const pageIndex = Array.from(allPages).indexOf(page);
-                let canvasData, canvasNum;
-                if(canvas2Flag){
-                    canvasNum = (pageIndex % 2 === 0) ? 1 : 2;
-                } else {
-                    canvasNum = 1;
-                }
-                canvasData = canvasNum === 1 ? canvas1Data : canvas2Data;
-                const tempS = canvasData.map(normalizeElement);
-                const sorted = tempS.slice().sort((a,b)=> (a.zIndex||0) - (b.zIndex||0));
-                page.querySelectorAll('.label-element').forEach((d, index) => {
-                    if(index < sorted.length){
-                        const el = sorted[index];
-                        if((el.type === 'text' || el.type === 'data') && (el.props.textOverflow === 'auto-scale' || el.props.textOverflow === 'squeeze')){
-                            const span = d.querySelector('div[style*="pointer-events: none"]');
-                            if(span){
-                                const containerWidth = d.offsetWidth;
-                                const containerHeight = d.offsetHeight;
-                                applyTextOverflow(span, el, containerWidth, containerHeight, true);
-                            }
-                        }
-                    }
-                });
-            });
-            
-            waitForPrintImages(printContainer).then(() => {
-                // Update print CSS
-                const styleId = 'dynamic-print-css';
-                let styleEl = document.getElementById(styleId);
-                if(!styleEl){
-                    styleEl = document.createElement('style');
-                    styleEl.id = styleId;
-                    document.head.appendChild(styleEl);
-                }
-                styleEl.textContent = `
-                    @media print{
-                        @page{
-                            size: ${profile.width}cm ${profile.height}cm;
-                            margin: 0;
-                            padding: 0;
-                            marks: none;
-                            bleed: 0;
-                        }
-                        html,body{margin:0!important;padding:0!important;background:#fff!important;width:${profile.width}cm!important;height:auto!important}
-                        #toolbar,#sidebar,#marquee,.status-message{display:none!important}
-                        .print-page{width:${profile.width}cm!important;height:${profile.height}cm!important;page-break-inside:avoid!important;overflow:visible!important;background:#fff!important;position:relative!important;margin:0!important;padding:0!important;display:block!important;box-sizing:border-box!important}
-                        .print-page:not(:last-child){page-break-after:always!important}
-                        .print-page:last-child{page-break-after:auto!important}
-                        .print-container{display:block!important;position:static!important;left:auto!important;top:auto!important}
-                        #main-content,#canvas-container,#canvas-wrapper,#label-canvas{display:none!important}
-                        .label-element{print-color-adjust:exact!important;-webkit-print-color-adjust:exact!important}
-                    }
-                `;
-                window.print();
-                setTimeout(()=>{
-                    currentCanvas = prevCanvas;
-                    S = prevS;
-                    selectedIds = prevSel;
-                    render();
-                    updateProps();
-                    if(printContainer.parentNode){
-                        document.body.removeChild(printContainer);
-                    }
-                    updatePrintCSS();
-                }, 100);
-            });
-        }
-        
-        function printBothCanvases(){
-            const profile = profiles[currentProfile];
-            if(!profile || !profile.designs[currentDesign]) return;
-            const design = profile.designs[currentDesign];
-            const canvas2Flag = design.canvas2Enabled || false;
-            
-            // Save current canvas
-            saveCurrentDesign();
-            
-            // Store original state
-            const prevSel = deepCopy(selectedIds);
-            const prevCanvas = currentCanvas;
-            const prevS = deepCopy(S);
-            
-            // Check if we have pack waves configured
-            if(packWaves && packWaves.length > 0){
-                // Show wave selection popup
-                showWaveSelectionPopup((selectedWaveIndices) => {
-                    if(selectedWaveIndices === null){
-                        // User cancelled
-                        return;
-                    }
-                    
-                    // Proceed with printing selected waves
-                    printSelectedWaves(selectedWaveIndices, profile, design, canvas2Flag, prevSel, prevCanvas, prevS);
-                }, canvas2Flag);
-                return;
-            }
-            
-            // No waves configured - use default behavior with globalSequenceCountColumn
-            // Sequence mode is always enabled
-            const sequenceEnabled = true;
-            // Validate sequence mode
-            if(!globalSequenceCountColumn){
-                msg('Error: No count column selected. Please select a column in Design Settings.', true);
-                return;
-            }
-            const globalCountValue = getRecordValueByColumnRef(globalSequenceCountColumn);
-            if(!globalCountValue.found){
-                msg('Error: Count column not found in current record', true);
-                return;
-            }
-            
-            // Calculate count for sequence mode (always enabled)
-            const countRaw = globalCountValue.value;
-            const count = Math.max(0, Math.floor(Number(countRaw)));
-            if(count <= 0){
-                msg('Warning: Count value is 0 or invalid, no labels will be printed', true);
-                return;
-            }
-            
-            // Create print container
-            const printContainer = document.createElement('div');
-            printContainer.className = 'print-container';
-            printContainer.style.position = 'absolute';
-            printContainer.style.left = '-9999px';
-            printContainer.style.top = '0';
-            printContainer.style.width = `${profile.width}cm`;
-            // Height is auto - pages will be stacked naturally
-            printContainer.style.height = 'auto';
-            
-            // Calculate total pages
-            const totalPages = canvas2Flag ? count * 2 : count;
-            
-            // Helper function to render canvas to print page
-            function renderCanvasToPage(canvasNum, sequenceIndex = 1, isLastPage = false, waveContext = null){
-                const canvasData = design[`canvas${canvasNum}`] || [];
-                const tempS = canvasData.map(normalizeElement);
-                
-                const page = document.createElement('div');
-                page.className = 'print-page';
-                page.style.width = `${profile.width}cm`;
-                page.style.height = `${profile.height}cm`;
-                page.style.position = 'relative';
-                page.style.background = '#fff';
-                page.style.overflow = 'hidden';
-                // Set pageBreakAfter only for last page - let CSS handle the rest
-                if(isLastPage){
-                    page.style.pageBreakAfter = 'auto';
-                }
-                // No marginTop or offsetY - pages are created in sequence
-                
-                // Render elements
-                const sorted = tempS.slice().sort((a,b)=> (a.zIndex||0) - (b.zIndex||0));
-                sorted.forEach(el=>{
-                    const d = document.createElement('div');
-                    d.classList.add('label-element');
-                    d.style.position = 'absolute';
-                    d.style.left = `${el.x}cm`;
-                    d.style.top = `${el.y}cm`;
-                    // For lines, don't set height in cm initially - it will be set in px later
-                    if(el.type !== 'line'){
-                        d.style.width = `${el.width}cm`;
-                        d.style.height = `${el.height}cm`;
-                    } else {
-                        d.style.width = `${el.width}cm`;
-                        // Height will be set in px in the line case below
-                    }
-                    d.style.zIndex = el.zIndex || 0;
-                    d.style.fontSize = `${el.props.fontSize || 16}px`;
-                    const fontWeight = el.props.fontWeight;
-                    if(typeof fontWeight === 'number'){
-                        d.style.fontWeight = fontWeight;
-                    } else {
-                        d.style.fontWeight = fontWeight || 'normal';
-                    }
-                    d.style.fontFamily = el.props.fontFamily || 'Arial, sans-serif';
-                    d.style.lineHeight = el.props.lineHeight !== undefined ? String(el.props.lineHeight) : '1.2';
-                    const justifyMap = { left: 'flex-start', center: 'center', right: 'flex-end' };
-                    const alignMap = { top: 'flex-start', middle: 'center', bottom: 'flex-end' };
-                    if(el.type !== 'line'){
-                        d.style.display = 'flex';
-                        d.style.alignItems = alignMap[el.props.valign] || 'flex-start';
-                        d.style.justifyContent = justifyMap[el.props.textAlign] || 'flex-start';
-                        // Use pre-wrap to preserve line breaks from textarea
-                        if(el.type === 'text' || el.type === 'data'){
-                            d.style.whiteSpace = 'pre-wrap';
-                        } else {
-                            d.style.whiteSpace = 'normal';
-                        }
-                    } else {
-                        d.style.display = 'block';
-                        d.style.whiteSpace = '';
-                    }
-                    d.style.textAlign = el.props.textAlign || 'left';
-                    // For lines, color is handled separately via background
-                    if(el.type !== 'line'){
-                        d.style.color = el.props.color || '#000000';
-                    }
-                    d.style.boxSizing = 'border-box';
-                    const rotation = Number(el.props.rotation) || 0;
-                    d.style.transform = `rotate(${rotation}deg)`;
-                    d.style.transformOrigin = 'center center';
-                    
-                    if((el.type === 'text' || el.type === 'data')){
-                        const pt = Number.isFinite(Number(el.props.paddingTop)) ? Number(el.props.paddingTop) : 0;
-                        const pr = Number.isFinite(Number(el.props.paddingRight)) ? Number(el.props.paddingRight) : 0;
-                        const pb = Number.isFinite(Number(el.props.paddingBottom)) ? Number(el.props.paddingBottom) : 0;
-                        const pl = Number.isFinite(Number(el.props.paddingLeft)) ? Number(el.props.paddingLeft) : 0;
-                        d.style.padding = `${pt}cm ${pr}cm ${pb}cm ${pl}cm`;
-                    } else {
-                        d.style.padding = '';
-                    }
-                    
-                        // Apply borders for elements with showBorder enabled
-                    if(el.props.showBorder){
-                        const bwNum = Number(el.props.borderWidth);
-                        const borderWidth = `${Number.isFinite(bwNum) ? bwNum : 1}px`;
-                        const borderColor = el.props.borderColor || '#000';
-                        const borderStyle = 'solid';
-                        
-                        d.style.borderTop = (el.props.borderTop !== false) ? `${borderWidth} ${borderStyle} ${borderColor}` : 'none';
-                        d.style.borderRight = (el.props.borderRight !== false) ? `${borderWidth} ${borderStyle} ${borderColor}` : 'none';
-                        d.style.borderBottom = (el.props.borderBottom !== false) ? `${borderWidth} ${borderStyle} ${borderColor}` : 'none';
-                        d.style.borderLeft = (el.props.borderLeft !== false) ? `${borderWidth} ${borderStyle} ${borderColor}` : 'none';
-                            
-                            d.style.printColorAdjust = 'exact';
-                            d.style.webkitPrintColorAdjust = 'exact';
-                        
-                        const brTL = Number(el.props.borderRadiusTopLeft) || 0;
-                        const brTR = Number(el.props.borderRadiusTopRight) || 0;
-                        const brBR = Number(el.props.borderRadiusBottomRight) || 0;
-                        const brBL = Number(el.props.borderRadiusBottomLeft) || 0;
-                        if(brTL > 0 || brTR > 0 || brBR > 0 || brBL > 0){
-                            d.style.borderRadius = `${brTL}px ${brTR}px ${brBR}px ${brBL}px`;
-                        } else {
-                            d.style.borderRadius = '';
-                        }
-                        } else if(el.type === 'box'){
-                            d.style.border = 'none';
-                            const brTL = Number(el.props.borderRadiusTopLeft) || 0;
-                            const brTR = Number(el.props.borderRadiusTopRight) || 0;
-                            const brBR = Number(el.props.borderRadiusBottomRight) || 0;
-                            const brBL = Number(el.props.borderRadiusBottomLeft) || 0;
-                            if(brTL > 0 || brTR > 0 || brBR > 0 || brBL > 0){
-                                d.style.borderRadius = `${brTL}px ${brTR}px ${brBR}px ${brBL}px`;
-                            } else {
-                                d.style.borderRadius = '';
-                            }
-                        } else if(el.type !== 'line'){
-                            if(!el.props.showBorder){
-                                d.style.border = '1px solid transparent';
-                            }
-                        }
-                    
-                    // Content
-                    switch(el.type){
-                        case 'text': {
-                            const span = document.createElement('div');
-                            span.style.display='block';
-                            span.style.pointerEvents='none';
-                            
-                            // Set whiteSpace and width based on textOverflow mode
-                            const overflowMode = el.props.textOverflow || 'clip';
-                            if(overflowMode === 'squeeze'){
-                                span.style.whiteSpace = 'nowrap'; // No wrapping for squeeze
-                                span.style.width = 'auto'; // Allow natural text width for squeeze
-                                span.style.overflow = 'visible'; // Don't clip compressed text
-                                span.style.wordWrap = 'normal'; // Disable word wrapping for squeeze
-                            } else {
-                                span.style.width = '100%';
-                                span.style.overflow = 'hidden';
-                                span.style.whiteSpace = 'pre-wrap'; // Allow wrapping for clip and auto-scale
-                                span.style.wordWrap='break-word';
-                            }
-                            
-                            setTextWithRegexFormatting(span, getData(el, sequenceIndex, waveContext), el.props.regexRules);
-                            // Copy font styles to span for overflow calculation
-                            span.style.fontFamily = el.props.fontFamily || 'Arial, sans-serif';
-                            span.style.fontSize = (el.props.fontSize || 16) + 'px';
-                            const fontWeight = el.props.fontWeight;
-                            if(typeof fontWeight === 'number'){
-                                span.style.fontWeight = fontWeight;
-                            } else {
-                                span.style.fontWeight = fontWeight || 'normal';
-                            }
-                            span.style.lineHeight = el.props.lineHeight !== undefined ? String(el.props.lineHeight) : '1.2';
-                            span.style.color = el.props.color || '#000000';
-                            applySvgOutlineToTextContainer(el, span);
-                            d.appendChild(span);
-                            break;
-                        }
-                        case 'data': {
-                            const span = document.createElement('div');
-                            span.style.display='block';
-                            span.style.pointerEvents='none';
-                            
-                            // Set whiteSpace and width based on textOverflow mode
-                            const overflowMode = el.props.textOverflow || 'clip';
-                            if(overflowMode === 'squeeze'){
-                                span.style.whiteSpace = 'nowrap'; // No wrapping for squeeze
-                                span.style.width = 'auto'; // Allow natural text width for squeeze
-                                span.style.overflow = 'visible'; // Don't clip compressed text
-                                span.style.wordWrap = 'normal'; // Disable word wrapping for squeeze
-                            } else {
-                                span.style.width = '100%';
-                                span.style.overflow = 'hidden';
-                                span.style.whiteSpace = 'pre-wrap'; // Allow wrapping for clip and auto-scale
-                                span.style.wordWrap='break-word';
-                            }
-                            
-                            setTextWithRegexFormatting(span, getData(el, sequenceIndex, waveContext), el.props.regexRules);
-                            // Copy font styles to span for overflow calculation
-                            span.style.fontFamily = el.props.fontFamily || 'Arial, sans-serif';
-                            span.style.fontSize = (el.props.fontSize || 16) + 'px';
-                            const fontWeight = el.props.fontWeight;
-                            if(typeof fontWeight === 'number'){
-                                span.style.fontWeight = fontWeight;
-                            } else {
-                                span.style.fontWeight = fontWeight || 'normal';
-                            }
-                            span.style.lineHeight = el.props.lineHeight !== undefined ? String(el.props.lineHeight) : '1.2';
-                            span.style.color = el.props.color || '#000000';
-                            applySvgOutlineToTextContainer(el, span);
-                            d.appendChild(span);
-                            break;
-                        }
-                        case 'line':
-                            // For lines, use explicit background color and ensure visibility
-                            const lineColor = el.props.color || '#000000';
-                            d.style.background = lineColor;
-                            d.style.backgroundColor = lineColor;
-                            d.style.height = `${el.props.thickness || 2}px`;
-                            d.style.width = `${el.width}cm`;
-                            d.style.border = 'none';
-                            d.style.display = 'block';
-                            d.style.margin = '0';
-                            d.style.padding = '0';
-                            d.style.overflow = 'visible';
-                            d.style.minHeight = `${el.props.thickness || 2}px`;
-                            d.style.maxHeight = `${el.props.thickness || 2}px`;
-                            d.style.boxSizing = 'border-box';
-                            // Force browsers to print background colors
-                            d.style.printColorAdjust = 'exact';
-                            d.style.webkitPrintColorAdjust = 'exact';
-                            // Add a non-breaking space to ensure the div has content (invisible but ensures rendering)
-                            d.innerHTML = '&nbsp;';
-                            d.style.color = 'transparent';
-                            d.style.fontSize = '0';
-                            break;
-                        case 'box':
-                            d.style.backgroundColor = el.props.fillColor || 'transparent';
-                            break;
-                        case 'qr': {
-                            const effectiveSequenceIndex = waveContext && waveContext.waveSequenceIndex !== undefined ? waveContext.waveSequenceIndex : sequenceIndex;
-                            const c = getData(el, sequenceIndex, waveContext) || '';
-                            let prefix = el.props.prefix || '';
-                            let suffix = el.props.suffix || '';
-                            
-                            // Apply sequence placeholder to prefix and suffix
-                            prefix = replaceColumnSyntax(prefix, el, waveContext);
-                            prefix = applySequencePlaceholder(prefix, effectiveSequenceIndex);
-                            suffix = replaceColumnSyntax(suffix, el, waveContext);
-                            suffix = applySequencePlaceholder(suffix, effectiveSequenceIndex);
-                            
-                            // Combine prefix + code + suffix into the QR code value
-                            const qrValue = prefix + String(c) + suffix;
-                            
-                            const q = document.createElement('img');
-                            const dpiPrint = 118.11;
-                            const qsPrint = Math.max(50, Math.min(el.width, el.height) * dpiPrint);
-                            const qrOpts = { colorDark: el.props.qrColorDark || '#000000', colorLight: el.props.qrColorLight || '#ffffff', errorCorrectLevel: el.props.qrErrorCorrectLevel || 'M' };
-                            q.src = generateQRDataURL(qrValue, qsPrint, qrOpts) || '';
-                            q.className = 'qr-code-img';
-                            q.style.imageRendering = 'pixelated';
-                            q.style.webkitImageRendering = 'pixelated';
-                            q.style.pointerEvents='none';
-                            q.style.width='100%';
-                            q.style.height='100%';
-                            q.style.objectFit='contain';
-                            d.appendChild(q);
-                            break;
-                        }
-                        case 'barcode': {
-                            const effectiveSequenceIndex = waveContext && waveContext.waveSequenceIndex !== undefined ? waveContext.waveSequenceIndex : sequenceIndex;
-                            const c = getData(el, sequenceIndex, waveContext) || '';
-                            let prefix = el.props.prefix || '';
-                            let suffix = el.props.suffix || '';
-                            
-                            // Apply sequence placeholder to prefix and suffix
-                            prefix = replaceColumnSyntax(prefix, el, waveContext);
-                            prefix = applySequencePlaceholder(prefix, effectiveSequenceIndex);
-                            suffix = replaceColumnSyntax(suffix, el, waveContext);
-                            suffix = applySequencePlaceholder(suffix, effectiveSequenceIndex);
-                            
-                            // Combine prefix + code + suffix into the barcode value
-                            const barcodeValue = prefix + String(c) + suffix;
-                            
-                            // Calculate dimensions considering padding and borders FIRST
-                            const paddingTop = (Number(el.props.paddingTop) || 0) * PIXELS_PER_CM;
-                            const paddingBottom = (Number(el.props.paddingBottom) || 0) * PIXELS_PER_CM;
-                            const paddingLeft = (Number(el.props.paddingLeft) || 0) * PIXELS_PER_CM;
-                            const paddingRight = (Number(el.props.paddingRight) || 0) * PIXELS_PER_CM;
-                            const borderWidth = (Number(el.props.thickness) || 0);
-                            
-                            const containerWidthPx = el.width * PIXELS_PER_CM;
-                            const containerHeightPx = el.height * PIXELS_PER_CM;
-                            const availableWidth = containerWidthPx - paddingLeft - paddingRight - (borderWidth * 2);
-                            const availableHeight = containerHeightPx - paddingTop - paddingBottom - (borderWidth * 2);
-                            
-                            // Create SVG for barcode - fill full container
-                            const sv = document.createElementNS('http://www.w3.org/2000/svg','svg');
-                            sv.style.pointerEvents='none';
-                            sv.style.width = '100%';
-                            sv.style.height = '100%';
-                            sv.style.display = 'block';
-                            sv.style.overflow = 'visible';
-                            d.appendChild(sv);
-                            
-                            try{
-                                const barcodeWidth = Math.max(50, availableWidth);
-                                const pxHeight = availableHeight; // Use full available height, no minimum
-                                
-                                // Calculate width per bar based on available width (estimate ~50 bars for typical barcode)
-                                const estimatedBars = 50;
-                                const widthPerBar = Math.max(1, barcodeWidth / estimatedBars);
-                                
-                                // Set explicit SVG dimensions
-                                sv.setAttribute('width', barcodeWidth.toString());
-                                sv.setAttribute('height', pxHeight.toString());
-                                sv.setAttribute('viewBox', `0 0 ${barcodeWidth} ${pxHeight}`);
-                                sv.setAttribute('preserveAspectRatio', 'none'); // No aspect ratio preservation - fill completely
-                                
-                                // Generate barcode with prefix + code + suffix included
-                                JsBarcode(sv, barcodeValue, {
-                                    format: el.props.format || "CODE128",
-                                    displayValue: el.props.displayValue !== false,
-                                    width: widthPerBar,
-                                    height: pxHeight,
-                                    margin: 0
-                                });
-                            }catch(err){
-                                sv.innerHTML = `<text x="10" y="20" fill="red" font-size="12">Invalid barcode</text>`;
-                            }
-                            break;
-                        }
-                        case 'image': {
-                            const mt = Number(el.props.marginTop) || 0, mr = Number(el.props.marginRight) || 0, mb = Number(el.props.marginBottom) || 0, ml = Number(el.props.marginLeft) || 0;
-                            if(mt || mr || mb || ml) d.style.padding = `${mt}cm ${mr}cm ${mb}cm ${ml}cm`;
-                            const img = document.createElement('img');
-                            img.style.pointerEvents='none';
-                            img.style.width='100%';
-                            img.style.height='100%';
-                            img.style.objectFit = el.props.objectFit || 'contain';
-                            applySvgOutlineToImage(el, img);
-                            if(el.props.fallbackLink) img.dataset.fallbackLink = String(el.props.fallbackLink).trim();
-                            
-                            // Build Imgur URL from Grist column value
-                            let imageUrl = '';
-                            const boundImageValue = getRecordValueByColumnRef(el.props.boundColumn);
-                            if(el.props.boundColumn && boundImageValue.found){
-                                const imgurId = boundImageValue.value;
-                                if(imgurId){
-                                    const id = String(imgurId).trim();
-                                    if(id){
-                                        // Construct Imgur URL: https://i.imgur.com/{id}.jpg
-                                        // If the value already contains http/https, use it as-is
-                                        if(id.startsWith('http://') || id.startsWith('https://')){
-                                            imageUrl = id;
-                                        } else {
-                                            // Remove any existing extension and add .jpg
-                                            const cleanId = id.replace(/\.(jpg|jpeg|png|gif|webp)$/i, '');
-                                            imageUrl = `https://i.imgur.com/${cleanId}.jpg`;
-                                        }
-                                    }
-                                }
-                            }
-                            
-                            if(imageUrl){
-                                img.onload = function(){
-                                    if(el.props.normalizeForBw && img.src && !img.src.startsWith('data:')){
-                                        normalizeImageForBw(img);
-                                    }
-                                };
-                                if(!imageUrl.startsWith('data:')) img.crossOrigin = 'anonymous';
-                                img.src = imageUrl;
-                                let fallbackTried = false;
-                                img.onerror = function(){
-                                    // Try fallback link if available
-                                    if(!fallbackTried && el.props.fallbackLink){
-                                        const fallbackUrl = String(el.props.fallbackLink).trim();
-                                        if(fallbackUrl){
-                                            fallbackTried = true;
-                                            img.src = fallbackUrl;
-                                            return; // Retry with fallback
-                                        }
-                                    }
-                                    // No fallback or fallback also failed
-                                    img.style.display = 'none';
-                                    const errorDiv = document.createElement('div');
-                                    errorDiv.style.width = '100%';
-                                    errorDiv.style.height = '100%';
-                                    errorDiv.style.display = 'flex';
-                                    errorDiv.style.alignItems = 'center';
-                                    errorDiv.style.justifyContent = 'center';
-                                    errorDiv.style.color = '#999';
-                                    errorDiv.style.fontSize = '12px';
-                                    errorDiv.textContent = 'Image not found';
-                                    d.appendChild(errorDiv);
-                                };
-                            } else if(el.props.fallbackLink){
-                                // No column selected, but fallback link available - use it directly
-                                const fallbackUrl = String(el.props.fallbackLink).trim();
-                                if(fallbackUrl){
-                                    img.onload = function(){
-                                        if(el.props.normalizeForBw && img.src && !img.src.startsWith('data:')){
-                                            normalizeImageForBw(img);
-                                        }
-                                    };
-                                    if(!fallbackUrl.startsWith('data:')) img.crossOrigin = 'anonymous';
-                                    img.src = fallbackUrl;
-                                    img.onerror = function(){
-                                        img.style.display = 'none';
-                                        const errorDiv = document.createElement('div');
-                                        errorDiv.style.width = '100%';
-                                        errorDiv.style.height = '100%';
-                                        errorDiv.style.display = 'flex';
-                                        errorDiv.style.alignItems = 'center';
-                                        errorDiv.style.justifyContent = 'center';
-                                        errorDiv.style.color = '#999';
-                                        errorDiv.style.fontSize = '12px';
-                                        errorDiv.textContent = 'Image not found';
-                                        d.appendChild(errorDiv);
-                                    };
-                                }
-                            } else {
-                                // Show placeholder when no image and no fallback
-                                img.style.display = 'none';
-                                const placeholder = document.createElement('div');
-                                placeholder.style.width = '100%';
-                                placeholder.style.height = '100%';
-                                placeholder.style.display = 'flex';
-                                placeholder.style.alignItems = 'center';
-                                placeholder.style.justifyContent = 'center';
-                                placeholder.style.color = '#ccc';
-                                placeholder.style.fontSize = '12px';
-                                placeholder.style.border = '1px dashed #ccc';
-                                placeholder.textContent = 'No image';
-                                d.appendChild(placeholder);
-                            }
-                            d.appendChild(img);
-                            break;
-                        }
-                    }
-                    // Background only for text/data/image (box set in case 'box'; line/qr/barcode have no background)
-                    if(el.type === 'text' || el.type === 'data' || el.type === 'image'){
-                        const bg = el.props.backgroundColor;
-                        d.style.backgroundColor = (bg && bg !== 'transparent') ? bg : 'transparent';
-                        if(bg && bg !== 'transparent'){
-                            d.style.printColorAdjust = 'exact';
-                            d.style.webkitPrintColorAdjust = 'exact';
-                        }
-                    }
-                    
-                    page.appendChild(d);
+                    contentRoot.appendChild(d);
                 });
                 
                 return page;
@@ -7013,9 +7072,6 @@ document.addEventListener('DOMContentLoaded', ()=>{
             
             // Store pages for text overflow handling
             const pages = printContainer.querySelectorAll('.print-page');
-            let page1 = null, page2 = null;
-            if(pages.length > 0) page1 = pages[0];
-            if(canvas2Flag && pages.length > 1) page2 = pages[1];
             
             // Now apply text overflow handling after all elements are in DOM
             // Need to get the canvas data for each page
@@ -7047,7 +7103,10 @@ document.addEventListener('DOMContentLoaded', ()=>{
                 const tempS = canvasData.map(normalizeElement);
                 const sorted = tempS.slice().sort((a,b)=> (a.zIndex||0) - (b.zIndex||0));
                 
-                page.querySelectorAll('.label-element').forEach((d, index) => {
+                // Use .print-content-root for measurements if it exists
+                const contentRoot = page.querySelector('.print-content-root') || page;
+                
+                contentRoot.querySelectorAll('.label-element').forEach((d, index) => {
                     if(index < sorted.length){
                         const el = sorted[index];
                         if((el.type === 'text' || el.type === 'data') && (el.props.textOverflow === 'auto-scale' || el.props.textOverflow === 'squeeze')){
@@ -7072,18 +7131,25 @@ document.addEventListener('DOMContentLoaded', ()=>{
                     styleEl.id = styleId;
                     document.head.appendChild(styleEl);
                 }
+                
+                const bleed = (printBleedEnabled && Number(printBleedCm) > 0) ? Number(printBleedCm) : 0;
+                const pageW = profile.width + 2 * bleed;
+                const pageH = profile.height + 2 * bleed;
+                const pageBg = printBleedEnabled ? printBleedColor : '#fff';
+
                 styleEl.textContent = `
                     @media print{
                         @page{
-                            size: ${profile.width}cm ${profile.height}cm;
+                            size: ${pageW}cm ${pageH}cm;
                             margin: 0;
                             padding: 0;
                             marks: none;
                             bleed: 0;
                         }
-                        html,body{margin:0!important;padding:0!important;background:#fff!important;width:${profile.width}cm!important;height:auto!important}
+                        html,body{margin:0!important;padding:0!important;background:${pageBg}!important;width:${pageW}cm!important;height:auto!important}
                         #toolbar,#sidebar,#marquee,.status-message{display:none!important}
-                        .print-page{width:${profile.width}cm!important;height:${profile.height}cm!important;page-break-inside:avoid!important;overflow:visible!important;background:#fff!important;position:relative!important;margin:0!important;padding:0!important;display:block!important;box-sizing:border-box!important}
+                        .print-page{width:${pageW}cm!important;height:${pageH}cm!important;page-break-inside:avoid!important;overflow:visible!important;background:${pageBg}!important;position:relative!important;margin:0!important;padding:0!important;display:block!important;box-sizing:border-box!important}
+                        .print-content-root{width:${profile.width}cm!important;height:${profile.height}cm!important;background:#fff!important;position:absolute!important;left:${bleed}cm!important;top:${bleed}cm!important;overflow:hidden!important;display:block!important}
                         .print-page:not(:last-child){page-break-after:always!important}
                         .print-page:last-child{page-break-after:auto!important}
                         .print-container{display:block!important;position:static!important;left:auto!important;top:auto!important}
@@ -7148,25 +7214,19 @@ document.addEventListener('DOMContentLoaded', ()=>{
         printContainer.style.position = 'absolute';
         printContainer.style.left = '-9999px';
         printContainer.style.top = '0';
-        printContainer.style.width = `${profile.width}cm`;
+        const bleedTotal = (printBleedEnabled && Number(printBleedCm) > 0) ? Number(printBleedCm) : 0;
+        const containerW = profile.width + 2 * bleedTotal;
+        printContainer.style.width = `${containerW}cm`;
         // Height is auto - pages will be stacked naturally
         printContainer.style.height = 'auto';
-        
-        // Calculate total pages
-        const totalPages = canvas2Flag ? 2 : 1;
         
         // Helper function to render canvas to print page (identical to printBothCanvases)
         function renderCanvasToPage(canvasNum, sequenceIndex = 1, isLastPage = false, waveContext = null){
             const canvasData = design[`canvas${canvasNum}`] || [];
             const tempS = canvasData.map(normalizeElement);
             
-            const page = document.createElement('div');
-            page.className = 'print-page';
-            page.style.width = `${profile.width}cm`;
-            page.style.height = `${profile.height}cm`;
-            page.style.position = 'relative';
-            page.style.background = '#fff';
-            page.style.overflow = 'hidden';
+            const { page, contentRoot } = createPrintPageWithBleed(profile);
+            
             // Set pageBreakAfter only for last page - let CSS handle the rest
             if(isLastPage){
                 page.style.pageBreakAfter = 'auto';
@@ -7181,11 +7241,13 @@ document.addEventListener('DOMContentLoaded', ()=>{
                 d.style.position = 'absolute';
                 d.style.left = `${el.x}cm`;
                 d.style.top = `${el.y}cm`;
+                // For lines, don't set height in cm initially - it will be set in px later
                 if(el.type !== 'line'){
                     d.style.width = `${el.width}cm`;
                     d.style.height = `${el.height}cm`;
                 } else {
                     d.style.width = `${el.width}cm`;
+                    // Height will be set in px in the line case below
                 }
                 d.style.zIndex = el.zIndex || 0;
                 d.style.fontSize = `${el.props.fontSize || 16}px`;
@@ -7203,6 +7265,7 @@ document.addEventListener('DOMContentLoaded', ()=>{
                     d.style.display = 'flex';
                     d.style.alignItems = alignMap[el.props.valign] || 'flex-start';
                     d.style.justifyContent = justifyMap[el.props.textAlign] || 'flex-start';
+                    // Use pre-wrap to preserve line breaks from textarea
                     if(el.type === 'text' || el.type === 'data'){
                         d.style.whiteSpace = 'pre-wrap';
                     } else {
@@ -7213,6 +7276,7 @@ document.addEventListener('DOMContentLoaded', ()=>{
                     d.style.whiteSpace = '';
                 }
                 d.style.textAlign = el.props.textAlign || 'left';
+                // For lines, color is handled separately via background
                 if(el.type !== 'line'){
                     d.style.color = el.props.color || '#000000';
                 }
@@ -7231,18 +7295,21 @@ document.addEventListener('DOMContentLoaded', ()=>{
                     d.style.padding = '';
                 }
                 
-                // Apply borders and styling (simplified - same as printBothCanvases)
+                // Apply borders for elements with showBorder enabled
                 if(el.props.showBorder){
                     const bwNum = Number(el.props.borderWidth);
                     const borderWidth = `${Number.isFinite(bwNum) ? bwNum : 1}px`;
                     const borderColor = el.props.borderColor || '#000';
                     const borderStyle = 'solid';
+                    
                     d.style.borderTop = (el.props.borderTop !== false) ? `${borderWidth} ${borderStyle} ${borderColor}` : 'none';
                     d.style.borderRight = (el.props.borderRight !== false) ? `${borderWidth} ${borderStyle} ${borderColor}` : 'none';
                     d.style.borderBottom = (el.props.borderBottom !== false) ? `${borderWidth} ${borderStyle} ${borderColor}` : 'none';
                     d.style.borderLeft = (el.props.borderLeft !== false) ? `${borderWidth} ${borderStyle} ${borderColor}` : 'none';
-                    d.style.printColorAdjust = 'exact';
-                    d.style.webkitPrintColorAdjust = 'exact';
+                        
+                        d.style.printColorAdjust = 'exact';
+                        d.style.webkitPrintColorAdjust = 'exact';
+                    
                     const brTL = Number(el.props.borderRadiusTopLeft) || 0;
                     const brTR = Number(el.props.borderRadiusTopRight) || 0;
                     const brBR = Number(el.props.borderRadiusBottomRight) || 0;
@@ -7252,22 +7319,22 @@ document.addEventListener('DOMContentLoaded', ()=>{
                     } else {
                         d.style.borderRadius = '';
                     }
-                } else if(el.type === 'box'){
-                    d.style.border = 'none';
-                    const brTL = Number(el.props.borderRadiusTopLeft) || 0;
-                    const brTR = Number(el.props.borderRadiusTopRight) || 0;
-                    const brBR = Number(el.props.borderRadiusBottomRight) || 0;
-                    const brBL = Number(el.props.borderRadiusBottomLeft) || 0;
-                    if(brTL > 0 || brTR > 0 || brBR > 0 || brBL > 0){
-                        d.style.borderRadius = `${brTL}px ${brTR}px ${brBR}px ${brBL}px`;
-                    } else {
-                        d.style.borderRadius = '';
+                    } else if(el.type === 'box'){
+                        d.style.border = 'none';
+                        const brTL = Number(el.props.borderRadiusTopLeft) || 0;
+                        const brTR = Number(el.props.borderRadiusTopRight) || 0;
+                        const brBR = Number(el.props.borderRadiusBottomRight) || 0;
+                        const brBL = Number(el.props.borderRadiusBottomLeft) || 0;
+                        if(brTL > 0 || brTR > 0 || brBR > 0 || brBL > 0){
+                            d.style.borderRadius = `${brTL}px ${brTR}px ${brBR}px ${brBL}px`;
+                        } else {
+                            d.style.borderRadius = '';
+                        }
+                    } else if(el.type !== 'line'){
+                        if(!el.props.showBorder){
+                            d.style.border = '1px solid transparent';
+                        }
                     }
-                } else if(el.type !== 'line'){
-                    if(!el.props.showBorder){
-                        d.style.border = '1px solid transparent';
-                    }
-                }
                 
                 // Content - use getData with the specified sequenceIndex
                 switch(el.type){
@@ -7291,8 +7358,16 @@ document.addEventListener('DOMContentLoaded', ()=>{
                         }
                         
                         setTextWithRegexFormatting(span, getData(el, sequenceIndex, waveContext), el.props.regexRules);
+                        // Copy font styles to span for overflow calculation
                         span.style.fontFamily = el.props.fontFamily || 'Arial, sans-serif';
                         span.style.fontSize = (el.props.fontSize || 16) + 'px';
+                        const fontWeight = el.props.fontWeight;
+                        if(typeof fontWeight === 'number'){
+                            span.style.fontWeight = fontWeight;
+                        } else {
+                            span.style.fontWeight = fontWeight || 'normal';
+                        }
+                        span.style.lineHeight = el.props.lineHeight !== undefined ? String(el.props.lineHeight) : '1.2';
                         span.style.color = el.props.color || '#000000';
                         applySvgOutlineToTextContainer(el, span);
                         d.appendChild(span);
@@ -7318,18 +7393,43 @@ document.addEventListener('DOMContentLoaded', ()=>{
                         }
                         
                         setTextWithRegexFormatting(span, getData(el, sequenceIndex, waveContext), el.props.regexRules);
+                        // Copy font styles to span for overflow calculation
                         span.style.fontFamily = el.props.fontFamily || 'Arial, sans-serif';
                         span.style.fontSize = (el.props.fontSize || 16) + 'px';
+                        const fontWeight = el.props.fontWeight;
+                        if(typeof fontWeight === 'number'){
+                            span.style.fontWeight = fontWeight;
+                        } else {
+                            span.style.fontWeight = fontWeight || 'normal';
+                        }
+                        span.style.lineHeight = el.props.lineHeight !== undefined ? String(el.props.lineHeight) : '1.2';
                         span.style.color = el.props.color || '#000000';
                         applySvgOutlineToTextContainer(el, span);
                         d.appendChild(span);
                         break;
                     }
                     case 'line':
-                        d.style.background = el.props.color || '#000000';
+                        // For lines, use explicit background color and ensure visibility
+                        const lineColor = el.props.color || '#000000';
+                        d.style.background = lineColor;
+                        d.style.backgroundColor = lineColor;
                         d.style.height = `${el.props.thickness || 2}px`;
                         d.style.width = `${el.width}cm`;
                         d.style.border = 'none';
+                        d.style.display = 'block';
+                        d.style.margin = '0';
+                        d.style.padding = '0';
+                        d.style.overflow = 'visible';
+                        d.style.minHeight = `${el.props.thickness || 2}px`;
+                        d.style.maxHeight = `${el.props.thickness || 2}px`;
+                        d.style.boxSizing = 'border-box';
+                        // Force browsers to print background colors
+                        d.style.printColorAdjust = 'exact';
+                        d.style.webkitPrintColorAdjust = 'exact';
+                        // Add a non-breaking space to ensure the div has content (invisible but ensures rendering)
+                        d.innerHTML = '&nbsp;';
+                        d.style.color = 'transparent';
+                        d.style.fontSize = '0';
                         break;
                     case 'box':
                         d.style.backgroundColor = el.props.fillColor || 'transparent';
@@ -7369,6 +7469,8 @@ document.addEventListener('DOMContentLoaded', ()=>{
                         const c = getData(el, sequenceIndex, waveContext) || '';
                         let prefix = el.props.prefix || '';
                         let suffix = el.props.suffix || '';
+                        
+                        // Apply sequence placeholder to prefix and suffix
                         prefix = replaceColumnSyntax(prefix, el, waveContext);
                         prefix = applySequencePlaceholder(prefix, effectiveSequenceIndex);
                         suffix = replaceColumnSyntax(suffix, el, waveContext);
@@ -7378,6 +7480,7 @@ document.addEventListener('DOMContentLoaded', ()=>{
                         const barcodeValue = prefix + String(c) + suffix;
                         
                         // Calculate dimensions considering padding and borders FIRST
+                        const PIXELS_PER_CM = 37.795276;
                         const paddingTop = (Number(el.props.paddingTop) || 0) * PIXELS_PER_CM;
                         const paddingBottom = (Number(el.props.paddingBottom) || 0) * PIXELS_PER_CM;
                         const paddingLeft = (Number(el.props.paddingLeft) || 0) * PIXELS_PER_CM;
@@ -7434,7 +7537,10 @@ document.addEventListener('DOMContentLoaded', ()=>{
                         img.style.height='100%';
                         img.style.objectFit = el.props.objectFit || 'contain';
                         applySvgOutlineToImage(el, img);
+                        img.style.opacity = getImageOpacityCss(el);
                         if(el.props.fallbackLink) img.dataset.fallbackLink = String(el.props.fallbackLink).trim();
+                        
+                        // Build Imgur URL from Grist column value
                         let imageUrl = '';
                         const boundImageValue = getRecordValueByColumnRef(el.props.boundColumn);
                         if(el.props.boundColumn && boundImageValue.found){
@@ -7442,15 +7548,19 @@ document.addEventListener('DOMContentLoaded', ()=>{
                             if(imgurId){
                                 const id = String(imgurId).trim();
                                 if(id){
+                                    // Construct Imgur URL: https://i.imgur.com/{id}.jpg
+                                    // If the value already contains http/https, use it as-is
                                     if(id.startsWith('http://') || id.startsWith('https://')){
                                         imageUrl = id;
                                     } else {
+                                        // Remove any existing extension and add .jpg
                                         const cleanId = id.replace(/\.(jpg|jpeg|png|gif|webp)$/i, '');
                                         imageUrl = `https://i.imgur.com/${cleanId}.jpg`;
                                     }
                                 }
                             }
                         }
+                        
                         if(imageUrl){
                             img.onload = function(){
                                 if(el.props.normalizeForBw && img.src && !img.src.startsWith('data:')){
@@ -7470,8 +7580,19 @@ document.addEventListener('DOMContentLoaded', ()=>{
                                         return; // Retry with fallback
                                     }
                                 }
-                                // No fallback or fallback also failed - hide image
+                                // No fallback or fallback also failed
                                 img.style.display = 'none';
+                                const errorDiv = document.createElement('div');
+                                errorDiv.style.width = '100%';
+                                errorDiv.style.height = '100%';
+                                errorDiv.style.display = 'flex';
+                                errorDiv.style.alignItems = 'center';
+                                errorDiv.style.justifyContent = 'center';
+                                errorDiv.style.color = '#999';
+                                errorDiv.style.fontSize = '12px';
+                                errorDiv.textContent = 'Image not found';
+                                errorDiv.style.opacity = getImageOpacityCss(el);
+                                d.appendChild(errorDiv);
                             };
                         } else if(el.props.fallbackLink){
                             // No column selected, but fallback link available - use it directly
@@ -7485,10 +7606,35 @@ document.addEventListener('DOMContentLoaded', ()=>{
                                 if(!fallbackUrl.startsWith('data:')) img.crossOrigin = 'anonymous';
                                 img.src = fallbackUrl;
                                 img.onerror = function(){
-                                    // No fallback or fallback also failed - hide image
                                     img.style.display = 'none';
+                                    const errorDiv = document.createElement('div');
+                                    errorDiv.style.width = '100%';
+                                    errorDiv.style.height = '100%';
+                                    errorDiv.style.display = 'flex';
+                                    errorDiv.style.alignItems = 'center';
+                                    errorDiv.style.justifyContent = 'center';
+                                    errorDiv.style.color = '#999';
+                                    errorDiv.style.fontSize = '12px';
+                                    errorDiv.textContent = 'Image not found';
+                                    errorDiv.style.opacity = getImageOpacityCss(el);
+                                    d.appendChild(errorDiv);
                                 };
                             }
+                        } else {
+                            // Show placeholder when no image and no fallback
+                            img.style.display = 'none';
+                            const placeholder = document.createElement('div');
+                            placeholder.style.width = '100%';
+                            placeholder.style.height = '100%';
+                            placeholder.style.display = 'flex';
+                            placeholder.style.alignItems = 'center';
+                            placeholder.style.justifyContent = 'center';
+                            placeholder.style.color = '#ccc';
+                            placeholder.style.fontSize = '12px';
+                            placeholder.style.border = '1px dashed #ccc';
+                            placeholder.textContent = 'No image';
+                            placeholder.style.opacity = getImageOpacityCss(el);
+                            d.appendChild(placeholder);
                         }
                         d.appendChild(img);
                         break;
@@ -7537,7 +7683,10 @@ document.addEventListener('DOMContentLoaded', ()=>{
             const tempS = canvasData.map(normalizeElement);
             const sorted = tempS.slice().sort((a,b)=> (a.zIndex||0) - (b.zIndex||0));
             
-            page.querySelectorAll('.label-element').forEach((d, index) => {
+            // Use .print-content-root for measurements if it exists
+            const contentRoot = page.querySelector('.print-content-root') || page;
+            
+            contentRoot.querySelectorAll('.label-element').forEach((d, index) => {
                 if(index < sorted.length){
                     const el = sorted[index];
                     if((el.type === 'text' || el.type === 'data') && (el.props.textOverflow === 'auto-scale' || el.props.textOverflow === 'squeeze')){
@@ -7562,18 +7711,25 @@ document.addEventListener('DOMContentLoaded', ()=>{
                 styleEl.id = styleId;
                 document.head.appendChild(styleEl);
             }
+            
+            const bleed = (printBleedEnabled && Number(printBleedCm) > 0) ? Number(printBleedCm) : 0;
+            const pageW = profile.width + 2 * bleed;
+            const pageH = profile.height + 2 * bleed;
+            const pageBg = printBleedEnabled ? printBleedColor : '#fff';
+
             styleEl.textContent = `
                 @media print{
                     @page{
-                        size: ${profile.width}cm ${profile.height}cm;
+                        size: ${pageW}cm ${pageH}cm;
                         margin: 0;
                         padding: 0;
                         marks: none;
                         bleed: 0;
                     }
-                    html,body{margin:0!important;padding:0!important;background:#fff!important;width:${profile.width}cm!important;height:auto!important}
+                    html,body{margin:0!important;padding:0!important;background:${pageBg}!important;width:${pageW}cm!important;height:auto!important}
                     #toolbar,#sidebar,#marquee,.status-message{display:none!important}
-                    .print-page{width:${profile.width}cm!important;height:${profile.height}cm!important;page-break-inside:avoid!important;overflow:visible!important;background:#fff!important;position:relative!important;margin:0!important;padding:0!important;display:block!important;box-sizing:border-box!important}
+                    .print-page{width:${pageW}cm!important;height:${pageH}cm!important;page-break-inside:avoid!important;overflow:visible!important;background:${pageBg}!important;position:relative!important;margin:0!important;padding:0!important;display:block!important;box-sizing:border-box!important}
+                    .print-content-root{width:${profile.width}cm!important;height:${profile.height}cm!important;background:#fff!important;position:absolute!important;left:${bleed}cm!important;top:${bleed}cm!important;overflow:hidden!important;display:block!important}
                     .print-page:not(:last-child){page-break-after:always!important}
                     .print-page:last-child{page-break-after:auto!important}
                     .print-container{display:block!important;position:static!important;left:auto!important;top:auto!important}
@@ -9396,6 +9552,12 @@ document.addEventListener('DOMContentLoaded', ()=>{
                         if(typeof p.dithering === 'string' && ['none','error-diffusion','halftone'].includes(p.dithering)) bwDithering = p.dithering;
                         if(typeof p.halftoneSize === 'number' && p.halftoneSize >= 2 && p.halftoneSize <= 16) bwHalftoneSize = p.halftoneSize;
                         if(typeof p.previewDpi === 'number' && p.previewDpi >= 72 && p.previewDpi <= 300) bwPreviewDpi = p.previewDpi;
+                    }
+                    if(parsed.printBleed && typeof parsed.printBleed === 'object'){
+                        const pb = parsed.printBleed;
+                        if(typeof pb.enabled === 'boolean') printBleedEnabled = pb.enabled;
+                        if(typeof pb.cm === 'number' && pb.cm > 0 && pb.cm <= 3) printBleedCm = pb.cm;
+                        if(typeof pb.color === 'string') printBleedColor = pb.color;
                     }
                     ensureLegacyMasterThreadsSyncedProps();
                     // Restore current profile, design and canvas if saved
