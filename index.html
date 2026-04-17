@@ -3419,10 +3419,12 @@ document.addEventListener('DOMContentLoaded', ()=>{
             const decVal = valueFor('props.decimals'); const asPctVal = valueFor('props.asPercent');
             h += `<hr><div class="${grid1Cls}"><label class="${labelClass('props.decimals')}">Decimals</label><input type="number" step="1" data-prop="props.decimals" value="${decVal!==undefined?decVal:2}" min="0" max="6" inputmode="numeric">${syncBtn('props.decimals')}</div>`;
             h += `<div class="${grid1Cls}"><label class="${labelClass('props.asPercent')}">As Percent</label><input type="checkbox" data-prop="props.asPercent" ${asPctVal?'checked':''}>${syncBtn('props.asPercent')}</div>`;
-            const dtFmtVal = valueFor('props.dateTimeFormat') || 'DD/MM/YYYY';
-            const dateFormatPresets = [['DD/MM/YYYY','gg/mm/aaaa'],['DD/MM/YYYY HH:mm','gg/mm/aaaa hh:mm'],['DD/MM/YYYY HH:mm:ss','gg/mm/aaaa hh:mm:ss'],['YYYY-MM-DD','aaaa-mm-gg'],['YYYY-MM-DD HH:mm','aaaa-mm-gg hh:mm'],['MM/DD/YYYY','mm/gg/aaaa'],['DD.MM.YYYY','gg.mm.aaaa']];
-            const isCustom = !dateFormatPresets.some(([v])=>v===dtFmtVal);
-            h += `<div class="${grid1Cls} date-time-format-row"><label class="${labelClass('props.dateTimeFormat')}">Formato Data/Ora</label><div><select class="date-time-format-select">${dateFormatPresets.map(([v,l])=>`<option value="${escapeHtml(v)}" ${dtFmtVal===v?'selected':''}>${l}</option>`).join('')}<option value="__custom__" ${isCustom?'selected':''}>Custom</option></select><input type="text" class="date-time-format-custom-input" placeholder="es. DD-MM-YYYY" value="${isCustom?escapeHtml(dtFmtVal):''}" style="margin-top:4px;width:100%;display:${isCustom?'block':'none'}"></div>${syncBtn('props.dateTimeFormat')}</div>`;
+            if(shouldShowDateTimeFormatRow()){
+                const dtFmtVal = valueFor('props.dateTimeFormat') || 'DD/MM/YYYY';
+                const dateFormatPresets = [['DD/MM/YYYY','gg/mm/aaaa'],['DD/MM/YYYY HH:mm','gg/mm/aaaa hh:mm'],['DD/MM/YYYY HH:mm:ss','gg/mm/aaaa hh:mm:ss'],['YYYY-MM-DD','aaaa-mm-gg'],['YYYY-MM-DD HH:mm','aaaa-mm-gg hh:mm'],['MM/DD/YYYY','mm/gg/aaaa'],['DD.MM.YYYY','gg.mm.aaaa']];
+                const isCustom = !dateFormatPresets.some(([v])=>v===dtFmtVal);
+                h += `<div class="${grid1Cls} date-time-format-row"><label class="${labelClass('props.dateTimeFormat')}">Formato Data/Ora</label><div><select class="date-time-format-select">${dateFormatPresets.map(([v,l])=>`<option value="${escapeHtml(v)}" ${dtFmtVal===v?'selected':''}>${l}</option>`).join('')}<option value="__custom__" ${isCustom?'selected':''}>Custom</option></select><input type="text" class="date-time-format-custom-input" placeholder="es. DD-MM-YYYY" value="${isCustom?escapeHtml(dtFmtVal):''}" style="margin-top:4px;width:100%;display:${isCustom?'block':'none'}"></div>${syncBtn('props.dateTimeFormat')}</div>`;
+            }
         }
 
         if(el.type==='qr' || el.type==='barcode'){
