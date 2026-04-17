@@ -137,6 +137,9 @@
         <div class="divider"></div>
         <button id="btn-print" title="Print Label">🖨️ Print</button>
         <button id="btn-print-single" title="Print Single Label">🖨️ Print Single</button>
+        <div class="divider"></div>
+        <input type="checkbox" id="print-bleed-enabled" style="width:auto;margin:0" title="Aggiunge 3 mm di bleed per lato alla pagina di stampa (area oltre il formato etichetta)">
+        <label for="print-bleed-enabled" style="font-size:12px;margin:0;white-space:nowrap;cursor:pointer">Bleed</label>
             <div class="divider"></div>
             <button id="btn-rotate-canvas" title="Rotate Canvas 90° (temporary, not for print)">🔄 Rotate</button>
         <div class="divider"></div>
@@ -324,6 +327,8 @@ document.addEventListener('DOMContentLoaded', ()=>{
         let bwHalftoneSize = 8;
         let bwPreviewDpi = 203;
         const FONT_FAVORITES_KEY = 'grist_label_font_favorites'; // Key for font favorites
+        const PRINT_BLEED_STORAGE_KEY = 'grist_label_print_bleed';
+        const PRINT_BLEED_MM = 3;
     const MAX_HISTORY = 100;
 
         // All available fonts for labels
@@ -704,21 +709,30 @@ document.addEventListener('DOMContentLoaded', ()=>{
             }
             const profile = profiles[currentProfile];
             if(profile){
+                const W = profile.width;
+                const H = profile.height;
+                const bleedEl = document.getElementById('print-bleed-enabled');
+                const bleedOn = !!(bleedEl && bleedEl.checked);
+                const bleedSideCm = PRINT_BLEED_MM / 10;
+                const extraCm = bleedOn ? bleedSideCm * 2 : 0;
+                const pageW = W + extraCm;
+                const pageH = H + extraCm;
+                const bleedAtRule = bleedOn ? `bleed: ${PRINT_BLEED_MM}mm;` : 'bleed: 0;';
                 styleEl.textContent = `
                     @media print{
                         @page{
-                            size: ${profile.width}cm ${profile.height}cm;
+                            size: ${pageW}cm ${pageH}cm;
                             margin: 0;
                             padding: 0;
                             marks: none;
-                            bleed: 0;
+                            ${bleedAtRule}
                         }
-                        html,body{margin:0!important;padding:0!important;width:${profile.width}cm!important;height:${profile.height}cm!important;overflow:visible!important;background:#fff!important}
+                        html,body{margin:0!important;padding:0!important;width:${pageW}cm!important;height:${pageH}cm!important;overflow:visible!important;background:#fff!important}
                         #toolbar,#sidebar,#marquee,.status-message{display:none!important}
-                        #main-content{width:${profile.width}cm!important;height:${profile.height}cm!important;overflow:visible!important;display:block!important;padding:0!important;margin:0!important}
-                        #canvas-container{width:${profile.width}cm!important;height:${profile.height}cm!important;padding:0!important;margin:0!important;overflow:visible!important;background:#fff!important;display:block!important;position:static!important}
-                        #canvas-wrapper{position:static!important;width:${profile.width}cm!important;height:${profile.height}cm!important;margin:0!important;padding:0!important;transform:none!important;display:block!important}
-                        #label-canvas{position:static!important;width:${profile.width}cm!important;height:${profile.height}cm!important;transform:none!important;box-shadow:none!important;display:block!important;overflow:visible!important;background:#fff!important}
+                        #main-content{width:${pageW}cm!important;height:${pageH}cm!important;overflow:visible!important;display:block!important;padding:0!important;margin:0!important}
+                        #canvas-container{width:${pageW}cm!important;height:${pageH}cm!important;padding:0!important;margin:0!important;overflow:visible!important;background:#fff!important;display:flex!important;flex-direction:row!important;justify-content:center!important;align-items:center!important;position:static!important}
+                        #canvas-wrapper{position:static!important;width:${W}cm!important;height:${H}cm!important;margin:0!important;padding:0!important;transform:none!important;display:block!important;flex-shrink:0!important}
+                        #label-canvas{position:static!important;width:${W}cm!important;height:${H}cm!important;transform:none!important;box-shadow:none!important;display:block!important;overflow:visible!important;background:#fff!important}
                             .label-element{page-break-inside:avoid!important;-webkit-print-color-adjust:exact!important;print-color-adjust:exact!important}
                         .label-element.selected{border:1px solid transparent!important;box-shadow:none!important}
                         .resize-handle{display:none!important}
@@ -8916,6 +8930,14 @@ document.addEventListener('DOMContentLoaded', ()=>{
     document.getElementById('btn-print-single').addEventListener('click', ()=>{
         printSingle();
     });
+    document.getElementById('print-bleed-enabled').addEventListener('change', ()=>{
+        try {
+            localStorage.setItem(PRINT_BLEED_STORAGE_KEY, document.getElementById('print-bleed-enabled').checked ? '1' : '0');
+        } catch (e) {}
+        const miniBleed = document.getElementById('mini-print-bleed');
+        if (miniBleed) miniBleed.checked = document.getElementById('print-bleed-enabled').checked;
+        updatePrintCSS();
+    });
         document.getElementById('btn-rotate-canvas').addEventListener('click', ()=>{
             canvasRotation = (canvasRotation + 90) % 360;
             applyCanvasRotation();
@@ -9231,10 +9253,31 @@ document.addEventListener('DOMContentLoaded', ()=>{
                     const btnRotate = document.getElementById('btn-rotate-canvas').cloneNode(true);
                     btnRotate.id = 'mini-btn-rotate';
                     btnRotate.addEventListener('click', () => document.getElementById('btn-rotate-canvas').click());
+                    const miniBleedChk = document.createElement('input');
+                    miniBleedChk.type = 'checkbox';
+                    miniBleedChk.id = 'mini-print-bleed';
+                    miniBleedChk.title = 'Aggiunge 3 mm di bleed per lato alla pagina di stampa';
+                    const mainBleedChk = document.getElementById('print-bleed-enabled');
+                    miniBleedChk.checked = mainBleedChk ? mainBleedChk.checked : false;
+                    miniBleedChk.addEventListener('change', (e) => {
+                        if (mainBleedChk) {
+                            mainBleedChk.checked = e.target.checked;
+                            mainBleedChk.dispatchEvent(new Event('change'));
+                        }
+                    });
+                    const miniBleedLbl = document.createElement('label');
+                    miniBleedLbl.style.display = 'flex';
+                    miniBleedLbl.style.alignItems = 'center';
+                    miniBleedLbl.style.gap = '4px';
+                    miniBleedLbl.style.fontSize = '11px';
+                    miniBleedLbl.style.whiteSpace = 'nowrap';
+                    miniBleedLbl.appendChild(miniBleedChk);
+                    miniBleedLbl.appendChild(document.createTextNode('Bleed'));
                     const col3 = document.createElement('div');
                     col3.className = 'mini-toolbar-col3';
                     col3.appendChild(canvasSelect);
                     col3.appendChild(btnRotate);
+                    col3.appendChild(miniBleedLbl);
 
                     const btnPrintSingle = document.getElementById('btn-print-single').cloneNode(true);
                     btnPrintSingle.id = 'mini-btn-print-single';
@@ -9525,6 +9568,11 @@ document.addEventListener('DOMContentLoaded', ()=>{
         } catch(e) {
             console.warn('Failed to load from localStorage:', e);
         }
+        
+        try {
+            const bleedChk = document.getElementById('print-bleed-enabled');
+            if (bleedChk && localStorage.getItem(PRINT_BLEED_STORAGE_KEY) === '1') bleedChk.checked = true;
+        } catch (e) {}
         
         // Initialize canvas size immediately
         updateCanvasSize();
