@@ -772,7 +772,7 @@ document.addEventListener('DOMContentLoaded', ()=>{
                         #main-content{width:${bleedWidth}cm!important;height:${bleedHeight}cm!important;overflow:visible!important;display:block!important;padding:0!important;margin:0!important}
                         #canvas-container{width:${bleedWidth}cm!important;height:${bleedHeight}cm!important;padding:0!important;margin:0!important;overflow:visible!important;background:${bleedBgColor}!important;display:block!important;position:static!important}
                         #canvas-wrapper{position:static!important;width:${bleedWidth}cm!important;height:${bleedHeight}cm!important;margin:0!important;padding:0!important;transform:none!important;display:block!important}
-                        #label-canvas{position:static!important;width:${profile.width}cm!important;height:${profile.height}cm!important;transform:none!important;box-shadow:none!important;display:block!important;overflow:visible!important;background:${bleedBgColor}!important;left:${bleedEnabled ? bleedSize + 'cm' : '0'}!important;top:${bleedEnabled ? bleedSize + 'cm' : '0'}!important}
+                        #label-canvas{position:static!important;width:cm!important;height:cm!important;transform:none!important;box-shadow:none!important;display:block!important;overflow:visible!important;background:${bleedBgColor}!important;left:${bleedEnabled ? bleedSize + 'cm' : '0'}!important;top:${bleedEnabled ? bleedSize + 'cm' : '0'}!important}
                             .label-element{page-break-inside:avoid!important;-webkit-print-color-adjust:exact!important;print-color-adjust:exact!important}
                         .label-element.selected{border:1px solid transparent!important;box-shadow:none!important}
                         .resize-handle{display:none!important}
@@ -5983,7 +5983,7 @@ document.addEventListener('DOMContentLoaded', ()=>{
             printContainer.style.left = '-9999px';
             printContainer.style.top = '0';
             printContainer.style.width = `${profile.width}cm`;
-            printContainer.style.height = 'auto';
+            printContainer.style.background = bleedBgColor;\n            printContainer.style.height = 'auto';
             
             // Calculate total pages across all selected waves
             let totalPages = 0;
@@ -6011,8 +6011,8 @@ document.addEventListener('DOMContentLoaded', ()=>{
                 page.style.width = `${profile.width}cm`;
                 page.style.height = `${profile.height}cm`;
                 page.style.position = 'relative';
-                page.style.background = '#fff';
-                page.style.overflow = 'hidden';
+                page.style.background = bleedBgColor;
+                page.style.overflow = 'hidden';\n                \n                // Add bleed background container if bleed is enabled\n                if(bleedEnabled) {\n                    const bleedContainer = document.createElement('div');\n                    bleedContainer.style.position = 'absolute';\n                    bleedContainer.style.left = '0';\n                    bleedContainer.style.top = '0';\n                    bleedContainer.style.width = ${bleedWidth}cm;\n                    bleedContainer.style.height = ${bleedHeight}cm;\n                    bleedContainer.style.backgroundColor = bleedColor;\n                    bleedContainer.style.zIndex = '0';\n                    page.appendChild(bleedContainer);\n                }
                 // Set pageBreakAfter only for last page - let CSS handle the rest
                 if(isLastPage){
                     page.style.pageBreakAfter = 'auto';
@@ -6534,15 +6534,15 @@ document.addEventListener('DOMContentLoaded', ()=>{
                 styleEl.textContent = `
                     @media print{
                         @page{
-                            size: ${profile.width}cm ${profile.height}cm;
+                            size: ${bleedWidth}cm cm;
                             margin: 0;
                             padding: 0;
                             marks: none;
-                            bleed: 0;
+                            bleed: ;
                         }
-                        html,body{margin:0!important;padding:0!important;background:#fff!important;width:${profile.width}cm!important;height:auto!important}
+                        html,body{margin:0!important;padding:0!important;background:!important;width:${profile.width}cm!important;height:auto!important}
                         #toolbar,#sidebar,#marquee,.status-message{display:none!important}
-                        .print-page{width:${profile.width}cm!important;height:${profile.height}cm!important;page-break-inside:avoid!important;overflow:visible!important;background:#fff!important;position:relative!important;margin:0!important;padding:0!important;display:block!important;box-sizing:border-box!important}
+                        .print-page{width:cm!important;height:cm!important;page-break-inside:avoid!important;overflow:visible!important;background:!important;position:relative!important;margin:0!important;padding:0!important;display:block!important;box-sizing:border-box!important}
                         .print-page:not(:last-child){page-break-after:always!important}
                         .print-page:last-child{page-break-after:auto!important}
                         .print-container{display:block!important;position:static!important;left:auto!important;top:auto!important}
@@ -6629,7 +6629,7 @@ document.addEventListener('DOMContentLoaded', ()=>{
             printContainer.style.top = '0';
             printContainer.style.width = `${bleedWidth}cm`;
             // Height is auto - pages will be stacked naturally
-            printContainer.style.height = 'auto';
+            printContainer.style.background = bleedBgColor;\n            printContainer.style.height = 'auto';
             printContainer.style.background = bleedBgColor;
             
             // Calculate total pages
@@ -6646,7 +6646,7 @@ document.addEventListener('DOMContentLoaded', ()=>{
                 page.style.height = `${bleedHeight}cm`;
                 page.style.position = 'relative';
                 page.style.background = bleedBgColor;
-                page.style.overflow = 'hidden';
+                page.style.overflow = 'hidden';\n                \n                // Add bleed background container if bleed is enabled\n                if(bleedEnabled) {\n                    const bleedContainer = document.createElement('div');\n                    bleedContainer.style.position = 'absolute';\n                    bleedContainer.style.left = '0';\n                    bleedContainer.style.top = '0';\n                    bleedContainer.style.width = ${bleedWidth}cm;\n                    bleedContainer.style.height = ${bleedHeight}cm;\n                    bleedContainer.style.backgroundColor = bleedColor;\n                    bleedContainer.style.zIndex = '0';\n                    page.appendChild(bleedContainer);\n                }
                 
                 // Add bleed background container if bleed is enabled
                 if(bleedEnabled) {
@@ -7170,15 +7170,15 @@ document.addEventListener('DOMContentLoaded', ()=>{
                 styleEl.textContent = `
                     @media print{
                         @page{
-                            size: ${profile.width}cm ${profile.height}cm;
+                            size: ${bleedWidth}cm cm;
                             margin: 0;
                             padding: 0;
                             marks: none;
-                            bleed: 0;
+                            bleed: ;
                         }
-                        html,body{margin:0!important;padding:0!important;background:#fff!important;width:${profile.width}cm!important;height:auto!important}
+                        html,body{margin:0!important;padding:0!important;background:!important;width:${profile.width}cm!important;height:auto!important}
                         #toolbar,#sidebar,#marquee,.status-message{display:none!important}
-                        .print-page{width:${profile.width}cm!important;height:${profile.height}cm!important;page-break-inside:avoid!important;overflow:visible!important;background:#fff!important;position:relative!important;margin:0!important;padding:0!important;display:block!important;box-sizing:border-box!important}
+                        .print-page{width:cm!important;height:cm!important;page-break-inside:avoid!important;overflow:visible!important;background:!important;position:relative!important;margin:0!important;padding:0!important;display:block!important;box-sizing:border-box!important}
                         .print-page:not(:last-child){page-break-after:always!important}
                         .print-page:last-child{page-break-after:auto!important}
                         .print-container{display:block!important;position:static!important;left:auto!important;top:auto!important}
@@ -7245,7 +7245,7 @@ document.addEventListener('DOMContentLoaded', ()=>{
         printContainer.style.top = '0';
         printContainer.style.width = `${profile.width}cm`;
         // Height is auto - pages will be stacked naturally
-        printContainer.style.height = 'auto';
+        printContainer.style.background = bleedBgColor;\n            printContainer.style.height = 'auto';
         
         // Calculate total pages
         const totalPages = canvas2Flag ? 2 : 1;
@@ -7260,8 +7260,8 @@ document.addEventListener('DOMContentLoaded', ()=>{
             page.style.width = `${profile.width}cm`;
             page.style.height = `${profile.height}cm`;
             page.style.position = 'relative';
-            page.style.background = '#fff';
-            page.style.overflow = 'hidden';
+            page.style.background = bleedBgColor;
+            page.style.overflow = 'hidden';\n                \n                // Add bleed background container if bleed is enabled\n                if(bleedEnabled) {\n                    const bleedContainer = document.createElement('div');\n                    bleedContainer.style.position = 'absolute';\n                    bleedContainer.style.left = '0';\n                    bleedContainer.style.top = '0';\n                    bleedContainer.style.width = ${bleedWidth}cm;\n                    bleedContainer.style.height = ${bleedHeight}cm;\n                    bleedContainer.style.backgroundColor = bleedColor;\n                    bleedContainer.style.zIndex = '0';\n                    page.appendChild(bleedContainer);\n                }
             // Set pageBreakAfter only for last page - let CSS handle the rest
             if(isLastPage){
                 page.style.pageBreakAfter = 'auto';
@@ -7660,15 +7660,15 @@ document.addEventListener('DOMContentLoaded', ()=>{
             styleEl.textContent = `
                 @media print{
                     @page{
-                        size: ${profile.width}cm ${profile.height}cm;
+                        size: ${bleedWidth}cm cm;
                         margin: 0;
                         padding: 0;
                         marks: none;
-                        bleed: 0;
+                        bleed: ;
                     }
-                    html,body{margin:0!important;padding:0!important;background:#fff!important;width:${profile.width}cm!important;height:auto!important}
+                    html,body{margin:0!important;padding:0!important;background:!important;width:${profile.width}cm!important;height:auto!important}
                     #toolbar,#sidebar,#marquee,.status-message{display:none!important}
-                    .print-page{width:${profile.width}cm!important;height:${profile.height}cm!important;page-break-inside:avoid!important;overflow:visible!important;background:#fff!important;position:relative!important;margin:0!important;padding:0!important;display:block!important;box-sizing:border-box!important}
+                    .print-page{width:cm!important;height:cm!important;page-break-inside:avoid!important;overflow:visible!important;background:!important;position:relative!important;margin:0!important;padding:0!important;display:block!important;box-sizing:border-box!important}
                     .print-page:not(:last-child){page-break-after:always!important}
                     .print-page:last-child{page-break-after:auto!important}
                     .print-container{display:block!important;position:static!important;left:auto!important;top:auto!important}
