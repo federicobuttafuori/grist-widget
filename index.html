@@ -36,6 +36,19 @@
         .sidebar-section .sidebar-design-row{display:flex;gap:4px;align-items:center}
         .sidebar-section .sidebar-design-row select{flex:1;min-width:0}
         .sidebar-section .sidebar-icon-btn{padding:0;width:32px;height:32px;flex-shrink:0;display:flex;align-items:center;justify-content:center;font-size:14px;border:1px solid #ccc;border-radius:4px;box-sizing:border-box}
+        #offset-profiles-modal{position:fixed;inset:0;background:rgba(0,0,0,0.45);z-index:20000;display:none;align-items:center;justify-content:center;padding:16px}
+        #offset-profiles-modal.offset-modal-open{display:flex}
+        .offset-modal-panel{background:#fff;border-radius:10px;max-width:520px;width:100%;max-height:88vh;overflow:auto;box-shadow:0 8px 32px rgba(0,0,0,0.25);display:flex;flex-direction:column}
+        .offset-modal-header{padding:14px 18px;border-bottom:1px solid #e8e8e8;display:flex;align-items:center;justify-content:space-between;gap:12px}
+        .offset-modal-header h3{margin:0;font-size:16px;font-weight:600}
+        .offset-modal-body{padding:14px 18px 18px;display:flex;flex-direction:column;gap:12px;font-size:13px}
+        .offset-modal-row{display:grid;grid-template-columns:1fr 72px 72px 36px;gap:6px;align-items:center}
+        .offset-modal-row.offset-modal-head{font-weight:600;font-size:12px;color:#555}
+        .offset-modal-row input[type="text"]{min-width:0}
+        .offset-modal-row input[type="number"]{min-width:0;padding:6px}
+        .offset-modal-hint{color:#666;font-size:11px;line-height:1.4}
+        .offset-modal-actions{display:flex;gap:8px;flex-wrap:wrap;margin-top:4px}
+        .offset-modal-actions button{font-size:12px;padding:6px 12px}
         .sidebar-section .sidebar-btn-row{display:flex;gap:4px;margin-top:8px}
         .sidebar-section .sidebar-btn-row button{flex:1;font-size:12px;padding:4px 8px}
         .sidebar-section .sidebar-btn-block{width:100%;padding:6px;border:none;border-radius:4px;cursor:pointer;font-size:12px}
@@ -175,6 +188,7 @@
                     </select>
                     <button type="button" id="btn-rename-design" class="sidebar-icon-btn" title="Rename Design">✏️</button>
                     <button type="button" id="btn-clone-design" class="sidebar-icon-btn" title="Clone Design">📋</button>
+                    <button type="button" id="btn-offset-profiles" class="sidebar-icon-btn" title="Profili offset stampa">📍</button>
                 </div>
                 <div class="sidebar-btn-row">
                     <button type="button" id="btn-add-profile">➕ Add Size</button>
@@ -290,6 +304,35 @@
 
     <input id="file-import" type="file" accept="application/json" style="display:none" />
     <input id="file-import-snapshot" type="file" accept="application/json" style="display:none" />
+
+    <div id="offset-profiles-modal" aria-hidden="true">
+        <div class="offset-modal-panel" onclick="event.stopPropagation()">
+            <div class="offset-modal-header">
+                <h3>Profili offset stampa</h3>
+                <button type="button" id="offset-modal-close" style="padding:4px 10px">Chiudi</button>
+            </div>
+            <div class="offset-modal-body">
+                <p class="offset-modal-hint">Sposta il contenuto in stampa (mm). Positivo X = verso destra, positivo Y = verso il basso. I profili sono condivisi tra tutti i formati; ogni design sceglie quale usare.</p>
+                <div>
+                    <label for="offset-profile-design-select" style="font-size:12px;font-weight:600;display:block;margin-bottom:6px">Profilo per il design corrente</label>
+                    <select id="offset-profile-design-select"></select>
+                </div>
+                <div style="overflow-x:auto">
+                    <div class="offset-modal-row offset-modal-head">
+                        <span>Nome</span>
+                        <span>X mm</span>
+                        <span>Y mm</span>
+                        <span></span>
+                    </div>
+                    <div id="offset-profiles-editor"></div>
+                </div>
+                <div class="offset-modal-actions">
+                    <button type="button" id="offset-profile-add">+ Nuovo profilo</button>
+                    <button type="button" id="offset-profile-save" class="sidebar-btn-block sidebar-btn-info" style="width:auto;padding:6px 14px;border:none">Salva modifiche</button>
+                </div>
+            </div>
+        </div>
+    </div>
 
 <script>
 document.addEventListener('DOMContentLoaded', ()=>{
@@ -412,6 +455,11 @@ document.addEventListener('DOMContentLoaded', ()=>{
             return html;
         }
         
+        const DEFAULT_OFFSET_PROFILE_ID = 'op_default';
+        let offsetProfiles = {
+            [DEFAULT_OFFSET_PROFILE_ID]: { name: 'Zero', offsetXmm: 0, offsetYmm: 0 }
+        };
+
         // Profile management
         let profiles = {
             '8x5': {
@@ -422,7 +470,8 @@ document.addEventListener('DOMContentLoaded', ()=>{
                         canvas1: [],
                         canvas2: [],
                         canvas2Enabled: false,
-                        sequenceEnabled: false
+                        sequenceEnabled: false,
+                        selectedOffsetProfileId: DEFAULT_OFFSET_PROFILE_ID
                     }
                 }
             }
@@ -682,6 +731,166 @@ document.addEventListener('DOMContentLoaded', ()=>{
 
     function deepCopy(obj){ return JSON.parse(JSON.stringify(obj)); }
 
+        function ensureOffsetProfilesTable(){
+            if(!offsetProfiles || typeof offsetProfiles !== 'object') offsetProfiles = {};
+            if(!offsetProfiles[DEFAULT_OFFSET_PROFILE_ID]){
+                offsetProfiles[DEFAULT_OFFSET_PROFILE_ID] = { name: 'Zero', offsetXmm: 0, offsetYmm: 0 };
+            }
+        }
+
+        function getOffsetMmForDesign(design){
+            if(!design) return { x: 0, y: 0 };
+            const id = design.selectedOffsetProfileId;
+            if(!id || typeof id !== 'string') return { x: 0, y: 0 };
+            ensureOffsetProfilesTable();
+            const p = offsetProfiles[id];
+            if(!p || typeof p !== 'object') return { x: 0, y: 0 };
+            const x = Number(p.offsetXmm);
+            const y = Number(p.offsetYmm);
+            return {
+                x: Number.isFinite(x) ? x : 0,
+                y: Number.isFinite(y) ? y : 0
+            };
+        }
+
+        function cssPrintTranslateMm(xMm, yMm){
+            if(!Number.isFinite(xMm) || !Number.isFinite(yMm) || (xMm === 0 && yMm === 0)) return 'none';
+            return `translate(${xMm}mm, ${yMm}mm)`;
+        }
+
+        function generateOffsetProfileId(){
+            return 'op_' + Date.now().toString(36) + '_' + Math.random().toString(36).slice(2, 9);
+        }
+
+        function reassignDesignsAfterOffsetProfileDelete(removedId){
+            if(!removedId || typeof removedId !== 'string') return;
+            Object.keys(profiles).forEach(pk => {
+                const prof = profiles[pk];
+                if(!prof || !prof.designs) return;
+                Object.keys(prof.designs).forEach(dk => {
+                    const d = prof.designs[dk];
+                    if(d && d.selectedOffsetProfileId === removedId){
+                        d.selectedOffsetProfileId = DEFAULT_OFFSET_PROFILE_ID;
+                    }
+                });
+            });
+        }
+
+        function renderOffsetProfileEditorRows(){
+            const editor = document.getElementById('offset-profiles-editor');
+            const sel = document.getElementById('offset-profile-design-select');
+            if(!editor || !sel) return;
+            ensureOffsetProfilesTable();
+            editor.innerHTML = '';
+            Object.keys(offsetProfiles).forEach(id => {
+                const p = offsetProfiles[id];
+                const row = document.createElement('div');
+                row.className = 'offset-modal-row';
+                row.dataset.profileId = id;
+                const nameVal = (p && p.name != null) ? String(p.name) : '';
+                const xVal = (p && p.offsetXmm != null) ? String(p.offsetXmm) : '0';
+                const yVal = (p && p.offsetYmm != null) ? String(p.offsetYmm) : '0';
+                const delBtn = id === DEFAULT_OFFSET_PROFILE_ID ? '' : `<button type="button" class="offset-row-delete" data-id="${id.replace(/"/g, '&quot;')}" title="Elimina" style="padding:4px">🗑️</button>`;
+                row.innerHTML = `
+                    <input type="text" class="offset-in-name" value="${nameVal.replace(/"/g, '&quot;')}">
+                    <input type="number" class="offset-in-x" step="0.1" value="${xVal.replace(/"/g, '&quot;')}">
+                    <input type="number" class="offset-in-y" step="0.1" value="${yVal.replace(/"/g, '&quot;')}">
+                    <span>${delBtn}</span>`;
+                editor.appendChild(row);
+            });
+            editor.querySelectorAll('.offset-row-delete').forEach(btn => {
+                btn.addEventListener('click', () => {
+                    const rid = btn.getAttribute('data-id');
+                    if(!rid || rid === DEFAULT_OFFSET_PROFILE_ID) return;
+                    if(!confirm('Eliminare questo profilo di offset? I design che lo usavano passeranno a "Zero".')) return;
+                    delete offsetProfiles[rid];
+                    reassignDesignsAfterOffsetProfileDelete(rid);
+                    if(sel.value === rid) sel.value = DEFAULT_OFFSET_PROFILE_ID;
+                    syncOffsetProfileDesignSelectOptions();
+                    renderOffsetProfileEditorRows();
+                });
+            });
+        }
+
+        function syncOffsetProfileDesignSelectOptions(){
+            const sel = document.getElementById('offset-profile-design-select');
+            if(!sel) return;
+            const cur = sel.value;
+            ensureOffsetProfilesTable();
+            sel.innerHTML = Object.keys(offsetProfiles).map(id => {
+                const p = offsetProfiles[id];
+                const label = (p && p.name) ? String(p.name) : id;
+                return `<option value="${id.replace(/"/g, '&quot;')}">${label.replace(/</g, '&lt;')}</option>`;
+            }).join('');
+            if(cur && offsetProfiles[cur]) sel.value = cur;
+            else sel.value = DEFAULT_OFFSET_PROFILE_ID;
+        }
+
+        function saveOffsetProfilesFromModal(){
+            const modal = document.getElementById('offset-profiles-modal');
+            const editor = document.getElementById('offset-profiles-editor');
+            const sel = document.getElementById('offset-profile-design-select');
+            if(!editor || !sel) return;
+            ensureOffsetProfilesTable();
+            editor.querySelectorAll('.offset-modal-row').forEach(row => {
+                const id = row.dataset.profileId;
+                if(!id || !offsetProfiles[id]) return;
+                const nIn = row.querySelector('.offset-in-name');
+                const xIn = row.querySelector('.offset-in-x');
+                const yIn = row.querySelector('.offset-in-y');
+                const name = nIn ? String(nIn.value).trim() : '';
+                const x = xIn ? Number(xIn.value) : 0;
+                const y = yIn ? Number(yIn.value) : 0;
+                offsetProfiles[id].name = name || id;
+                offsetProfiles[id].offsetXmm = Number.isFinite(x) ? x : 0;
+                offsetProfiles[id].offsetYmm = Number.isFinite(y) ? y : 0;
+            });
+            const profileNow = profiles[currentProfile];
+            const designNow = profileNow && profileNow.designs ? profileNow.designs[currentDesign] : null;
+            if(designNow){
+                designNow.selectedOffsetProfileId = sel.value || DEFAULT_OFFSET_PROFILE_ID;
+            }
+            saveCurrentDesign();
+            updatePrintCSS();
+            msg('Profili offset salvati');
+            if(modal){
+                modal.classList.remove('offset-modal-open');
+                modal.setAttribute('aria-hidden', 'true');
+            }
+        }
+
+        function openOffsetProfilesModal(){
+            ensureOffsetProfilesTable();
+            const modal = document.getElementById('offset-profiles-modal');
+            const sel = document.getElementById('offset-profile-design-select');
+            if(!modal || !sel) return;
+
+            const profile = profiles[currentProfile];
+            const design = profile && profile.designs ? profile.designs[currentDesign] : null;
+            if(design && (design.selectedOffsetProfileId === undefined || design.selectedOffsetProfileId === '')){
+                design.selectedOffsetProfileId = DEFAULT_OFFSET_PROFILE_ID;
+            }
+
+            syncOffsetProfileDesignSelectOptions();
+            if(design && design.selectedOffsetProfileId && offsetProfiles[design.selectedOffsetProfileId]){
+                sel.value = design.selectedOffsetProfileId;
+            } else {
+                sel.value = DEFAULT_OFFSET_PROFILE_ID;
+            }
+
+            renderOffsetProfileEditorRows();
+
+            modal.classList.add('offset-modal-open');
+            modal.setAttribute('aria-hidden', 'false');
+        }
+
+        function closeOffsetProfilesModal(){
+            const modal = document.getElementById('offset-profiles-modal');
+            if(!modal) return;
+            modal.classList.remove('offset-modal-open');
+            modal.setAttribute('aria-hidden', 'true');
+        }
+
         // ---------- Profile Management ----------
         function updateCanvasSize(){
             const profile = profiles[currentProfile];
@@ -704,6 +913,10 @@ document.addEventListener('DOMContentLoaded', ()=>{
             }
             const profile = profiles[currentProfile];
             if(profile){
+                ensureOffsetProfilesTable();
+                const designForPrint = profile.designs && profile.designs[currentDesign] ? profile.designs[currentDesign] : null;
+                const offMm = getOffsetMmForDesign(designForPrint);
+                const printTr = cssPrintTranslateMm(offMm.x, offMm.y);
                 styleEl.textContent = `
                     @media print{
                         @page{
@@ -718,7 +931,7 @@ document.addEventListener('DOMContentLoaded', ()=>{
                         #main-content{width:${profile.width}cm!important;height:${profile.height}cm!important;overflow:visible!important;display:block!important;padding:0!important;margin:0!important}
                         #canvas-container{width:${profile.width}cm!important;height:${profile.height}cm!important;padding:0!important;margin:0!important;overflow:visible!important;background:#fff!important;display:block!important;position:static!important}
                         #canvas-wrapper{position:static!important;width:${profile.width}cm!important;height:${profile.height}cm!important;margin:0!important;padding:0!important;transform:none!important;display:block!important}
-                        #label-canvas{position:static!important;width:${profile.width}cm!important;height:${profile.height}cm!important;transform:none!important;box-shadow:none!important;display:block!important;overflow:visible!important;background:#fff!important}
+                        #label-canvas{position:static!important;width:${profile.width}cm!important;height:${profile.height}cm!important;transform:${printTr}!important;transform-origin:0 0!important;box-shadow:none!important;display:block!important;overflow:visible!important;background:#fff!important}
                             .label-element{page-break-inside:avoid!important;-webkit-print-color-adjust:exact!important;print-color-adjust:exact!important}
                         .label-element.selected{border:1px solid transparent!important;box-shadow:none!important}
                         .resize-handle{display:none!important}
@@ -964,10 +1177,13 @@ document.addEventListener('DOMContentLoaded', ()=>{
                         parsed.globalSequenceCountColumn = globalSequenceCountColumn;
                         parsed.packWaves = packWaves || [];
                         parsed.masterDataThreads = masterDataThreads || [];
+                        ensureOffsetProfilesTable();
+                        parsed.offsetProfiles = offsetProfiles;
                         localStorage.setItem(KEY, JSON.stringify(parsed));
                     }
                 } else {
                     // If no saved data exists, create new payload
+                    ensureOffsetProfilesTable();
                     const payloadObj = { 
                         version: 2, 
                         profiles: profiles || {},
@@ -980,7 +1196,8 @@ document.addEventListener('DOMContentLoaded', ()=>{
                         lastCanvasByDesign: lastCanvasByDesign || {},
                         globalSequenceCountColumn: globalSequenceCountColumn,
                         packWaves: packWaves || [],
-                        masterDataThreads: masterDataThreads || []
+                        masterDataThreads: masterDataThreads || [],
+                        offsetProfiles: offsetProfiles
                     };
                     localStorage.setItem(KEY, JSON.stringify(payloadObj));
                 }
@@ -992,17 +1209,22 @@ document.addEventListener('DOMContentLoaded', ()=>{
         function saveCurrentDesign(){
             const profile = profiles[currentProfile];
             if(!profile) return;
+            ensureOffsetProfilesTable();
             if(!profile.designs[currentDesign]) {
                 profile.designs[currentDesign] = {
                     canvas1: [],
                     canvas2: [],
                     canvas2Enabled: false,
-                    sequenceEnabled: true
+                    sequenceEnabled: true,
+                    selectedOffsetProfileId: DEFAULT_OFFSET_PROFILE_ID
                 };
             }
             const design = profile.designs[currentDesign];
             // Ensure sequence fields exist (backward compatibility)
             if(design.sequenceEnabled === undefined) design.sequenceEnabled = false;
+            if(design.selectedOffsetProfileId === undefined || design.selectedOffsetProfileId === ''){
+                design.selectedOffsetProfileId = DEFAULT_OFFSET_PROFILE_ID;
+            }
             const canvasKey = `canvas${currentCanvas}`;
             design[canvasKey] = deepCopy(S);
             
@@ -1022,6 +1244,7 @@ document.addEventListener('DOMContentLoaded', ()=>{
                         packWaves: packWaves || [],
                         globalRegexRules: globalRegexRules || [],
                         masterDataThreads: masterDataThreads || [],
+                        offsetProfiles: offsetProfiles,
                         bwPreview: {
                             modeEnabled: bwModeEnabled,
                             gamma: bwGamma,
@@ -1043,17 +1266,22 @@ document.addEventListener('DOMContentLoaded', ()=>{
         function loadCurrentDesign(){
             const profile = profiles[currentProfile];
             if(!profile) return;
+            ensureOffsetProfilesTable();
             if(!profile.designs[currentDesign]) {
                 profile.designs[currentDesign] = {
                     canvas1: [],
                     canvas2: [],
                     canvas2Enabled: false,
-                    sequenceEnabled: true
+                    sequenceEnabled: true,
+                    selectedOffsetProfileId: DEFAULT_OFFSET_PROFILE_ID
                 };
             }
             const design = profile.designs[currentDesign];
             // Ensure sequence fields exist (backward compatibility)
             if(design.sequenceEnabled === undefined) design.sequenceEnabled = false;
+            if(design.selectedOffsetProfileId === undefined || design.selectedOffsetProfileId === ''){
+                design.selectedOffsetProfileId = DEFAULT_OFFSET_PROFILE_ID;
+            }
             const canvasKey = `canvas${currentCanvas}`;
             const canvasData = design[canvasKey] || [];
             S = canvasData.map(normalizeElement);
@@ -1098,7 +1326,8 @@ document.addEventListener('DOMContentLoaded', ()=>{
                         canvas1: [],
                         canvas2: [],
                         canvas2Enabled: false,
-                        sequenceEnabled: false
+                        sequenceEnabled: false,
+                        selectedOffsetProfileId: DEFAULT_OFFSET_PROFILE_ID
                     }
                 }
             };
@@ -1134,7 +1363,8 @@ document.addEventListener('DOMContentLoaded', ()=>{
                 canvas1: [],
                 canvas2: [],
                 canvas2Enabled: false,
-                        sequenceEnabled: false
+                        sequenceEnabled: false,
+                        selectedOffsetProfileId: DEFAULT_OFFSET_PROFILE_ID
                     };
             switchDesign(designKey);
             msg(`Design "${designKey}" added`);
@@ -1169,6 +1399,7 @@ document.addEventListener('DOMContentLoaded', ()=>{
         function cloneDesign(){
             const profile = profiles[currentProfile];
             if(!profile || !profile.designs[currentDesign]) return;
+            ensureOffsetProfilesTable();
             // Save current design first
             saveCurrentDesign();
             // Generate new name
@@ -1185,7 +1416,10 @@ document.addEventListener('DOMContentLoaded', ()=>{
                 canvas1: deepCopy(currentDes.canvas1 || []),
                 canvas2: deepCopy(currentDes.canvas2 || []),
                 canvas2Enabled: currentDes.canvas2Enabled || false,
-                sequenceEnabled: currentDes.sequenceEnabled || false
+                sequenceEnabled: currentDes.sequenceEnabled || false,
+                selectedOffsetProfileId: (currentDes.selectedOffsetProfileId && offsetProfiles[currentDes.selectedOffsetProfileId])
+                    ? currentDes.selectedOffsetProfileId
+                    : DEFAULT_OFFSET_PROFILE_ID
             };
             // Switch to cloned design
             switchDesign(newKey);
@@ -5561,7 +5795,8 @@ document.addEventListener('DOMContentLoaded', ()=>{
                 profiles: profiles,
                 currentProfile: currentProfile,
                 currentDesign: currentDesign,
-                currentCanvas: currentCanvas
+                currentCanvas: currentCanvas,
+                offsetProfiles: offsetProfiles
             };
         const blob = new Blob([JSON.stringify(payloadObj,null,2)], { type:'application/json' });
         const url = URL.createObjectURL(blob);
@@ -5593,6 +5828,7 @@ document.addEventListener('DOMContentLoaded', ()=>{
                 globalRegexRules: globalRegexRules || [],
                 masterDataThreads: masterDataThreads || [],
                 fontFavorites: fontFavorites || [],
+                offsetProfiles: offsetProfiles,
                 bwPreview: {
                     modeEnabled: bwModeEnabled,
                     gamma: bwGamma,
@@ -5636,11 +5872,30 @@ document.addEventListener('DOMContentLoaded', ()=>{
                 saveCurrentDesign();
 
                 profiles = deepCopy(parsed.profiles);
-                const defaultDesign = { canvas1: [], canvas2: [], canvas2Enabled: false, sequenceEnabled: false };
+                if(parsed.offsetProfiles && typeof parsed.offsetProfiles === 'object'){
+                    offsetProfiles = deepCopy(parsed.offsetProfiles);
+                }
+                ensureOffsetProfilesTable();
+                const defaultDesign = { canvas1: [], canvas2: [], canvas2Enabled: false, sequenceEnabled: false, selectedOffsetProfileId: DEFAULT_OFFSET_PROFILE_ID };
                 Object.keys(profiles).forEach(key => {
                     if(!profiles[key] || typeof profiles[key] !== 'object') return;
                     if(!profiles[key].designs || typeof profiles[key].designs !== 'object'){
                         profiles[key].designs = { default: deepCopy(defaultDesign) };
+                    }
+                });
+                Object.keys(profiles).forEach(profileKey => {
+                    const prof = profiles[profileKey];
+                    if(prof && prof.designs){
+                        Object.keys(prof.designs).forEach(designKey => {
+                            const des = prof.designs[designKey];
+                            if(des){
+                                if(des.selectedOffsetProfileId === undefined || des.selectedOffsetProfileId === ''){
+                                    des.selectedOffsetProfileId = DEFAULT_OFFSET_PROFILE_ID;
+                                } else if(!offsetProfiles[des.selectedOffsetProfileId]){
+                                    des.selectedOffsetProfileId = DEFAULT_OFFSET_PROFILE_ID;
+                                }
+                            }
+                        });
                     }
                 });
                 groups = Array.isArray(parsed.groups) ? deepCopy(parsed.groups) : [];
@@ -6455,6 +6710,9 @@ document.addEventListener('DOMContentLoaded', ()=>{
                     styleEl.id = styleId;
                     document.head.appendChild(styleEl);
                 }
+                ensureOffsetProfilesTable();
+                const offMmWave = getOffsetMmForDesign(design);
+                const printPageTrWave = cssPrintTranslateMm(offMmWave.x, offMmWave.y);
                 styleEl.textContent = `
                     @media print{
                         @page{
@@ -6466,7 +6724,7 @@ document.addEventListener('DOMContentLoaded', ()=>{
                         }
                         html,body{margin:0!important;padding:0!important;background:#fff!important;width:${profile.width}cm!important;height:auto!important}
                         #toolbar,#sidebar,#marquee,.status-message{display:none!important}
-                        .print-page{width:${profile.width}cm!important;height:${profile.height}cm!important;page-break-inside:avoid!important;overflow:visible!important;background:#fff!important;position:relative!important;margin:0!important;padding:0!important;display:block!important;box-sizing:border-box!important}
+                        .print-page{width:${profile.width}cm!important;height:${profile.height}cm!important;page-break-inside:avoid!important;overflow:visible!important;background:#fff!important;position:relative!important;margin:0!important;padding:0!important;display:block!important;box-sizing:border-box!important;transform:${printPageTrWave}!important;transform-origin:0 0!important}
                         .print-page:not(:last-child){page-break-after:always!important}
                         .print-page:last-child{page-break-after:auto!important}
                         .print-container{display:block!important;position:static!important;left:auto!important;top:auto!important}
@@ -7072,6 +7330,9 @@ document.addEventListener('DOMContentLoaded', ()=>{
                     styleEl.id = styleId;
                     document.head.appendChild(styleEl);
                 }
+                ensureOffsetProfilesTable();
+                const offMmBoth = getOffsetMmForDesign(design);
+                const printPageTrBoth = cssPrintTranslateMm(offMmBoth.x, offMmBoth.y);
                 styleEl.textContent = `
                     @media print{
                         @page{
@@ -7083,7 +7344,7 @@ document.addEventListener('DOMContentLoaded', ()=>{
                         }
                         html,body{margin:0!important;padding:0!important;background:#fff!important;width:${profile.width}cm!important;height:auto!important}
                         #toolbar,#sidebar,#marquee,.status-message{display:none!important}
-                        .print-page{width:${profile.width}cm!important;height:${profile.height}cm!important;page-break-inside:avoid!important;overflow:visible!important;background:#fff!important;position:relative!important;margin:0!important;padding:0!important;display:block!important;box-sizing:border-box!important}
+                        .print-page{width:${profile.width}cm!important;height:${profile.height}cm!important;page-break-inside:avoid!important;overflow:visible!important;background:#fff!important;position:relative!important;margin:0!important;padding:0!important;display:block!important;box-sizing:border-box!important;transform:${printPageTrBoth}!important;transform-origin:0 0!important}
                         .print-page:not(:last-child){page-break-after:always!important}
                         .print-page:last-child{page-break-after:auto!important}
                         .print-container{display:block!important;position:static!important;left:auto!important;top:auto!important}
@@ -7562,6 +7823,9 @@ document.addEventListener('DOMContentLoaded', ()=>{
                 styleEl.id = styleId;
                 document.head.appendChild(styleEl);
             }
+            ensureOffsetProfilesTable();
+            const offMmSingle = getOffsetMmForDesign(design);
+            const printPageTrSingle = cssPrintTranslateMm(offMmSingle.x, offMmSingle.y);
             styleEl.textContent = `
                 @media print{
                     @page{
@@ -7573,7 +7837,7 @@ document.addEventListener('DOMContentLoaded', ()=>{
                     }
                     html,body{margin:0!important;padding:0!important;background:#fff!important;width:${profile.width}cm!important;height:auto!important}
                     #toolbar,#sidebar,#marquee,.status-message{display:none!important}
-                    .print-page{width:${profile.width}cm!important;height:${profile.height}cm!important;page-break-inside:avoid!important;overflow:visible!important;background:#fff!important;position:relative!important;margin:0!important;padding:0!important;display:block!important;box-sizing:border-box!important}
+                    .print-page{width:${profile.width}cm!important;height:${profile.height}cm!important;page-break-inside:avoid!important;overflow:visible!important;background:#fff!important;position:relative!important;margin:0!important;padding:0!important;display:block!important;box-sizing:border-box!important;transform:${printPageTrSingle}!important;transform-origin:0 0!important}
                     .print-page:not(:last-child){page-break-after:always!important}
                     .print-page:last-child{page-break-after:auto!important}
                     .print-container{display:block!important;position:static!important;left:auto!important;top:auto!important}
@@ -8990,6 +9254,49 @@ document.addEventListener('DOMContentLoaded', ()=>{
         document.getElementById('btn-clone-design').addEventListener('click', ()=>{
             cloneDesign();
         });
+        const btnOffsetProfiles = document.getElementById('btn-offset-profiles');
+        if(btnOffsetProfiles){
+            btnOffsetProfiles.addEventListener('click', () => openOffsetProfilesModal());
+        }
+        const offsetModalEl = document.getElementById('offset-profiles-modal');
+        if(offsetModalEl){
+            offsetModalEl.addEventListener('click', (e) => {
+                if(e.target === offsetModalEl) closeOffsetProfilesModal();
+            });
+        }
+        const offsetAddBtn = document.getElementById('offset-profile-add');
+        if(offsetAddBtn){
+            offsetAddBtn.addEventListener('click', () => {
+                ensureOffsetProfilesTable();
+                const nid = generateOffsetProfileId();
+                offsetProfiles[nid] = { name: 'Nuovo profilo', offsetXmm: 0, offsetYmm: 0 };
+                syncOffsetProfileDesignSelectOptions();
+                renderOffsetProfileEditorRows();
+                const s = document.getElementById('offset-profile-design-select');
+                if(s) s.value = nid;
+            });
+        }
+        const offsetSaveBtn = document.getElementById('offset-profile-save');
+        if(offsetSaveBtn){
+            offsetSaveBtn.addEventListener('click', () => saveOffsetProfilesFromModal());
+        }
+        const offsetCloseBtn = document.getElementById('offset-modal-close');
+        if(offsetCloseBtn){
+            offsetCloseBtn.addEventListener('click', () => closeOffsetProfilesModal());
+        }
+        const offsetDesignSel = document.getElementById('offset-profile-design-select');
+        if(offsetDesignSel){
+            offsetDesignSel.addEventListener('change', () => {
+                ensureOffsetProfilesTable();
+                const profile = profiles[currentProfile];
+                const design = profile && profile.designs ? profile.designs[currentDesign] : null;
+                if(design && offsetDesignSel.value && offsetProfiles[offsetDesignSel.value]){
+                    design.selectedOffsetProfileId = offsetDesignSel.value;
+                    saveCurrentDesign();
+                    updatePrintCSS();
+                }
+            });
+        }
         canvasSelector.addEventListener('change', (e)=>{
             switchCanvas(parseInt(e.target.value));
             saveCurrentDesign();
@@ -9384,6 +9691,25 @@ document.addEventListener('DOMContentLoaded', ()=>{
                     } else {
                         masterDataThreads = [];
                     }
+                    if(parsed.offsetProfiles && typeof parsed.offsetProfiles === 'object'){
+                        offsetProfiles = deepCopy(parsed.offsetProfiles);
+                    }
+                    ensureOffsetProfilesTable();
+                    Object.keys(profiles).forEach(profileKey => {
+                        const prof = profiles[profileKey];
+                        if(prof && prof.designs){
+                            Object.keys(prof.designs).forEach(designKey => {
+                                const des = prof.designs[designKey];
+                                if(des){
+                                    if(des.selectedOffsetProfileId === undefined || des.selectedOffsetProfileId === ''){
+                                        des.selectedOffsetProfileId = DEFAULT_OFFSET_PROFILE_ID;
+                                    } else if(!offsetProfiles[des.selectedOffsetProfileId]){
+                                        des.selectedOffsetProfileId = DEFAULT_OFFSET_PROFILE_ID;
+                                    }
+                                }
+                            });
+                        }
+                    });
                     // Load anteprima termica (B&W preview) options if saved
                     if(parsed.bwPreview && typeof parsed.bwPreview === 'object'){
                         const p = parsed.bwPreview;
@@ -9674,8 +10000,10 @@ document.addEventListener('DOMContentLoaded', ()=>{
             const selectHeight = designSelector.offsetHeight;
             const renameBtn = document.getElementById('btn-rename-design');
             const cloneBtn = document.getElementById('btn-clone-design');
+            const offsetPb = document.getElementById('btn-offset-profiles');
             if(renameBtn && selectHeight) renameBtn.style.height = `${selectHeight}px`;
             if(cloneBtn && selectHeight) cloneBtn.style.height = `${selectHeight}px`;
+            if(offsetPb && selectHeight) offsetPb.style.height = `${selectHeight}px`;
         }, 100);
 
 }); // DOMContentLoaded
