@@ -438,6 +438,14 @@ document.addEventListener('DOMContentLoaded', ()=>{
     const cw = document.getElementById('canvas-wrapper');
     const lc = document.getElementById('label-canvas');
     const pp = document.getElementById('properties-panel');
+    /** Evita che grist.onRecord faccia innerHTML sul pannello mentre l'utente edita (tastiera mobile che si chiude). */
+    let deferredRecordPropsRefresh = false;
+    function isEditingPropertiesPanel(){
+        const ae = document.activeElement;
+        if(!ae || !pp || !pp.contains(ae)) return false;
+        const t = ae.tagName;
+        return t === 'INPUT' || t === 'TEXTAREA' || t === 'SELECT';
+    }
     const zd = document.getElementById('zoom-display');
     const bd = document.getElementById('btn-duplicate');
     const bf = document.getElementById('btn-bring-front');
@@ -3330,7 +3338,7 @@ document.addEventListener('DOMContentLoaded', ()=>{
                 h += `<div class="prop-stack"><label class="${labelClass('props.prefix')}">Prefix</label><div class="prop-stack-row"><textarea data-prop="props.prefix" rows="2" class="column-mention-input" data-column-mention="1">${escapeHtml(String(valueFor('props.prefix')||''))}</textarea>${syncBtn('props.prefix')}</div></div>`;
                 h += `<div class="prop-stack"><label class="${labelClass('props.suffix')}">Suffix</label><div class="prop-stack-row"><textarea data-prop="props.suffix" rows="2" class="column-mention-input" data-column-mention="1">${escapeHtml(String(valueFor('props.suffix')||''))}</textarea>${syncBtn('props.suffix')}</div></div>`;
             const decVal = valueFor('props.decimals'); const asPctVal = valueFor('props.asPercent');
-            h += `<hr><div class="${grid1Cls}"><label class="${labelClass('props.decimals')}">Decimals</label><input type="number" step="1" data-prop="props.decimals" value="${decVal!==undefined?decVal:2}" min="0" max="10">${syncBtn('props.decimals')}</div>`;
+            h += `<hr><div class="${grid1Cls}"><label class="${labelClass('props.decimals')}">Decimals</label><input type="number" step="1" data-prop="props.decimals" value="${decVal!==undefined?decVal:2}" min="0" max="6" inputmode="numeric">${syncBtn('props.decimals')}</div>`;
             h += `<div class="${grid1Cls}"><label class="${labelClass('props.asPercent')}">As Percent</label><input type="checkbox" data-prop="props.asPercent" ${asPctVal?'checked':''}>${syncBtn('props.asPercent')}</div>`;
             const dtFmtVal = valueFor('props.dateTimeFormat') || 'DD/MM/YYYY';
             const dateFormatPresets = [['DD/MM/YYYY','gg/mm/aaaa'],['DD/MM/YYYY HH:mm','gg/mm/aaaa hh:mm'],['DD/MM/YYYY HH:mm:ss','gg/mm/aaaa hh:mm:ss'],['YYYY-MM-DD','aaaa-mm-gg'],['YYYY-MM-DD HH:mm','aaaa-mm-gg hh:mm'],['MM/DD/YYYY','mm/gg/aaaa'],['DD.MM.YYYY','gg.mm.aaaa']];
@@ -3850,7 +3858,7 @@ document.addEventListener('DOMContentLoaded', ()=>{
             // Show decimals only if at least one element is of type 'data'
             const hasDataElement = elems.some(el => el.type === 'data');
             if(hasDataElement){
-                    h += `<hr><div class="prop-grid"><label>Decimals</label><input type="number" step="0.1" data-prop="multi.props.decimals" value="${common('props.decimals')!==''?common('props.decimals'):2}" min="0" max="10"><label>As Percent</label><input type="checkbox" data-prop="multi.props.asPercent" ${common('props.asPercent')?'checked':''}></div>`;
+                    h += `<hr><div class="prop-grid"><label>Decimals</label><input type="number" step="1" data-prop="multi.props.decimals" value="${common('props.decimals')!==''?common('props.decimals'):2}" min="0" max="6" inputmode="numeric"><label>As Percent</label><input type="checkbox" data-prop="multi.props.asPercent" ${common('props.asPercent')?'checked':''}></div>`;
                 }
                 // Show box controls only if at least one element is of type 'box'
                 const hasBoxElement = elems.some(el => el.type === 'box');
@@ -8045,6 +8053,16 @@ document.addEventListener('DOMContentLoaded', ()=>{
         }
     });
 
+    // Dopo un aggiornamento record Grist rimandato, aggiorna il pannello quando il focus esce dal pannello proprietà
+    pp.addEventListener('focusout', ()=>{
+        if(!deferredRecordPropsRefresh) return;
+        setTimeout(()=>{
+            if(pp.contains(document.activeElement)) return;
+            deferredRecordPropsRefresh = false;
+            updateProps();
+        }, 0);
+    }, true);
+
     // ---------- Property edits (apply to single or multiple) ----------
     function applyPropToElement(el, p, v){
         if(p === 'widthHeight'){ el.height = Number(v); return; }
@@ -8079,6 +8097,21 @@ document.addEventListener('DOMContentLoaded', ()=>{
         const target = e.target;
         const prop = target.dataset.prop;
         if(!prop) return;
+
+        // Decimals (0–6): non usare Number('') durante la digitazione; evita salti a 0 e impossibilità di ridurre il valore
+        if(prop === 'props.decimals' || prop === 'multi.props.decimals'){
+            const raw = String(target.value ?? '').trim();
+            if(raw === ''){
+                saveCurrentDesign();
+                return;
+            }
+            const n = parseInt(raw, 10);
+            if(Number.isNaN(n)) return;
+            const clamped = Math.max(0, Math.min(6, n));
+            if(String(clamped) !== raw){
+                target.value = String(clamped);
+            }
+        }
 
         // Handle bound column search input
         if(prop === 'bind_search'){
@@ -8238,8 +8271,9 @@ document.addEventListener('DOMContentLoaded', ()=>{
                 return;
             }
 
-        // For textarea, don't render immediately to avoid losing focus
+        // Per textarea e input testo (es. fallback column-mention): niente render ad ogni tasto — evita tastiera mobile che si chiude
         const isTextarea = target.tagName === 'TEXTAREA';
+        const isDeferredTextInput = isTextarea || (target.tagName === 'INPUT' && target.type === 'text' && target.classList && target.classList.contains('column-mention-input'));
         
         pushBeforeChange();
         if(applyToAll){
@@ -8252,7 +8286,7 @@ document.addEventListener('DOMContentLoaded', ()=>{
             const el = S.find(s=>s.id===id);
             if(el) {
                 applyPropToElement(el, prop, parsedValue);
-                if(el.masterThreadId && !isTextarea){
+                if(el.masterThreadId && !isDeferredTextInput){
                     const thread = getMasterThread(el.masterThreadId);
                     if(thread && isPropSynced(thread, prop) && !isPropOverridden(el, prop)){
                         syncPropertyToThread(el.masterThreadId, prop, parsedValue);
@@ -8261,9 +8295,8 @@ document.addEventListener('DOMContentLoaded', ()=>{
             }
         }
         
-        // For textarea, only update the element value, don't render or sync yet
-        if(isTextarea){
-            // Just save the value, render will happen on blur
+        // Testo: solo salvataggio; render su blur (vedi listener blur)
+        if(isDeferredTextInput){
             saveCurrentDesign();
         } else {
             render(); 
@@ -8271,12 +8304,14 @@ document.addEventListener('DOMContentLoaded', ()=>{
         }
     });
 
-    // Handle textarea blur to sync and render after typing
+    // Blur su textarea / input testo column-mention: sync e render
     pp.addEventListener('blur', (e)=>{
         if(selectedIds.length === 0) return;
         
         const target = e.target;
-        if(target.tagName !== 'TEXTAREA') return;
+        const isTa = target.tagName === 'TEXTAREA';
+        const isColText = target.tagName === 'INPUT' && target.type === 'text' && target.classList && target.classList.contains('column-mention-input');
+        if(!isTa && !isColText) return;
         
         const prop = target.dataset.prop;
         if(!prop) return;
@@ -8307,8 +8342,9 @@ document.addEventListener('DOMContentLoaded', ()=>{
         const prop = target.dataset.prop;
         if(!prop) return;
         
-        // Skip if it's a textarea (handled by blur)
+        // Textarea e input testo column-mention: gestiti da blur
         if(target.tagName === 'TEXTAREA') return;
+        if(target.tagName === 'INPUT' && target.type === 'text' && target.classList && target.classList.contains('column-mention-input')) return;
         
         if(selectedIds.length === 1){
             const id = selectedIds[0];
@@ -8341,20 +8377,16 @@ document.addEventListener('DOMContentLoaded', ()=>{
         // ---------- Prevent textarea from losing focus when typing "." ----------
         // Add listener to textarea to prevent focus loss
         pp.addEventListener('keydown', (e)=>{
-            // If user is typing in a textarea, prevent any behavior that might cause focus loss
-            if(e.target.tagName === 'TEXTAREA'){
-                // Stop propagation to prevent any parent handlers from interfering
+            const isTextField = e.target.tagName === 'TEXTAREA' || (e.target.tagName === 'INPUT' && e.target.type === 'text' && e.target.classList && e.target.classList.contains('column-mention-input'));
+            if(isTextField){
                 e.stopPropagation();
-                // Allow all normal text input, including "." character
-                // Don't prevent default for normal typing
                 return;
             }
         }, true);
         
-        // Also prevent any click events on the canvas while typing in textarea
         pp.addEventListener('mousedown', (e)=>{
-            // If user is typing in a textarea, don't let clicks outside interfere
-            if(e.target.tagName === 'TEXTAREA'){
+            const isTextField = e.target.tagName === 'TEXTAREA' || (e.target.tagName === 'INPUT' && e.target.type === 'text' && e.target.classList && e.target.classList.contains('column-mention-input'));
+            if(isTextField){
                 e.stopPropagation();
             }
         }, true);
@@ -8475,11 +8507,10 @@ document.addEventListener('DOMContentLoaded', ()=>{
             });
         })();
         
-        // Prevent canvas clicks from stealing focus from textarea
+        // Prevent canvas clicks from stealing focus from the properties panel (mobile keyboard)
         lc.addEventListener('mousedown', (e)=>{
-            // If a textarea is focused, don't let canvas clicks steal focus
             const activeElement = document.activeElement;
-            if(activeElement && activeElement.tagName === 'TEXTAREA'){
+            if(activeElement && pp && pp.contains(activeElement) && (activeElement.tagName === 'TEXTAREA' || activeElement.tagName === 'SELECT' || activeElement.tagName === 'INPUT')){
                 e.preventDefault();
                 e.stopPropagation();
                 return false;
@@ -8563,9 +8594,10 @@ document.addEventListener('DOMContentLoaded', ()=>{
             e.preventDefault();
         });
         
-        window.addEventListener('mouseup', (e)=>{
+        function clearSpinnerHold(){
             if(spinnerInterval){
                 clearTimeout(spinnerInterval);
+                clearInterval(spinnerInterval);
                 spinnerInterval = null;
             }
             spinnerInput = null;
@@ -8573,7 +8605,9 @@ document.addEventListener('DOMContentLoaded', ()=>{
             spinnerStep = null;
             spinnerMin = null;
             spinnerMax = null;
-        });
+        }
+        window.addEventListener('mouseup', clearSpinnerHold);
+        window.addEventListener('touchend', clearSpinnerHold, { passive: true });
 
         // ---------- Canvas Rotation ----------
         function applyCanvasRotation(){
@@ -9029,9 +9063,12 @@ document.addEventListener('DOMContentLoaded', ()=>{
                 window.grist.onRecord(function(record,mappings){ 
                     R = record||{}; 
                     rebuildColumnCatalog(R, mappings);
-                    // Always update props when columns are loaded, because pack waves need columns
-                    // even when no elements are selected
-                    updateProps(); 
+                    // Non rifare innerHTML sul pannello proprietà mentre l'utente sta digitando (mobile: tastiera che sparisce)
+                    if(isEditingPropertiesPanel()){
+                        deferredRecordPropsRefresh = true;
+                    } else {
+                        updateProps();
+                    }
                     // Use requestAnimationFrame to ensure DOM is ready before rendering
                     requestAnimationFrame(() => {
                         render();
