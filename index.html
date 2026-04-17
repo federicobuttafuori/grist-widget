@@ -151,12 +151,6 @@
         </select>
         <input type="checkbox" id="canvas2-enabled" style="width:auto;margin:0 4px 0 8px" title="Enable Canvas 2">
         <label for="canvas2-enabled" style="font-size:12px;margin:0;white-space:nowrap;cursor:pointer">2</label>
-        <div class="divider"></div>
-        <input type="checkbox" id="bleed-enabled" style="width:auto;margin:0 4px 0 0" title="Enable Bleed">
-        <label for="bleed-enabled" style="font-size:12px;margin:0;white-space:nowrap;cursor:pointer">Bleed</label>
-        <input type="color" id="bleed-color" value="#ff0000" style="width:32px;height:24px;margin:0 4px 0 8px;border:1px solid #ccc;border-radius:4px;cursor:pointer" title="Bleed Color">
-        <input type="number" id="bleed-size-cm" min="0.1" step="0.1" value="1.0" style="width:64px;padding:4px 6px;font-size:12px" title="Bleed Size (cm per side)">
-        <label for="bleed-size-cm" style="font-size:12px;margin:0;white-space:nowrap;cursor:pointer">cm</label>
         <span class="zoom-label">Zoom:</span>
         <div class="button-group">
             <button id="btn-zoom-out" title="Zoom Out">-</button>
@@ -369,49 +363,6 @@ document.addEventListener('DOMContentLoaded', ()=>{
                 localStorage.setItem(FONT_FAVORITES_KEY, JSON.stringify(fontFavorites));
             } catch(e) {
                 console.warn('Failed to save font favorites:', e);
-            }
-        }
-        
-        // Load bleed settings from localStorage
-        function loadBleedSettings() {
-            try {
-                const saved = localStorage.getItem(BLEED_SETTINGS_KEY);
-                if(saved) {
-                    const settings = JSON.parse(saved);
-                    bleedEnabled = settings.enabled || false;
-                    bleedColor = settings.color || '#ff0000';
-                    const parsedSize = Number(settings.size);
-                    bleedSize = Number.isFinite(parsedSize) && parsedSize > 0 ? parsedSize : 1.0;
-                    
-                    // Update UI elements
-                    const bleedCheckbox = document.getElementById('bleed-enabled');
-                    const bleedColorInput = document.getElementById('bleed-color');
-                    const bleedSizeInput = document.getElementById('bleed-size-cm');
-                    
-                    if(bleedCheckbox) bleedCheckbox.checked = bleedEnabled;
-                    if(bleedColorInput) bleedColorInput.value = bleedColor;
-                    if(bleedSizeInput) bleedSizeInput.value = String(bleedSize);
-                }
-            } catch(e) {
-                console.warn('Failed to load bleed settings:', e);
-                // Use defaults
-                bleedEnabled = false;
-                bleedColor = '#ff0000';
-                bleedSize = 1.0;
-            }
-        }
-        
-        // Save bleed settings to localStorage
-        function saveBleedSettings() {
-            try {
-                const settings = {
-                    enabled: bleedEnabled,
-                    color: bleedColor,
-                    size: bleedSize
-                };
-                localStorage.setItem(BLEED_SETTINGS_KEY, JSON.stringify(settings));
-            } catch(e) {
-                console.warn('Failed to save bleed settings:', e);
             }
         }
         
@@ -753,12 +704,6 @@ document.addEventListener('DOMContentLoaded', ()=>{
             }
             const profile = profiles[currentProfile];
             if(profile){
-                // Calculate bleed dimensions if enabled
-                const safeBleedSize = Number.isFinite(Number(bleedSize)) && Number(bleedSize) > 0 ? Number(bleedSize) : 1;
-                const bleedWidth = bleedEnabled ? profile.width + (safeBleedSize * 2) : profile.width;
-                const bleedHeight = bleedEnabled ? profile.height + (safeBleedSize * 2) : profile.height;
-                const bleedBgColor = bleedEnabled ? bleedColor : '#fff';
-                
                 styleEl.textContent = `
                     @media print{
                         @page{
@@ -767,7 +712,6 @@ document.addEventListener('DOMContentLoaded', ()=>{
                             padding: 0;
                             marks: none;
                             bleed: 0;
-                            bleed: ${bleedEnabled ? safeBleedSize + 'cm' : '0'};
                         }
                         html,body{margin:0!important;padding:0!important;width:${profile.width}cm!important;height:${profile.height}cm!important;overflow:visible!important;background:#fff!important}
                         #toolbar,#sidebar,#marquee,.status-message{display:none!important}
@@ -775,10 +719,6 @@ document.addEventListener('DOMContentLoaded', ()=>{
                         #canvas-container{width:${profile.width}cm!important;height:${profile.height}cm!important;padding:0!important;margin:0!important;overflow:visible!important;background:#fff!important;display:block!important;position:static!important}
                         #canvas-wrapper{position:static!important;width:${profile.width}cm!important;height:${profile.height}cm!important;margin:0!important;padding:0!important;transform:none!important;display:block!important}
                         #label-canvas{position:static!important;width:${profile.width}cm!important;height:${profile.height}cm!important;transform:none!important;box-shadow:none!important;display:block!important;overflow:visible!important;background:#fff!important}
-                        #main-content{width:${bleedWidth}cm!important;height:${bleedHeight}cm!important;overflow:visible!important;display:block!important;padding:0!important;margin:0!important}
-                        #canvas-container{width:${bleedWidth}cm!important;height:${bleedHeight}cm!important;padding:0!important;margin:0!important;overflow:visible!important;background:${bleedBgColor}!important;display:block!important;position:static!important}
-                        #canvas-wrapper{position:static!important;width:${bleedWidth}cm!important;height:${bleedHeight}cm!important;margin:0!important;padding:0!important;transform:none!important;display:block!important}
-                        #label-canvas{position:static!important;width:${profile.width}cm!important;height:${profile.height}cm!important;transform:none!important;box-shadow:none!important;display:block!important;overflow:visible!important;background:${bleedBgColor}!important;left:${bleedEnabled ? safeBleedSize + 'cm' : '0'}!important;top:${bleedEnabled ? safeBleedSize + 'cm' : '0'}!important}
                             .label-element{page-break-inside:avoid!important;-webkit-print-color-adjust:exact!important;print-color-adjust:exact!important}
                         .label-element.selected{border:1px solid transparent!important;box-shadow:none!important}
                         .resize-handle{display:none!important}
@@ -5966,14 +5906,8 @@ document.addEventListener('DOMContentLoaded', ()=>{
             printContainer.style.position = 'absolute';
             printContainer.style.left = '-9999px';
             printContainer.style.top = '0';
-            const safeBleedSize = Number.isFinite(Number(bleedSize)) && Number(bleedSize) > 0 ? Number(bleedSize) : 1;
-            const bleedOffset = bleedEnabled ? safeBleedSize : 0;
-            const bleedWidth = bleedEnabled ? profile.width + (safeBleedSize * 2) : profile.width;
-            const bleedHeight = bleedEnabled ? profile.height + (safeBleedSize * 2) : profile.height;
-            const bleedBgColor = bleedEnabled ? bleedColor : '#fff';
-            printContainer.style.width = `${bleedWidth}cm`;
+            printContainer.style.width = `${profile.width}cm`;
             printContainer.style.height = 'auto';
-            printContainer.style.background = bleedBgColor;
             
             // Calculate total pages across all selected waves
             let totalPages = 0;
@@ -5998,22 +5932,11 @@ document.addEventListener('DOMContentLoaded', ()=>{
                 
                 const page = document.createElement('div');
                 page.className = 'print-page';
-                page.style.width = `${bleedWidth}cm`;
-                page.style.height = `${bleedHeight}cm`;
+                page.style.width = `${profile.width}cm`;
+                page.style.height = `${profile.height}cm`;
                 page.style.position = 'relative';
-                page.style.background = bleedBgColor;
+                page.style.background = '#fff';
                 page.style.overflow = 'hidden';
-                if(bleedEnabled){
-                    const bleedContainer = document.createElement('div');
-                    bleedContainer.style.position = 'absolute';
-                    bleedContainer.style.left = '0';
-                    bleedContainer.style.top = '0';
-                    bleedContainer.style.width = `${bleedWidth}cm`;
-                    bleedContainer.style.height = `${bleedHeight}cm`;
-                    bleedContainer.style.backgroundColor = bleedColor;
-                    bleedContainer.style.zIndex = '0';
-                    page.appendChild(bleedContainer);
-                }
                 // Set pageBreakAfter only for last page - let CSS handle the rest
                 if(isLastPage){
                     page.style.pageBreakAfter = 'auto';
@@ -6026,8 +5949,8 @@ document.addEventListener('DOMContentLoaded', ()=>{
                     const d = document.createElement('div');
                     d.classList.add('label-element');
                     d.style.position = 'absolute';
-                    d.style.left = `${el.x + bleedOffset}cm`;
-                    d.style.top = `${el.y + bleedOffset}cm`;
+                    d.style.left = `${el.x}cm`;
+                    d.style.top = `${el.y}cm`;
                     // For lines, don't set height in cm initially - it will be set in px later
                     if(el.type !== 'line'){
                         d.style.width = `${el.width}cm`;
@@ -6535,15 +6458,15 @@ document.addEventListener('DOMContentLoaded', ()=>{
                 styleEl.textContent = `
                     @media print{
                         @page{
-                            size: ${bleedWidth}cm ${bleedHeight}cm;
+                            size: ${profile.width}cm ${profile.height}cm;
                             margin: 0;
                             padding: 0;
                             marks: none;
-                            bleed: ${bleedEnabled ? safeBleedSize + 'cm' : '0'};
+                            bleed: 0;
                         }
-                        html,body{margin:0!important;padding:0!important;background:${bleedBgColor}!important;width:${bleedWidth}cm!important;height:auto!important}
+                        html,body{margin:0!important;padding:0!important;background:#fff!important;width:${profile.width}cm!important;height:auto!important}
                         #toolbar,#sidebar,#marquee,.status-message{display:none!important}
-                        .print-page{width:${bleedWidth}cm!important;height:${bleedHeight}cm!important;page-break-inside:avoid!important;overflow:visible!important;background:${bleedBgColor}!important;position:relative!important;margin:0!important;padding:0!important;display:block!important;box-sizing:border-box!important}
+                        .print-page{width:${profile.width}cm!important;height:${profile.height}cm!important;page-break-inside:avoid!important;overflow:visible!important;background:#fff!important;position:relative!important;margin:0!important;padding:0!important;display:block!important;box-sizing:border-box!important}
                         .print-page:not(:last-child){page-break-after:always!important}
                         .print-page:last-child{page-break-after:auto!important}
                         .print-container{display:block!important;position:static!important;left:auto!important;top:auto!important}
@@ -6617,13 +6540,6 @@ document.addEventListener('DOMContentLoaded', ()=>{
                 return;
             }
             
-            // Calculate bleed dimensions if enabled
-            const safeBleedSize = Number.isFinite(Number(bleedSize)) && Number(bleedSize) > 0 ? Number(bleedSize) : 1;
-            const bleedOffset = bleedEnabled ? safeBleedSize : 0;
-            const bleedWidth = bleedEnabled ? profile.width + (safeBleedSize * 2) : profile.width;
-            const bleedHeight = bleedEnabled ? profile.height + (safeBleedSize * 2) : profile.height;
-            const bleedBgColor = bleedEnabled ? bleedColor : '#fff';
-            
             // Create print container
             const printContainer = document.createElement('div');
             printContainer.className = 'print-container';
@@ -6661,8 +6577,8 @@ document.addEventListener('DOMContentLoaded', ()=>{
                     const d = document.createElement('div');
                     d.classList.add('label-element');
                     d.style.position = 'absolute';
-                    d.style.left = `${el.x + bleedOffset}cm`;
-                    d.style.top = `${el.y + bleedOffset}cm`;
+                    d.style.left = `${el.x}cm`;
+                    d.style.top = `${el.y}cm`;
                     // For lines, don't set height in cm initially - it will be set in px later
                     if(el.type !== 'line'){
                         d.style.width = `${el.width}cm`;
@@ -7159,15 +7075,15 @@ document.addEventListener('DOMContentLoaded', ()=>{
                 styleEl.textContent = `
                     @media print{
                         @page{
-                            size: ${bleedWidth}cm ${bleedHeight}cm;
+                            size: ${profile.width}cm ${profile.height}cm;
                             margin: 0;
                             padding: 0;
                             marks: none;
-                            bleed: ${bleedEnabled ? safeBleedSize + 'cm' : '0'};
+                            bleed: 0;
                         }
-                        html,body{margin:0!important;padding:0!important;background:${bleedBgColor}!important;width:${bleedWidth}cm!important;height:auto!important}
+                        html,body{margin:0!important;padding:0!important;background:#fff!important;width:${profile.width}cm!important;height:auto!important}
                         #toolbar,#sidebar,#marquee,.status-message{display:none!important}
-                        .print-page{width:${bleedWidth}cm!important;height:${bleedHeight}cm!important;page-break-inside:avoid!important;overflow:visible!important;background:${bleedBgColor}!important;position:relative!important;margin:0!important;padding:0!important;display:block!important;box-sizing:border-box!important}
+                        .print-page{width:${profile.width}cm!important;height:${profile.height}cm!important;page-break-inside:avoid!important;overflow:visible!important;background:#fff!important;position:relative!important;margin:0!important;padding:0!important;display:block!important;box-sizing:border-box!important}
                         .print-page:not(:last-child){page-break-after:always!important}
                         .print-page:last-child{page-break-after:auto!important}
                         .print-container{display:block!important;position:static!important;left:auto!important;top:auto!important}
@@ -7225,11 +7141,6 @@ document.addEventListener('DOMContentLoaded', ()=>{
             const prevSel = deepCopy(selectedIds);
             const prevCanvas = currentCanvas;
             const prevS = deepCopy(S);
-            const safeBleedSize = Number.isFinite(Number(bleedSize)) && Number(bleedSize) > 0 ? Number(bleedSize) : 1;
-            const bleedOffset = bleedEnabled ? safeBleedSize : 0;
-            const bleedWidth = bleedEnabled ? profile.width + (safeBleedSize * 2) : profile.width;
-            const bleedHeight = bleedEnabled ? profile.height + (safeBleedSize * 2) : profile.height;
-            const bleedBgColor = bleedEnabled ? bleedColor : '#fff';
         
         // Create print container for single label
         const printContainer = document.createElement('div');
@@ -7237,10 +7148,9 @@ document.addEventListener('DOMContentLoaded', ()=>{
         printContainer.style.position = 'absolute';
         printContainer.style.left = '-9999px';
         printContainer.style.top = '0';
-        printContainer.style.width = `${bleedWidth}cm`;
+        printContainer.style.width = `${profile.width}cm`;
         // Height is auto - pages will be stacked naturally
         printContainer.style.height = 'auto';
-        printContainer.style.background = bleedBgColor;
         
         // Calculate total pages
         const totalPages = canvas2Flag ? 2 : 1;
@@ -7252,22 +7162,11 @@ document.addEventListener('DOMContentLoaded', ()=>{
             
             const page = document.createElement('div');
             page.className = 'print-page';
-            page.style.width = `${bleedWidth}cm`;
-            page.style.height = `${bleedHeight}cm`;
+            page.style.width = `${profile.width}cm`;
+            page.style.height = `${profile.height}cm`;
             page.style.position = 'relative';
-            page.style.background = bleedBgColor;
+            page.style.background = '#fff';
             page.style.overflow = 'hidden';
-            if(bleedEnabled){
-                const bleedContainer = document.createElement('div');
-                bleedContainer.style.position = 'absolute';
-                bleedContainer.style.left = '0';
-                bleedContainer.style.top = '0';
-                bleedContainer.style.width = `${bleedWidth}cm`;
-                bleedContainer.style.height = `${bleedHeight}cm`;
-                bleedContainer.style.backgroundColor = bleedColor;
-                bleedContainer.style.zIndex = '0';
-                page.appendChild(bleedContainer);
-            }
             // Set pageBreakAfter only for last page - let CSS handle the rest
             if(isLastPage){
                 page.style.pageBreakAfter = 'auto';
@@ -7280,8 +7179,8 @@ document.addEventListener('DOMContentLoaded', ()=>{
                 const d = document.createElement('div');
                 d.classList.add('label-element');
                 d.style.position = 'absolute';
-                d.style.left = `${el.x + bleedOffset}cm`;
-                d.style.top = `${el.y + bleedOffset}cm`;
+                d.style.left = `${el.x}cm`;
+                d.style.top = `${el.y}cm`;
                 if(el.type !== 'line'){
                     d.style.width = `${el.width}cm`;
                     d.style.height = `${el.height}cm`;
@@ -7666,15 +7565,15 @@ document.addEventListener('DOMContentLoaded', ()=>{
             styleEl.textContent = `
                 @media print{
                     @page{
-                        size: ${bleedWidth}cm ${bleedHeight}cm;
+                        size: ${profile.width}cm ${profile.height}cm;
                         margin: 0;
                         padding: 0;
                         marks: none;
-                        bleed: ${bleedEnabled ? safeBleedSize + 'cm' : '0'};
+                        bleed: 0;
                     }
-                    html,body{margin:0!important;padding:0!important;background:${bleedBgColor}!important;width:${bleedWidth}cm!important;height:auto!important}
+                    html,body{margin:0!important;padding:0!important;background:#fff!important;width:${profile.width}cm!important;height:auto!important}
                     #toolbar,#sidebar,#marquee,.status-message{display:none!important}
-                    .print-page{width:${bleedWidth}cm!important;height:${bleedHeight}cm!important;page-break-inside:avoid!important;overflow:visible!important;background:${bleedBgColor}!important;position:relative!important;margin:0!important;padding:0!important;display:block!important;box-sizing:border-box!important}
+                    .print-page{width:${profile.width}cm!important;height:${profile.height}cm!important;page-break-inside:avoid!important;overflow:visible!important;background:#fff!important;position:relative!important;margin:0!important;padding:0!important;display:block!important;box-sizing:border-box!important}
                     .print-page:not(:last-child){page-break-after:always!important}
                     .print-page:last-child{page-break-after:auto!important}
                     .print-container{display:block!important;position:static!important;left:auto!important;top:auto!important}
@@ -9021,41 +8920,6 @@ document.addEventListener('DOMContentLoaded', ()=>{
             canvasRotation = (canvasRotation + 90) % 360;
             applyCanvasRotation();
     });
-        
-        // Bleed controls event listeners
-        const bleedCheckbox = document.getElementById('bleed-enabled');
-        const bleedColorInput = document.getElementById('bleed-color');
-        const bleedSizeInput = document.getElementById('bleed-size-cm');
-        
-        if(bleedCheckbox) {
-            bleedCheckbox.addEventListener('change', (e) => {
-                bleedEnabled = e.target.checked;
-                saveBleedSettings();
-                updatePrintCSS();
-                render(); // Re-render canvas to show/hide bleed
-            });
-        }
-        
-        if(bleedColorInput) {
-            bleedColorInput.addEventListener('input', (e) => {
-                bleedColor = e.target.value;
-                saveBleedSettings();
-                updatePrintCSS();
-                render(); // Re-render canvas to update bleed color
-            });
-        }
-        
-        if(bleedSizeInput) {
-            bleedSizeInput.addEventListener('change', (e) => {
-                const parsed = Number(e.target.value);
-                bleedSize = Number.isFinite(parsed) && parsed > 0 ? parsed : 1;
-                e.target.value = String(bleedSize);
-                saveBleedSettings();
-                updatePrintCSS();
-                render();
-            });
-        }
-        
     document.getElementById('btn-clear').addEventListener('click', ()=>{
         if(confirm('Are you sure you want to clear the layout?')){
             pushBeforeChange();
