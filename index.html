@@ -24,8 +24,6 @@
         #toolbar{flex-shrink:0;padding:8px;background:#fff;border-bottom:1px solid #e0e0e0;display:flex;gap:8px;align-items:center;flex-wrap:wrap}
         #toolbar .zoom-label{font-size:14px;margin-left:auto}
         #toolbar .divider{width:1px;height:24px;background:#e0e0e0;margin:0 4px}
-        #toolbar .toolbar-bleed-wrap{display:inline-flex;align-items:center;gap:6px;font-size:13px;white-space:nowrap;margin:0}
-        #toolbar .toolbar-bleed-wrap input[type="color"]{width:26px;height:24px;padding:0;border:1px solid #ccc;border-radius:4px;cursor:pointer;vertical-align:middle;flex-shrink:0}
         #main-content{display:flex;flex-grow:1;overflow:hidden}
         #sidebar{width:320px;flex-shrink:0;background:#fdfdfd;border-right:1px solid #e0e0e0;padding:12px;overflow-y:auto;display:flex;flex-direction:column;gap:16px}
         #sidebar h3{font-size:16px;font-weight:600;border-bottom:1px solid #eee;padding-bottom:6px;margin-bottom:4px}
@@ -145,11 +143,6 @@
         <button id="btn-duplicate" title="Duplicate Selected Elements" disabled>📋 Duplicate</button>
         <button id="btn-bring-front" title="Bring to Front" disabled>⬆️ Front</button>
         <button id="btn-send-back" title="Send to Back" disabled>⬇️ Back</button>
-        <label class="toolbar-bleed-wrap" title="Extra colored margin around the label when printing (same label size; avoids white gaps if the thermal print is slightly misaligned)">
-            <input type="checkbox" id="cb-print-bleed" style="width:auto;margin:0">
-            <span>Print bleed</span>
-            <input type="color" id="print-bleed-color" value="#d0d0d0" title="Bleed color" aria-label="Print bleed color">
-        </label>
         <div class="divider"></div>
         <label for="canvas-selector" style="font-size:14px;margin:0;white-space:nowrap">Canvas:</label>
         <select id="canvas-selector" style="width:auto;padding:4px 8px;font-size:14px">
@@ -483,30 +476,6 @@ document.addEventListener('DOMContentLoaded', ()=>{
         const canvasSelector = document.getElementById('canvas-selector');
         const canvas2Checkbox = document.getElementById('canvas2-enabled');
 
-        loadPrintBleedSettings();
-        syncPrintBleedToolbar();
-        (function bindPrintBleedControls(){
-            const cbBleed = document.getElementById('cb-print-bleed');
-            const colBleed = document.getElementById('print-bleed-color');
-            if(cbBleed){
-                cbBleed.addEventListener('change', function(){
-                    printBleedEnabled = !!this.checked;
-                    savePrintBleedSettings();
-                    applyPrintBleedEditorPreview();
-                    updatePrintCSS();
-                    syncPrintBleedToolbar();
-                });
-            }
-            if(colBleed){
-                colBleed.addEventListener('input', function(){
-                    printBleedColor = normalizePrintBleedColorHex(this.value);
-                    savePrintBleedSettings();
-                    applyPrintBleedEditorPreview();
-                    updatePrintCSS();
-                });
-            }
-        })();
-
     // Marquee state
     let marqueeActive = false;
     let marqueeStart = { clientX:0, clientY:0, startX:0, startY:0, containerRect:null };
@@ -713,140 +682,6 @@ document.addEventListener('DOMContentLoaded', ()=>{
 
     function deepCopy(obj){ return JSON.parse(JSON.stringify(obj)); }
 
-        const PRINT_BLEED_STORAGE_KEY = 'grist_label_print_bleed_v1';
-        let printBleedEnabled = false;
-        let printBleedColor = '#d0d0d0';
-        let printBleedMm = 2;
-
-        function normalizePrintBleedColorHex(hex){
-            const s = String(hex || '').trim();
-            if(/^#[0-9A-Fa-f]{6}$/.test(s)) return s.toLowerCase();
-            if(/^#[0-9A-Fa-f]{3}$/.test(s)) return ('#' + s[1] + s[1] + s[2] + s[2] + s[3] + s[3]).toLowerCase();
-            return '#d0d0d0';
-        }
-        function getPrintBleedCmValue(){
-            return printBleedEnabled ? Math.max(0, Math.min(20, Number(printBleedMm) || 0)) / 10 : 0;
-        }
-        function getPrintBleedPageDimensionsCm(profile){
-            const bleedCm = getPrintBleedCmValue();
-            const w = Number(profile && profile.width) || 8;
-            const h = Number(profile && profile.height) || 5;
-            return {
-                bleedCm,
-                pageW: w + 2 * bleedCm,
-                pageH: h + 2 * bleedCm,
-                labelW: w,
-                labelH: h
-            };
-        }
-        function loadPrintBleedSettings(){
-            try{
-                const raw = localStorage.getItem(PRINT_BLEED_STORAGE_KEY);
-                if(!raw) return;
-                const o = JSON.parse(raw);
-                if(o && typeof o === 'object'){
-                    if(typeof o.enabled === 'boolean') printBleedEnabled = o.enabled;
-                    if(typeof o.mm === 'number' && Number.isFinite(o.mm)) printBleedMm = Math.max(0, Math.min(20, o.mm));
-                    if(typeof o.color === 'string') printBleedColor = normalizePrintBleedColorHex(o.color);
-                }
-            }catch(e){}
-        }
-        function savePrintBleedSettings(){
-            try{
-                localStorage.setItem(PRINT_BLEED_STORAGE_KEY, JSON.stringify({
-                    enabled: printBleedEnabled,
-                    mm: printBleedMm,
-                    color: printBleedColor
-                }));
-            }catch(e){}
-        }
-        function createPrintPageWithBleed(profile, isLastPage){
-            const bleedCm = getPrintBleedCmValue();
-            const w = Number(profile && profile.width) || 8;
-            const h = Number(profile && profile.height) || 5;
-            const col = normalizePrintBleedColorHex(printBleedColor);
-            const page = document.createElement('div');
-            page.className = 'print-page';
-            if(isLastPage) page.style.pageBreakAfter = 'auto';
-            if(bleedCm > 0){
-                const pw = w + 2 * bleedCm;
-                const ph = h + 2 * bleedCm;
-                page.style.width = `${pw}cm`;
-                page.style.height = `${ph}cm`;
-                page.style.position = 'relative';
-                page.style.background = col;
-                page.style.overflow = 'hidden';
-                const labelArea = document.createElement('div');
-                labelArea.className = 'print-label-area';
-                labelArea.style.position = 'absolute';
-                labelArea.style.left = `${bleedCm}cm`;
-                labelArea.style.top = `${bleedCm}cm`;
-                labelArea.style.width = `${w}cm`;
-                labelArea.style.height = `${h}cm`;
-                labelArea.style.background = '#fff';
-                labelArea.style.overflow = 'hidden';
-                page.appendChild(labelArea);
-                return { page, root: labelArea };
-            }
-            page.style.width = `${w}cm`;
-            page.style.height = `${h}cm`;
-            page.style.position = 'relative';
-            page.style.background = '#fff';
-            page.style.overflow = 'hidden';
-            return { page, root: page };
-        }
-        function applyPrintBleedEditorPreview(){
-            if(!cw) return;
-            const profile = profiles[currentProfile];
-            if(!profile) return;
-            const b = getPrintBleedCmValue();
-            const col = normalizePrintBleedColorHex(printBleedColor);
-            if(b > 0){
-                cw.style.padding = `${b}cm`;
-                cw.style.background = col;
-                cw.style.boxSizing = 'content-box';
-            }else{
-                cw.style.padding = '';
-                cw.style.background = '';
-                cw.style.boxSizing = '';
-            }
-        }
-        function syncPrintBleedToolbar(){
-            const cb = document.getElementById('cb-print-bleed');
-            const colInp = document.getElementById('print-bleed-color');
-            if(cb) cb.checked = printBleedEnabled;
-            if(colInp){
-                colInp.value = printBleedColor;
-                colInp.disabled = !printBleedEnabled;
-            }
-        }
-        function buildOffscreenPrintMediaCss(profile){
-            const dim = getPrintBleedPageDimensionsCm(profile);
-            const pw = dim.pageW;
-            const ph = dim.pageH;
-            const bleedBg = normalizePrintBleedColorHex(printBleedColor);
-            const pageBg = dim.bleedCm > 0 ? bleedBg : '#fff';
-            return `
-                    @media print{
-                        @page{
-                            size: ${pw}cm ${ph}cm;
-                            margin: 0;
-                            padding: 0;
-                            marks: none;
-                            bleed: 0;
-                        }
-                        html,body{margin:0!important;padding:0!important;background:${pageBg}!important;width:${pw}cm!important;height:auto!important}
-                        #toolbar,#sidebar,#marquee,.status-message{display:none!important}
-                        .print-page{width:${pw}cm!important;height:${ph}cm!important;page-break-inside:avoid!important;overflow:visible!important;background:${pageBg}!important;position:relative!important;margin:0!important;padding:0!important;display:block!important;box-sizing:border-box!important}
-                        .print-page:not(:last-child){page-break-after:always!important}
-                        .print-page:last-child{page-break-after:auto!important}
-                        .print-container{display:block!important;position:static!important;left:auto!important;top:auto!important}
-                        #main-content,#canvas-container,#canvas-wrapper,#label-canvas{display:none!important}
-                        .label-element{print-color-adjust:exact!important;-webkit-print-color-adjust:exact!important}
-                    }
-                `;
-        }
-
         // ---------- Profile Management ----------
         function updateCanvasSize(){
             const profile = profiles[currentProfile];
@@ -869,29 +704,21 @@ document.addEventListener('DOMContentLoaded', ()=>{
             }
             const profile = profiles[currentProfile];
             if(profile){
-                const dim = getPrintBleedPageDimensionsCm(profile);
-                const pageW = dim.pageW;
-                const pageH = dim.pageH;
-                const lw = dim.labelW;
-                const lh = dim.labelH;
-                const bleed = dim.bleedCm;
-                const bleedBg = normalizePrintBleedColorHex(printBleedColor);
-                const outerBg = bleed > 0 ? bleedBg : '#fff';
                 styleEl.textContent = `
                     @media print{
                         @page{
-                            size: ${pageW}cm ${pageH}cm;
+                            size: ${profile.width}cm ${profile.height}cm;
                             margin: 0;
                             padding: 0;
                             marks: none;
                             bleed: 0;
                         }
-                        html,body{margin:0!important;padding:0!important;width:${pageW}cm!important;height:${pageH}cm!important;overflow:visible!important;background:${outerBg}!important}
+                        html,body{margin:0!important;padding:0!important;width:${profile.width}cm!important;height:${profile.height}cm!important;overflow:visible!important;background:#fff!important}
                         #toolbar,#sidebar,#marquee,.status-message{display:none!important}
-                        #main-content{width:${pageW}cm!important;height:${pageH}cm!important;overflow:visible!important;display:block!important;padding:0!important;margin:0!important}
-                        #canvas-container{width:${pageW}cm!important;height:${pageH}cm!important;padding:0!important;margin:0!important;overflow:visible!important;background:${outerBg}!important;display:block!important;position:static!important}
-                        #canvas-wrapper{position:static!important;width:${lw}cm!important;height:${lh}cm!important;margin:0!important;padding:${bleed > 0 ? bleed + 'cm' : '0'}!important;transform:none!important;display:block!important;box-sizing:content-box!important;background:${bleed > 0 ? bleedBg : 'transparent'}!important}
-                        #label-canvas{position:static!important;width:${lw}cm!important;height:${lh}cm!important;transform:none!important;box-shadow:none!important;display:block!important;overflow:visible!important;background:#fff!important}
+                        #main-content{width:${profile.width}cm!important;height:${profile.height}cm!important;overflow:visible!important;display:block!important;padding:0!important;margin:0!important}
+                        #canvas-container{width:${profile.width}cm!important;height:${profile.height}cm!important;padding:0!important;margin:0!important;overflow:visible!important;background:#fff!important;display:block!important;position:static!important}
+                        #canvas-wrapper{position:static!important;width:${profile.width}cm!important;height:${profile.height}cm!important;margin:0!important;padding:0!important;transform:none!important;display:block!important}
+                        #label-canvas{position:static!important;width:${profile.width}cm!important;height:${profile.height}cm!important;transform:none!important;box-shadow:none!important;display:block!important;overflow:visible!important;background:#fff!important}
                             .label-element{page-break-inside:avoid!important;-webkit-print-color-adjust:exact!important;print-color-adjust:exact!important}
                         .label-element.selected{border:1px solid transparent!important;box-shadow:none!important}
                         .resize-handle{display:none!important}
@@ -900,7 +727,6 @@ document.addEventListener('DOMContentLoaded', ()=>{
                     }
                 `;
             }
-            applyPrintBleedEditorPreview();
         }
 
         function updateProfileSelector(){
@@ -6080,7 +5906,7 @@ document.addEventListener('DOMContentLoaded', ()=>{
             printContainer.style.position = 'absolute';
             printContainer.style.left = '-9999px';
             printContainer.style.top = '0';
-            printContainer.style.width = `${getPrintBleedPageDimensionsCm(profile).pageW}cm`;
+            printContainer.style.width = `${profile.width}cm`;
             printContainer.style.height = 'auto';
             
             // Calculate total pages across all selected waves
@@ -6103,7 +5929,19 @@ document.addEventListener('DOMContentLoaded', ()=>{
             function renderCanvasToPage(canvasNum, sequenceIndex = 1, isLastPage = false, waveContext = null){
                 const canvasData = design[`canvas${canvasNum}`] || [];
                 const tempS = canvasData.map(normalizeElement);
-                const { page, root } = createPrintPageWithBleed(profile, isLastPage);
+                
+                const page = document.createElement('div');
+                page.className = 'print-page';
+                page.style.width = `${profile.width}cm`;
+                page.style.height = `${profile.height}cm`;
+                page.style.position = 'relative';
+                page.style.background = '#fff';
+                page.style.overflow = 'hidden';
+                // Set pageBreakAfter only for last page - let CSS handle the rest
+                if(isLastPage){
+                    page.style.pageBreakAfter = 'auto';
+                }
+                // No marginTop or offsetY - pages are created in sequence
                 
                 // Render elements
                 const sorted = tempS.slice().sort((a,b)=> (a.zIndex||0) - (b.zIndex||0));
@@ -6522,11 +6360,11 @@ document.addEventListener('DOMContentLoaded', ()=>{
                         }
                     }
                     
-                    root.appendChild(d);
+                    page.appendChild(d);
                 });
                 
                 // Ensure page has content - if no elements, add a placeholder to prevent blank pages
-                if(root.children.length === 0){
+                if(page.children.length === 0){
                     const placeholder = document.createElement('div');
                     placeholder.style.width = '100%';
                     placeholder.style.height = '100%';
@@ -6536,7 +6374,7 @@ document.addEventListener('DOMContentLoaded', ()=>{
                     placeholder.style.color = '#999';
                     placeholder.style.fontSize = '12px';
                     placeholder.textContent = 'Empty page';
-                    root.appendChild(placeholder);
+                    page.appendChild(placeholder);
                 }
                 
                 return page;
@@ -6617,7 +6455,25 @@ document.addEventListener('DOMContentLoaded', ()=>{
                     styleEl.id = styleId;
                     document.head.appendChild(styleEl);
                 }
-                styleEl.textContent = buildOffscreenPrintMediaCss(profile);
+                styleEl.textContent = `
+                    @media print{
+                        @page{
+                            size: ${profile.width}cm ${profile.height}cm;
+                            margin: 0;
+                            padding: 0;
+                            marks: none;
+                            bleed: 0;
+                        }
+                        html,body{margin:0!important;padding:0!important;background:#fff!important;width:${profile.width}cm!important;height:auto!important}
+                        #toolbar,#sidebar,#marquee,.status-message{display:none!important}
+                        .print-page{width:${profile.width}cm!important;height:${profile.height}cm!important;page-break-inside:avoid!important;overflow:visible!important;background:#fff!important;position:relative!important;margin:0!important;padding:0!important;display:block!important;box-sizing:border-box!important}
+                        .print-page:not(:last-child){page-break-after:always!important}
+                        .print-page:last-child{page-break-after:auto!important}
+                        .print-container{display:block!important;position:static!important;left:auto!important;top:auto!important}
+                        #main-content,#canvas-container,#canvas-wrapper,#label-canvas{display:none!important}
+                        .label-element{print-color-adjust:exact!important;-webkit-print-color-adjust:exact!important}
+                    }
+                `;
                 window.print();
                 setTimeout(()=>{
                     currentCanvas = prevCanvas;
@@ -6690,7 +6546,7 @@ document.addEventListener('DOMContentLoaded', ()=>{
             printContainer.style.position = 'absolute';
             printContainer.style.left = '-9999px';
             printContainer.style.top = '0';
-            printContainer.style.width = `${getPrintBleedPageDimensionsCm(profile).pageW}cm`;
+            printContainer.style.width = `${profile.width}cm`;
             // Height is auto - pages will be stacked naturally
             printContainer.style.height = 'auto';
             
@@ -6701,7 +6557,19 @@ document.addEventListener('DOMContentLoaded', ()=>{
             function renderCanvasToPage(canvasNum, sequenceIndex = 1, isLastPage = false, waveContext = null){
                 const canvasData = design[`canvas${canvasNum}`] || [];
                 const tempS = canvasData.map(normalizeElement);
-                const { page, root } = createPrintPageWithBleed(profile, isLastPage);
+                
+                const page = document.createElement('div');
+                page.className = 'print-page';
+                page.style.width = `${profile.width}cm`;
+                page.style.height = `${profile.height}cm`;
+                page.style.position = 'relative';
+                page.style.background = '#fff';
+                page.style.overflow = 'hidden';
+                // Set pageBreakAfter only for last page - let CSS handle the rest
+                if(isLastPage){
+                    page.style.pageBreakAfter = 'auto';
+                }
+                // No marginTop or offsetY - pages are created in sequence
                 
                 // Render elements
                 const sorted = tempS.slice().sort((a,b)=> (a.zIndex||0) - (b.zIndex||0));
@@ -7115,7 +6983,7 @@ document.addEventListener('DOMContentLoaded', ()=>{
                         }
                     }
                     
-                    root.appendChild(d);
+                    page.appendChild(d);
                 });
                 
                 return page;
@@ -7204,7 +7072,25 @@ document.addEventListener('DOMContentLoaded', ()=>{
                     styleEl.id = styleId;
                     document.head.appendChild(styleEl);
                 }
-                styleEl.textContent = buildOffscreenPrintMediaCss(profile);
+                styleEl.textContent = `
+                    @media print{
+                        @page{
+                            size: ${profile.width}cm ${profile.height}cm;
+                            margin: 0;
+                            padding: 0;
+                            marks: none;
+                            bleed: 0;
+                        }
+                        html,body{margin:0!important;padding:0!important;background:#fff!important;width:${profile.width}cm!important;height:auto!important}
+                        #toolbar,#sidebar,#marquee,.status-message{display:none!important}
+                        .print-page{width:${profile.width}cm!important;height:${profile.height}cm!important;page-break-inside:avoid!important;overflow:visible!important;background:#fff!important;position:relative!important;margin:0!important;padding:0!important;display:block!important;box-sizing:border-box!important}
+                        .print-page:not(:last-child){page-break-after:always!important}
+                        .print-page:last-child{page-break-after:auto!important}
+                        .print-container{display:block!important;position:static!important;left:auto!important;top:auto!important}
+                        #main-content,#canvas-container,#canvas-wrapper,#label-canvas{display:none!important}
+                        .label-element{print-color-adjust:exact!important;-webkit-print-color-adjust:exact!important}
+                    }
+                `;
                 
                 // Print
                 window.print();
@@ -7262,7 +7148,7 @@ document.addEventListener('DOMContentLoaded', ()=>{
         printContainer.style.position = 'absolute';
         printContainer.style.left = '-9999px';
         printContainer.style.top = '0';
-        printContainer.style.width = `${getPrintBleedPageDimensionsCm(profile).pageW}cm`;
+        printContainer.style.width = `${profile.width}cm`;
         // Height is auto - pages will be stacked naturally
         printContainer.style.height = 'auto';
         
@@ -7273,7 +7159,19 @@ document.addEventListener('DOMContentLoaded', ()=>{
         function renderCanvasToPage(canvasNum, sequenceIndex = 1, isLastPage = false, waveContext = null){
             const canvasData = design[`canvas${canvasNum}`] || [];
             const tempS = canvasData.map(normalizeElement);
-            const { page, root } = createPrintPageWithBleed(profile, isLastPage);
+            
+            const page = document.createElement('div');
+            page.className = 'print-page';
+            page.style.width = `${profile.width}cm`;
+            page.style.height = `${profile.height}cm`;
+            page.style.position = 'relative';
+            page.style.background = '#fff';
+            page.style.overflow = 'hidden';
+            // Set pageBreakAfter only for last page - let CSS handle the rest
+            if(isLastPage){
+                page.style.pageBreakAfter = 'auto';
+            }
+            // No marginTop or offsetY - pages are created in sequence
             
             // Render elements
             const sorted = tempS.slice().sort((a,b)=> (a.zIndex||0) - (b.zIndex||0));
@@ -7606,7 +7504,7 @@ document.addEventListener('DOMContentLoaded', ()=>{
                     }
                 }
                 
-                root.appendChild(d);
+                page.appendChild(d);
             });
             
             return page;
@@ -7664,7 +7562,25 @@ document.addEventListener('DOMContentLoaded', ()=>{
                 styleEl.id = styleId;
                 document.head.appendChild(styleEl);
             }
-            styleEl.textContent = buildOffscreenPrintMediaCss(profile);
+            styleEl.textContent = `
+                @media print{
+                    @page{
+                        size: ${profile.width}cm ${profile.height}cm;
+                        margin: 0;
+                        padding: 0;
+                        marks: none;
+                        bleed: 0;
+                    }
+                    html,body{margin:0!important;padding:0!important;background:#fff!important;width:${profile.width}cm!important;height:auto!important}
+                    #toolbar,#sidebar,#marquee,.status-message{display:none!important}
+                    .print-page{width:${profile.width}cm!important;height:${profile.height}cm!important;page-break-inside:avoid!important;overflow:visible!important;background:#fff!important;position:relative!important;margin:0!important;padding:0!important;display:block!important;box-sizing:border-box!important}
+                    .print-page:not(:last-child){page-break-after:always!important}
+                    .print-page:last-child{page-break-after:auto!important}
+                    .print-container{display:block!important;position:static!important;left:auto!important;top:auto!important}
+                    #main-content,#canvas-container,#canvas-wrapper,#label-canvas{display:none!important}
+                    .label-element{print-color-adjust:exact!important;-webkit-print-color-adjust:exact!important}
+                }
+            `;
             
             // Print
             window.print();
