@@ -128,91 +128,6 @@
         .bw-controls .bw-value{grid-column:3;text-align:right;font-size:13px;min-width:40px}
         .bw-controls .bw-control-full{grid-column:2/4}
         .bw-controls .bw-toggle-row{grid-column:1/-1;display:flex;align-items:center;gap:8px}
-        
-        /* Debug Modal */
-        #debug-modal {
-            position: fixed;
-            top: 0;
-            left: 0;
-            width: 100%;
-            height: 100%;
-            background: rgba(0,0,0,0.7);
-            z-index: 20000;
-            display: none;
-            align-items: center;
-            justify-content: center;
-            backdrop-filter: blur(4px);
-        }
-        #debug-box {
-            background: #1e1e1e;
-            color: #d4d4d4;
-            width: 90%;
-            max-width: 800px;
-            height: 80%;
-            border-radius: 8px;
-            display: flex;
-            flex-direction: column;
-            box-shadow: 0 20px 50px rgba(0,0,0,0.5);
-            border: 1px solid #333;
-            overflow: hidden;
-            font-family: 'Consolas', 'Monaco', 'Courier New', monospace;
-        }
-        #debug-header {
-            padding: 12px 20px;
-            background: #252526;
-            border-bottom: 1px solid #333;
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-        }
-        #debug-header h3 {
-            margin: 0;
-            font-size: 16px;
-            color: #fff;
-        }
-        #debug-log-content {
-            flex-grow: 1;
-            padding: 20px;
-            overflow-y: auto;
-            white-space: pre-wrap;
-            font-size: 13px;
-            line-height: 1.5;
-        }
-        #debug-footer {
-            padding: 12px 20px;
-            background: #252526;
-            border-top: 1px solid #333;
-            display: flex;
-            gap: 12px;
-            justify-content: flex-end;
-        }
-        .debug-btn {
-            padding: 8px 16px;
-            border-radius: 4px;
-            border: none;
-            cursor: pointer;
-            font-size: 13px;
-            font-weight: 500;
-            transition: all 0.2s;
-        }
-        .debug-btn-copy { background: #007aff; color: #fff; }
-        .debug-btn-copy:hover { background: #0062cc; }
-        .debug-btn-close { background: #444; color: #fff; }
-        .debug-btn-close:hover { background: #555; }
-        #btn-open-debug {
-            margin-top: auto;
-            background: #f0f0f0;
-            border: 1px solid #ccc;
-            color: #666;
-            font-size: 12px;
-            padding: 8px;
-            width: 100%;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            gap: 6px;
-        }
-        #btn-open-debug:hover { background: #e8e8e8; }
     </style>
 </head>
 <body>
@@ -367,10 +282,6 @@
                     <input type="number" id="bw-preview-dpi" class="bw-control-full" min="72" max="300" value="203">
                 </div>
             </div>
-                </div>
-            </div>
-            
-            <button type="button" id="btn-open-debug">🛠️ Open Debug Log</button>
         </div>
 
         <div id="canvas-container">
@@ -385,41 +296,11 @@
     <input id="file-import" type="file" accept="application/json" style="display:none" />
     <input id="file-import-snapshot" type="file" accept="application/json" style="display:none" />
 
-    <div id="debug-modal">
-        <div id="debug-box">
-            <div id="debug-header">
-                <h3>System Debug Log</h3>
-                <span style="font-size: 12px; color: #888;">Diagnostic Information</span>
-            </div>
-            <div id="debug-log-content">No logs available.</div>
-            <div id="debug-footer">
-                <button class="debug-btn debug-btn-copy" id="btn-copy-debug">📋 Copy Logs</button>
-                <button class="debug-btn debug-btn-close" id="btn-close-debug">Close</button>
-            </div>
-        </div>
-    </div>
-
 <script>
 document.addEventListener('DOMContentLoaded', ()=>{
-    logDebug('DOM Content Loaded. Initializing state...');
-
+    console.log('🚀 [label] DOMContentLoaded — boot');
 
     // ---------- State ----------
-    // ---------- Debug Logging ----------
-    const debugLogs = [];
-    function logDebug(msg) {
-        const time = new Date().toLocaleTimeString();
-        const fullMsg = `[${time}] ${msg}`;
-        debugLogs.push(fullMsg);
-        console.log(fullMsg);
-        // If debug window is open, update its content (optional but good)
-        const logContent = document.getElementById('debug-log-content');
-        if (logContent) {
-            logContent.textContent = debugLogs.join('\n');
-            logContent.scrollTop = logContent.scrollHeight;
-        }
-    }
-
     let S = [];                       // elements array
     let selectedIds = [];             // array of selected element ids (multi-select)
         let groups = [];                   // array of groups: [{id: 'group_xxx', elementIds: ['el_xxx', ...], bounds: {x, y, width, height}}]
@@ -890,36 +771,27 @@ document.addEventListener('DOMContentLoaded', ()=>{
                 `;
             }
         }
+
         function updateCanvasSize(){
-            logDebug('Updating canvas size...');
+            console.log('📐 [label] updateCanvasSize start', { currentProfile, currentDesign, currentCanvas });
             const profile = profiles[currentProfile];
-            if(!profile) {
-                logDebug('No profile found for currentProfile: ' + currentProfile);
+            if(!profile){
+                console.warn('⚠️ [label] updateCanvasSize: no profile for currentProfile', currentProfile);
                 return;
             }
-            W = profile.width;
-            H = profile.height;
-            logDebug(`Setting dimensions: W=${W}cm, H=${H}cm`);
-            const lc = document.getElementById('label-canvas');
-            if (lc) {
-                lc.style.width = W + 'cm';
-                lc.style.height = H + 'cm';
-            } else {
-                logDebug('ERROR: label-canvas element not found!');
+            const w = Number(profile.width);
+            const h = Number(profile.height);
+            W = Number.isFinite(w) && w > 0 ? w : 8;
+            H = Number.isFinite(h) && h > 0 ? h : 5;
+            lc.style.width = `${W}cm`;
+            lc.style.height = `${H}cm`;
+            if(cw){
+                cw.style.width = `${W}cm`;
+                cw.style.height = `${H}cm`;
             }
             updatePrintCSS();
+            console.log('✅ [label] updateCanvasSize done', { W, H, label: W + '×' + H + ' cm' });
         }
-
-        function syncPrintBleedControlsFromState(){
-            logDebug('Syncing print bleed controls from state...');
-            const enabledCb = document.getElementById('print-bleed-enabled');
-            const colorInput = document.getElementById('print-bleed-color');
-            const cmInput = document.getElementById('print-bleed-cm');
-            if(enabledCb) enabledCb.checked = printBleedEnabled;
-            if(colorInput) colorInput.value = printBleedColor;
-            if(cmInput) cmInput.value = printBleedCm;
-        }
-
 
         function updateProfileSelector(){
             const options = Object.keys(profiles).map(key => {
@@ -1187,7 +1059,6 @@ document.addEventListener('DOMContentLoaded', ()=>{
         }
 
         function saveCurrentDesign(){
-            logDebug(`Saving state... Profile: ${currentProfile}, Design: ${currentDesign}, Canvas: ${currentCanvas}`);
             const profile = profiles[currentProfile];
             if(!profile) return;
             if(!profile.designs[currentDesign]) {
@@ -1244,7 +1115,6 @@ document.addEventListener('DOMContentLoaded', ()=>{
         }
 
         function loadCurrentDesign(){
-            logDebug(`Loading design... Profile: ${currentProfile}, Design: ${currentDesign}, Canvas: ${currentCanvas}`);
             const profile = profiles[currentProfile];
             if(!profile) return;
             if(!profile.designs[currentDesign]) {
@@ -1279,6 +1149,7 @@ document.addEventListener('DOMContentLoaded', ()=>{
             selectedIds = [];
             // Reset history when switching design/profile/canvas
             resetHistory();
+            console.log('📂 [label] loadCurrentDesign', { canvasKey, elements: S.length, design: currentDesign, profile: currentProfile });
         }
 
         function addProfile(){
@@ -1714,12 +1585,11 @@ document.addEventListener('DOMContentLoaded', ()=>{
 
     // ---------- Rendering ----------
     function render(){
+        lc.innerHTML = '';
+        
+        // Sequence mode is always enabled
         const profile = profiles[currentProfile];
         const design = profile && profile.designs[currentDesign] ? profile.designs[currentDesign] : null;
-        logDebug(`Rendering. Profile width: ${profile ? profile.width : 'N/A'}, height: ${profile ? profile.height : 'N/A'}`);
-        logDebug(`Global variables W: ${W}, H: ${H}`);
-        lc.innerHTML = '';
-
         const sequenceCountColumn = globalSequenceCountColumn || '';
         const canvas2Flag = design && design.canvas2Enabled ? true : false;
         
@@ -9422,12 +9292,26 @@ document.addEventListener('DOMContentLoaded', ()=>{
     function fit(){ const cr = cc.getBoundingClientRect(); const hw = (cr.width-40)/(W*37.795276); const vw = (cr.height-40)/(H*37.795276); setZoom(Math.min(hw,vw,1.5)); }
 
         // ---------- Full screen detection & UI visibility ----------
+        let labelViewportLoggedOnce = false;
         function checkFullScreenMode() {
             // Se la finestra è molto piccola, probabilmente è in modalità widget
             // Soglia: se width < 600px o height < 400px, consideralo widget mode
             const isWidget = window.innerWidth < 600 || window.innerHeight < 400;
             const wasFullScreen = isFullScreen;
             isFullScreen = !isWidget;
+            if(!labelViewportLoggedOnce){
+                labelViewportLoggedOnce = true;
+                console.log('🪟 [label] viewport / mode (first check)', { isWidget, isFullScreen, innerWidth: window.innerWidth, innerHeight: window.innerHeight });
+            }
+            if(wasFullScreen !== isFullScreen){
+                console.log('🪟 [label] fullScreen / widget mode changed', {
+                    wasFullScreen,
+                    isFullScreen,
+                    isWidget,
+                    innerWidth: window.innerWidth,
+                    innerHeight: window.innerHeight
+                });
+            }
             
             // Se si è appena entrati in full screen, applica fit zoom
             if(isFullScreen && !wasFullScreen){
@@ -9642,16 +9526,17 @@ document.addEventListener('DOMContentLoaded', ()=>{
         // ---------- Initial setup & history init ----------
         // Load from localStorage on startup
         try {
-            logDebug(`Checking localStorage for key: ${KEY}`);
             const saved = localStorage.getItem(KEY);
             if(saved){
-                logDebug('Data found in localStorage. Parsing...');
                 const parsed = JSON.parse(saved);
-                logDebug(`Local storage version: ${parsed.version}`);
                 if(parsed && parsed.version === 2 && parsed.profiles){
+                    console.log('💾 [label] localStorage OK', {
+                        version: parsed.version,
+                        profiles: Object.keys(parsed.profiles).length,
+                        currentProfile: parsed.currentProfile,
+                        currentDesign: parsed.currentDesign
+                    });
                     profiles = parsed.profiles;
-                    logDebug(`Loaded ${Object.keys(profiles).length} profiles`);
-
                     // Ensure backward compatibility: add sequence fields to all designs
                     Object.keys(profiles).forEach(profileKey => {
                         const profile = profiles[profileKey];
@@ -9840,34 +9725,46 @@ document.addEventListener('DOMContentLoaded', ()=>{
                                 }
                             });
                     }
+                } else {
+                    console.warn('⚠️ [label] localStorage: ignored (need version 2 + profiles)', { version: parsed?.version, hasProfiles: !!parsed?.profiles });
                 }
+            } else {
+                console.log('📭 [label] localStorage: empty — using defaults', { KEY });
             }
         } catch(e) {
-            console.warn('Failed to load from localStorage:', e);
+            console.warn('💥 [label] localStorage load failed:', e);
         }
         
         // Initialize canvas size immediately
-        updateCanvasSize();
-        updateProfileSelector();
-        updateDesignSelector();
-        updateCanvasControls();
-        loadCurrentDesign();
+        try {
+            console.log('🔧 [label] init: updateCanvasSize → selectors → loadCurrentDesign → render');
+            updateCanvasSize();
+            updateProfileSelector();
+            updateDesignSelector();
+            updateCanvasControls();
+            loadCurrentDesign();
             // Recalculate group bounds after loading elements
             groups.forEach(group => {
                 group.bounds = getGroupBounds(group.elementIds);
             });
-        // Clear canvas before rendering
-        lc.innerHTML = '';
-        // Use requestAnimationFrame to ensure DOM is ready and dimensions are calculated
-        requestAnimationFrame(() => {
-            render();
-            updateProps();
-            updateSynchronizedBlocksUI();
-            // Force a reflow and fit after DOM update
-            void lc.offsetHeight;
-            void cc.offsetHeight;
-            fit();
-        });
+            console.log('📊 [label] after loadCurrentDesign', { elementsOnCanvas: S.length, groups: groups.length });
+            // Clear canvas before rendering
+            lc.innerHTML = '';
+            // Use requestAnimationFrame to ensure DOM is ready and dimensions are calculated
+            requestAnimationFrame(() => {
+                render();
+                console.log('🎨 [label] first render done', { elements: S.length });
+                updateProps();
+                updateSynchronizedBlocksUI();
+                // Force a reflow and fit after DOM update
+                void lc.offsetHeight;
+                void cc.offsetHeight;
+                fit();
+                console.log('🔍 [label] fit applied', { zoom: z, W, H, viewport: { w: window.innerWidth, h: window.innerHeight } });
+            });
+        } catch(initErr){
+            console.error('❌ [label] init sequence crashed:', initErr);
+        }
     resetHistory();
 
     // Global regex rules management
@@ -9997,38 +9894,6 @@ document.addEventListener('DOMContentLoaded', ()=>{
             if(renameBtn && selectHeight) renameBtn.style.height = `${selectHeight}px`;
             if(cloneBtn && selectHeight) cloneBtn.style.height = `${selectHeight}px`;
         }, 100);
-
-    // Debug modal event listeners
-    document.getElementById('btn-open-debug').addEventListener('click', () => {
-        const modal = document.getElementById('debug-modal');
-        const content = document.getElementById('debug-log-content');
-        if (modal && content) {
-            content.textContent = debugLogs.join('\n');
-            modal.style.display = 'flex';
-            content.scrollTop = content.scrollHeight;
-        }
-    });
-
-    document.getElementById('btn-close-debug').addEventListener('click', () => {
-        document.getElementById('debug-modal').style.display = 'none';
-    });
-
-    document.getElementById('btn-copy-debug').addEventListener('click', () => {
-        const logText = debugLogs.join('\n');
-        navigator.clipboard.writeText(logText).then(() => {
-            msg('Logs copied to clipboard');
-        }).catch(err => {
-            console.error('Failed to copy logs: ', err);
-            msg('Failed to copy logs', true);
-        });
-    });
-
-    // Close modal when clicking outside the debug box
-    document.getElementById('debug-modal').addEventListener('click', (e) => {
-        if (e.target === document.getElementById('debug-modal')) {
-            document.getElementById('debug-modal').style.display = 'none';
-        }
-    });
 
 }); // DOMContentLoaded
 </script>
