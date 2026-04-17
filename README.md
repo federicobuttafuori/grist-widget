@@ -1,61 +1,54 @@
 # Grist Label Designer Widget
 
-Un widget personalizzato per Grist che permette di creare e stampare etichette prodotto direttamente dai dati della tabella.
+A custom widget for Grist that allows you to design and print product labels directly from your table data.
 
-## Caratteristiche
+## Features
 
-### Editor Visuale
-- **Canvas editor** con drag-and-drop e zoom
-- **Elementi disponibili**:
-  - Testo
-  - Campi dati (collegati a colonne Grist)
-  - Immagini
-  - Codici QR
+### Visual Editor
+- **Canvas editor** with drag-and-drop and zoom
+- **Available elements**:
+  - Text
+  - Data fields (linked to Grist columns)
+  - Images
+  - QR codes
   - Barcodes
-  - Linee e riquadri
-- **Profili etichetta** con dimensioni personalizzabili
-- **Multi-design** per ogni profilo
+  - Lines and boxes
+- **Label profiles** with customizable sizes
+- **Multi-design** support for each profile
 
-### Funzionalità Avanzate
-- **Binding dati**: Collega elementi a colonne Grist per aggiornamenti automatici
-- **Import/Export**: Salva e carica layout etichette
-- **Anteprima stampa**: Preview ottimizzata per stampanti termiche
-- **Controlli stampa**: Gamma, contrasto e soglia per output bianco/nero
-- **Regole testo**: Trasformazioni regex per formattazione automatica
+### Advanced Features
+- **Data binding**: Link elements to Grist columns for automatic updates
+- **Import/Export**: Save and load label layouts
+- **Print preview**: Optimized for thermal printers
+- **Print controls**: Gamma, contrast, and threshold tuning for black/white output
+- **Text rules**: Regex-based transformations for automatic formatting
 
-### Stampa
-- **Stampa batch**: Stampa multiple etichette in una volta
-- **Stampa singola**: Stampa etichetta individuale
-- **Ottimizzazione termica**: Controlli specifici per stampanti termiche
+### Printing
+- **Batch print**: Print multiple labels at once
+- **Single print**: Print individual labels
+- **Thermal optimization**: Controls tailored for thermal printers
 
-## Installazione
+## Using the widget in Grist
 
-1. Pubblica i file del widget su GitHub Pages o un altro hosting statico
-2. In Grist, vai su "Widget" > "Crea Widget Personalizzato"
-3. Incolla l'URL del tuo GitHub Pages nella sezione "Custom Widget URL"
-4. Il widget sarà disponibile per l'uso nei tuoi documenti Grist
+You do **not** need to publish or install anything yourself. The widget is already hosted here:
 
-## Utilizzo
+**[https://federicobuttafuori.github.io/grist-widget/](https://federicobuttafuori.github.io/grist-widget/)**
 
-1. **Configura il Widget**:
-   - Seleziona la tabella Grist da utilizzare
-   - Scegli o crea un profilo etichetta
+1. In your Grist document, add a widget to the page and choose **Custom widget** (or **Create custom widget**, depending on your Grist UI).
+2. When asked for the widget URL, **paste the link above** into the **Custom widget URL** field.
+3. Point the widget at the table you want and start designing.
 
-2. **Progetta l'Etichetta**:
-   - Aggiungi elementi al canvas
-   - Collega i campi dati alle colonne Grist
-   - Configura le proprietà nella sidebar
+## Usage
 
-3. **Stampa**:
-   - Usa "Stampa" per batch di etichette
-   - Usa "Stampa Singola" per etichetta individuale
+1. **Configure the Widget**:
+   - Select the Grist table you want to use
+   - Choose or create a label profile
 
-## Requisiti
+2. **Design the Label**:
+   - Add elements to the canvas
+   - Link data fields to Grist columns
+   - Configure properties in the sidebar
 
-- Browser moderno con JavaScript abilitato
-- Connessione internet per le dipendenze CDN
-- Accesso a un documento Grist
-
-## Supporto
-
-Il widget è fornito così com'è per l'uso con Grist. Per supporto o segnalazioni di problemi, contatta lo sviluppatore.
+3. **Print**:
+   - Use "Print" for label batches
+   - Use "Single Print" for one label
