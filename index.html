@@ -2952,6 +2952,28 @@ document.addEventListener('DOMContentLoaded', ()=>{
         return false;
     }
 
+    /** Column refs from **col** / @col@ (same as replaceColumnSyntax); skips **sequence** placeholder name */
+    function columnRefsFromTextMentions(str){
+        if(!str || typeof str !== 'string') return [];
+        const seen = Object.create(null);
+        const refs = [];
+        function add(c){
+            const t = (c || '').trim();
+            if(!t || /^sequence$/i.test(t)) return;
+            if(!seen[t]){ seen[t] = 1; refs.push(t); }
+        }
+        str.replace(/\*\*([^*]+)\*\*/g, (_, col) => { add(col); return ''; });
+        str.replace(/@([^@]+)@/g, (_, col) => { add(col); return ''; });
+        return refs;
+    }
+
+    function recordValueIsApplicableDate(rv){
+        if(!rv || !rv.found) return false;
+        const v = rv.value;
+        if(v === null || v === undefined || v === '') return false;
+        return isDateValue(v);
+    }
+
     function formatDateValue(v, format){
         if(v === null || v === undefined) return '';
         let d;
@@ -3333,6 +3355,35 @@ document.addEventListener('DOMContentLoaded', ()=>{
             return `<button type="button" class="${btnCls}" data-prop-key="${escapeHtml(pk)}" title="${escapeHtml(title)}">\u21BB</button>`;
         }
 
+        function shouldShowDateTimeFormatRow(){
+            if(el.type === 'text'){
+                const refs = columnRefsFromTextMentions(String(valueFor('props.text') || ''));
+                if(!refs.length) return false;
+                if(!R || typeof R !== 'object') return false;
+                for(const ref of refs){
+                    if(recordValueIsApplicableDate(getRecordValueByColumnRef(ref))) return true;
+                }
+                return false;
+            }
+            if(el.type === 'data'){
+                const boundRef = String(valueFor('props.boundColumn') || '').trim();
+                if(boundRef && recordValueIsApplicableDate(getRecordValueByColumnRef(boundRef))) return true;
+                const chunks = [
+                    String(valueFor('props.prefix') || ''),
+                    String(valueFor('props.suffix') || ''),
+                    String(valueFor('props.text') || '')
+                ];
+                if(!R || typeof R !== 'object') return false;
+                for(const chunk of chunks){
+                    for(const ref of columnRefsFromTextMentions(chunk)){
+                        if(recordValueIsApplicableDate(getRecordValueByColumnRef(ref))) return true;
+                    }
+                }
+                return false;
+            }
+            return false;
+        }
+
         let bindHtml = '';
         if(C && C.length){
             const boundVal = valueFor('props.boundColumn');
@@ -3350,10 +3401,12 @@ document.addEventListener('DOMContentLoaded', ()=>{
 
         if(el.type==='text'){
             h += `<div class="${grid1Cls}"><label class="${labelClass('props.text')}">Text</label><textarea data-prop="props.text" class="column-mention-input" data-column-mention="1">${escapeHtml(String(valueFor('props.text')||''))}</textarea>${syncBtn('props.text')}</div>`;
-            const dtFmtValText = valueFor('props.dateTimeFormat') || 'DD/MM/YYYY';
-            const dateFormatPresets = [['DD/MM/YYYY','gg/mm/aaaa'],['DD/MM/YYYY HH:mm','gg/mm/aaaa hh:mm'],['DD/MM/YYYY HH:mm:ss','gg/mm/aaaa hh:mm:ss'],['YYYY-MM-DD','aaaa-mm-gg'],['YYYY-MM-DD HH:mm','aaaa-mm-gg hh:mm'],['MM/DD/YYYY','mm/gg/aaaa'],['DD.MM.YYYY','gg.mm.aaaa']];
-            const isCustomText = !dateFormatPresets.some(([v])=>v===dtFmtValText);
-            h += `<div class="${grid1Cls} date-time-format-row"><label class="${labelClass('props.dateTimeFormat')}">Formato Data/Ora</label><div><select class="date-time-format-select">${dateFormatPresets.map(([v,l])=>`<option value="${escapeHtml(v)}" ${dtFmtValText===v?'selected':''}>${l}</option>`).join('')}<option value="__custom__" ${isCustomText?'selected':''}>Custom</option></select><input type="text" class="date-time-format-custom-input" placeholder="es. DD-MM-YYYY" value="${isCustomText?escapeHtml(dtFmtValText):''}" style="margin-top:4px;width:100%;display:${isCustomText?'block':'none'}"></div>${syncBtn('props.dateTimeFormat')}</div>`;
+            if(shouldShowDateTimeFormatRow()){
+                const dtFmtValText = valueFor('props.dateTimeFormat') || 'DD/MM/YYYY';
+                const dateFormatPresets = [['DD/MM/YYYY','gg/mm/aaaa'],['DD/MM/YYYY HH:mm','gg/mm/aaaa hh:mm'],['DD/MM/YYYY HH:mm:ss','gg/mm/aaaa hh:mm:ss'],['YYYY-MM-DD','aaaa-mm-gg'],['YYYY-MM-DD HH:mm','aaaa-mm-gg hh:mm'],['MM/DD/YYYY','mm/gg/aaaa'],['DD.MM.YYYY','gg.mm.aaaa']];
+                const isCustomText = !dateFormatPresets.some(([v])=>v===dtFmtValText);
+                h += `<div class="${grid1Cls} date-time-format-row"><label class="${labelClass('props.dateTimeFormat')}">Formato Data/Ora</label><div><select class="date-time-format-select">${dateFormatPresets.map(([v,l])=>`<option value="${escapeHtml(v)}" ${dtFmtValText===v?'selected':''}>${l}</option>`).join('')}<option value="__custom__" ${isCustomText?'selected':''}>Custom</option></select><input type="text" class="date-time-format-custom-input" placeholder="es. DD-MM-YYYY" value="${isCustomText?escapeHtml(dtFmtValText):''}" style="margin-top:4px;width:100%;display:${isCustomText?'block':'none'}"></div>${syncBtn('props.dateTimeFormat')}</div>`;
+            }
         }
 
             if(el.type==='data' || el.type==='qr' || el.type==='barcode' || el.type==='image'){
@@ -5004,6 +5057,28 @@ document.addEventListener('DOMContentLoaded', ()=>{
                 }
             });
 
+            saveCurrentDesign();
+            render();
+            updateProps();
+        }
+
+        /** After resize or multi-edit, push width/height into the master thread so all synced instances match. */
+        function syncThreadDimensionsFromElementIfSynced(el){
+            if(!el || !el.masterThreadId) return;
+            const thread = getMasterThread(el.masterThreadId);
+            if(!thread) return;
+            const syncW = isPropSynced(thread, 'width') && !isPropOverridden(el, 'width');
+            const syncH = isPropSynced(thread, 'height') && !isPropOverridden(el, 'height');
+            if(!syncW && !syncH) return;
+            pushBeforeChange();
+            if(!thread.data) thread.data = {};
+            if(syncW) thread.data.width = el.width;
+            if(syncH) thread.data.height = el.height;
+            S.forEach(el2 => {
+                if(el2.masterThreadId !== el.masterThreadId) return;
+                if(syncW && !isPropOverridden(el2, 'width')) setElementPropFromThread(el2, 'width', el.width);
+                if(syncH && !isPropOverridden(el2, 'height')) setElementPropFromThread(el2, 'height', el.height);
+            });
             saveCurrentDesign();
             render();
             updateProps();
@@ -8001,6 +8076,9 @@ document.addEventListener('DOMContentLoaded', ()=>{
             return;
         }
 
+        if(resizeMode && ctx && ctx.el && !ctx.isGroup){
+            syncThreadDimensionsFromElementIfSynced(ctx.el);
+        }
         if(drag || resizeMode){
                 saveCurrentDesign();
         }
@@ -8374,6 +8452,15 @@ document.addEventListener('DOMContentLoaded', ()=>{
                     el.props.textOutline2Enabled = false;
                 }
             });
+            if((prop === 'width' || prop === 'height') && !isDeferredTextInput){
+                const seenThread = new Set();
+                selectedIds.forEach(id=>{
+                    const el = S.find(s=>s.id===id);
+                    if(!el || !el.masterThreadId || seenThread.has(el.masterThreadId)) return;
+                    seenThread.add(el.masterThreadId);
+                    syncThreadDimensionsFromElementIfSynced(el);
+                });
+            }
         } else {
             const id = selectedIds[0];
             const el = S.find(s=>s.id===id);
