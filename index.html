@@ -5084,6 +5084,28 @@ document.addEventListener('DOMContentLoaded', ()=>{
             updateProps();
         }
 
+        /** After drag or multi-edit, push x/y into the master thread so all synced instances match. */
+        function syncThreadPositionFromElementIfSynced(el){
+            if(!el || !el.masterThreadId) return;
+            const thread = getMasterThread(el.masterThreadId);
+            if(!thread) return;
+            const syncX = isPropSynced(thread, 'x') && !isPropOverridden(el, 'x');
+            const syncY = isPropSynced(thread, 'y') && !isPropOverridden(el, 'y');
+            if(!syncX && !syncY) return;
+            pushBeforeChange();
+            if(!thread.data) thread.data = {};
+            if(syncX) thread.data.x = el.x;
+            if(syncY) thread.data.y = el.y;
+            S.forEach(el2 => {
+                if(el2.masterThreadId !== el.masterThreadId) return;
+                if(syncX && !isPropOverridden(el2, 'x')) setElementPropFromThread(el2, 'x', el.x);
+                if(syncY && !isPropOverridden(el2, 'y')) setElementPropFromThread(el2, 'y', el.y);
+            });
+            saveCurrentDesign();
+            render();
+            updateProps();
+        }
+
         function toggleSyncState(threadId, propKey, el){
             const thread = getMasterThread(threadId);
             if(!thread) return;
@@ -8012,6 +8034,13 @@ document.addEventListener('DOMContentLoaded', ()=>{
                         group.bounds = getGroupBounds(group.elementIds);
                     }
                 }
+                const seenThreadDrag = new Set();
+                ctx.items.forEach(it => {
+                    const elMoved = S.find(s => s.id === it.id);
+                    if(!elMoved || !elMoved.masterThreadId || seenThreadDrag.has(elMoved.masterThreadId)) return;
+                    seenThreadDrag.add(elMoved.masterThreadId);
+                    syncThreadPositionFromElementIfSynced(elMoved);
+                });
             }
             if(resizeMode && ctx && ctx.isGroup && ctx.group){
                 // Update group bounds after resize
@@ -8158,8 +8187,15 @@ document.addEventListener('DOMContentLoaded', ()=>{
                                     const newX = el.x + step;
                                     el.x = snapToPixel(Math.min(W - (effectiveWidth + el.width) / 2, newX));
                                     break;
-                                }
                             }
+                        }
+                        });
+                        const seenThreadArrow = new Set();
+                        selectedIds.forEach(id=>{
+                            const el = S.find(s=>s.id===id);
+                            if(!el || !el.masterThreadId || seenThreadArrow.has(el.masterThreadId)) return;
+                            seenThreadArrow.add(el.masterThreadId);
+                            syncThreadPositionFromElementIfSynced(el);
                         });
                         render(); updateProps(); saveCurrentDesign();
                 }
@@ -8393,7 +8429,20 @@ document.addEventListener('DOMContentLoaded', ()=>{
                     else el[keyPath] = value;
                 }
             });
-                render(); updateProps(); saveCurrentDesign();
+            if(['x','y','width','height'].includes(keyPath)){
+                const seenThread = new Set();
+                selectedIds.forEach(id=>{
+                    const el = S.find(s=>s.id===id);
+                    if(!el || !el.masterThreadId || seenThread.has(el.masterThreadId)) return;
+                    seenThread.add(el.masterThreadId);
+                    if(keyPath === 'width' || keyPath === 'height'){
+                        syncThreadDimensionsFromElementIfSynced(el);
+                    } else {
+                        syncThreadPositionFromElementIfSynced(el);
+                    }
+                });
+            }
+            render(); updateProps(); saveCurrentDesign();
             return;
         }
 
@@ -8461,6 +8510,15 @@ document.addEventListener('DOMContentLoaded', ()=>{
                     syncThreadDimensionsFromElementIfSynced(el);
                 });
             }
+            if((prop === 'x' || prop === 'y') && !isDeferredTextInput){
+                const seenThreadPos = new Set();
+                selectedIds.forEach(id=>{
+                    const el = S.find(s=>s.id===id);
+                    if(!el || !el.masterThreadId || seenThreadPos.has(el.masterThreadId)) return;
+                    seenThreadPos.add(el.masterThreadId);
+                    syncThreadPositionFromElementIfSynced(el);
+                });
+            }
         } else {
             const id = selectedIds[0];
             const el = S.find(s=>s.id===id);
@@ -8482,6 +8540,9 @@ document.addEventListener('DOMContentLoaded', ()=>{
                         if(prop === 'width' || prop === 'height'){
                             if(isPropSynced(thread, 'width') && !isPropOverridden(el, 'width')) syncPropertyToThread(el.masterThreadId, 'width', el.width);
                             if(isPropSynced(thread, 'height') && !isPropOverridden(el, 'height')) syncPropertyToThread(el.masterThreadId, 'height', el.height);
+                        } else if(prop === 'x' || prop === 'y'){
+                            if(isPropSynced(thread, 'x') && !isPropOverridden(el, 'x')) syncPropertyToThread(el.masterThreadId, 'x', el.x);
+                            if(isPropSynced(thread, 'y') && !isPropOverridden(el, 'y')) syncPropertyToThread(el.masterThreadId, 'y', el.y);
                         } else if(isPropSynced(thread, prop) && !isPropOverridden(el, prop)){
                             syncPropertyToThread(el.masterThreadId, prop, parsedValue);
                         }
