@@ -353,6 +353,52 @@ document.addEventListener('DOMContentLoaded', ()=>{
             const mini = document.getElementById('mini-print-bleed-color');
             if (mini && main) mini.value = main.value;
         }
+
+        function isPrintBleedEnabled(){
+            const el = document.getElementById('print-bleed-enabled');
+            return !!(el && el.checked);
+        }
+
+        function getBleedLayoutForProfile(profile){
+            const W = profile.width;
+            const H = profile.height;
+            const bleedOn = isPrintBleedEnabled();
+            const extraCm = bleedOn ? PRINT_BLEED_CM * 2 : 0;
+            return {
+                W,
+                H,
+                bleedOn,
+                pageW: W + extraCm,
+                pageH: H + extraCm,
+                bleedAtRule: bleedOn ? `bleed: ${PRINT_BLEED_CM}cm;` : 'bleed: 0;',
+                pageBg: bleedOn ? getPrintBleedColor() : '#ffffff'
+            };
+        }
+
+        /** CSS per stampa multi-pagina (.print-container / .print-page): stesso bleed dell’anteprima. */
+        function buildMultiPagePrintStylesheet(profile){
+            const { W, H, pageW, pageH, bleedAtRule, pageBg } = getBleedLayoutForProfile(profile);
+            return `
+                    @media print{
+                        @page{
+                            size: ${pageW}cm ${pageH}cm;
+                            margin: 0;
+                            padding: 0;
+                            marks: none;
+                            ${bleedAtRule}
+                        }
+                        html,body{margin:0!important;padding:0!important;background:${pageBg}!important;width:${pageW}cm!important;height:auto!important}
+                        #toolbar,#sidebar,#marquee,.status-message{display:none!important}
+                        .print-page{width:${pageW}cm!important;height:${pageH}cm!important;page-break-inside:avoid!important;overflow:visible!important;background:${pageBg}!important;position:relative!important;margin:0!important;padding:0!important;display:flex!important;flex-direction:row!important;justify-content:center!important;align-items:center!important;box-sizing:border-box!important}
+                        .print-page-trim{width:${W}cm!important;height:${H}cm!important;position:relative!important;overflow:hidden!important;flex-shrink:0!important;background:transparent!important}
+                        .print-page:not(:last-child){page-break-after:always!important}
+                        .print-page:last-child{page-break-after:auto!important}
+                        .print-container{display:block!important;position:static!important;left:auto!important;top:auto!important}
+                        #main-content,#canvas-container,#canvas-wrapper,#label-canvas{display:none!important}
+                        .label-element{print-color-adjust:exact!important;-webkit-print-color-adjust:exact!important}
+                    }
+                `;
+        }
     const MAX_HISTORY = 100;
 
         // All available fonts for labels
@@ -5953,7 +5999,7 @@ document.addEventListener('DOMContentLoaded', ()=>{
             printContainer.style.position = 'absolute';
             printContainer.style.left = '-9999px';
             printContainer.style.top = '0';
-            printContainer.style.width = `${profile.width}cm`;
+            printContainer.style.width = `${getBleedLayoutForProfile(profile).pageW}cm`;
             printContainer.style.height = 'auto';
             
             // Calculate total pages across all selected waves
@@ -5979,10 +6025,29 @@ document.addEventListener('DOMContentLoaded', ()=>{
                 
                 const page = document.createElement('div');
                 page.className = 'print-page';
-                page.style.width = `${profile.width}cm`;
-                page.style.height = `${profile.height}cm`;
+                const bleedLayout = getBleedLayoutForProfile(profile);
+                const W = bleedLayout.W;
+                const H = bleedLayout.H;
+                const trim = document.createElement('div');
+                trim.className = 'print-page-trim';
+                trim.style.width = `${W}cm`;
+                trim.style.height = `${H}cm`;
+                trim.style.position = 'relative';
+                trim.style.overflow = 'hidden';
+                trim.style.flexShrink = '0';
+                if(bleedLayout.bleedOn){
+                    page.style.width = `${bleedLayout.pageW}cm`;
+                    page.style.height = `${bleedLayout.pageH}cm`;
+                    page.style.display = 'flex';
+                    page.style.alignItems = 'center';
+                    page.style.justifyContent = 'center';
+                    page.style.background = bleedLayout.pageBg;
+                } else {
+                    page.style.width = `${W}cm`;
+                    page.style.height = `${H}cm`;
+                    page.style.background = '#ffffff';
+                }
                 page.style.position = 'relative';
-                page.style.background = '#fff';
                 page.style.overflow = 'hidden';
                 // Set pageBreakAfter only for last page - let CSS handle the rest
                 if(isLastPage){
@@ -6407,11 +6472,11 @@ document.addEventListener('DOMContentLoaded', ()=>{
                         }
                     }
                     
-                    page.appendChild(d);
+                    trim.appendChild(d);
                 });
                 
                 // Ensure page has content - if no elements, add a placeholder to prevent blank pages
-                if(page.children.length === 0){
+                if(trim.children.length === 0){
                     const placeholder = document.createElement('div');
                     placeholder.style.width = '100%';
                     placeholder.style.height = '100%';
@@ -6421,8 +6486,9 @@ document.addEventListener('DOMContentLoaded', ()=>{
                     placeholder.style.color = '#999';
                     placeholder.style.fontSize = '12px';
                     placeholder.textContent = 'Empty page';
-                    page.appendChild(placeholder);
+                    trim.appendChild(placeholder);
                 }
+                page.appendChild(trim);
                 
                 return page;
             }
@@ -6502,25 +6568,7 @@ document.addEventListener('DOMContentLoaded', ()=>{
                     styleEl.id = styleId;
                     document.head.appendChild(styleEl);
                 }
-                styleEl.textContent = `
-                    @media print{
-                        @page{
-                            size: ${profile.width}cm ${profile.height}cm;
-                            margin: 0;
-                            padding: 0;
-                            marks: none;
-                            bleed: 0;
-                        }
-                        html,body{margin:0!important;padding:0!important;background:#fff!important;width:${profile.width}cm!important;height:auto!important}
-                        #toolbar,#sidebar,#marquee,.status-message{display:none!important}
-                        .print-page{width:${profile.width}cm!important;height:${profile.height}cm!important;page-break-inside:avoid!important;overflow:visible!important;background:#fff!important;position:relative!important;margin:0!important;padding:0!important;display:block!important;box-sizing:border-box!important}
-                        .print-page:not(:last-child){page-break-after:always!important}
-                        .print-page:last-child{page-break-after:auto!important}
-                        .print-container{display:block!important;position:static!important;left:auto!important;top:auto!important}
-                        #main-content,#canvas-container,#canvas-wrapper,#label-canvas{display:none!important}
-                        .label-element{print-color-adjust:exact!important;-webkit-print-color-adjust:exact!important}
-                    }
-                `;
+                styleEl.textContent = buildMultiPagePrintStylesheet(profile);
                 window.print();
                 setTimeout(()=>{
                     currentCanvas = prevCanvas;
@@ -6593,7 +6641,7 @@ document.addEventListener('DOMContentLoaded', ()=>{
             printContainer.style.position = 'absolute';
             printContainer.style.left = '-9999px';
             printContainer.style.top = '0';
-            printContainer.style.width = `${profile.width}cm`;
+            printContainer.style.width = `${getBleedLayoutForProfile(profile).pageW}cm`;
             // Height is auto - pages will be stacked naturally
             printContainer.style.height = 'auto';
             
@@ -6607,10 +6655,29 @@ document.addEventListener('DOMContentLoaded', ()=>{
                 
                 const page = document.createElement('div');
                 page.className = 'print-page';
-                page.style.width = `${profile.width}cm`;
-                page.style.height = `${profile.height}cm`;
+                const bleedLayout = getBleedLayoutForProfile(profile);
+                const W = bleedLayout.W;
+                const H = bleedLayout.H;
+                const trim = document.createElement('div');
+                trim.className = 'print-page-trim';
+                trim.style.width = `${W}cm`;
+                trim.style.height = `${H}cm`;
+                trim.style.position = 'relative';
+                trim.style.overflow = 'hidden';
+                trim.style.flexShrink = '0';
+                if(bleedLayout.bleedOn){
+                    page.style.width = `${bleedLayout.pageW}cm`;
+                    page.style.height = `${bleedLayout.pageH}cm`;
+                    page.style.display = 'flex';
+                    page.style.alignItems = 'center';
+                    page.style.justifyContent = 'center';
+                    page.style.background = bleedLayout.pageBg;
+                } else {
+                    page.style.width = `${W}cm`;
+                    page.style.height = `${H}cm`;
+                    page.style.background = '#ffffff';
+                }
                 page.style.position = 'relative';
-                page.style.background = '#fff';
                 page.style.overflow = 'hidden';
                 // Set pageBreakAfter only for last page - let CSS handle the rest
                 if(isLastPage){
@@ -7030,8 +7097,9 @@ document.addEventListener('DOMContentLoaded', ()=>{
                         }
                     }
                     
-                    page.appendChild(d);
+                    trim.appendChild(d);
                 });
+                page.appendChild(trim);
                 
                 return page;
             }
@@ -7119,25 +7187,7 @@ document.addEventListener('DOMContentLoaded', ()=>{
                     styleEl.id = styleId;
                     document.head.appendChild(styleEl);
                 }
-                styleEl.textContent = `
-                    @media print{
-                        @page{
-                            size: ${profile.width}cm ${profile.height}cm;
-                            margin: 0;
-                            padding: 0;
-                            marks: none;
-                            bleed: 0;
-                        }
-                        html,body{margin:0!important;padding:0!important;background:#fff!important;width:${profile.width}cm!important;height:auto!important}
-                        #toolbar,#sidebar,#marquee,.status-message{display:none!important}
-                        .print-page{width:${profile.width}cm!important;height:${profile.height}cm!important;page-break-inside:avoid!important;overflow:visible!important;background:#fff!important;position:relative!important;margin:0!important;padding:0!important;display:block!important;box-sizing:border-box!important}
-                        .print-page:not(:last-child){page-break-after:always!important}
-                        .print-page:last-child{page-break-after:auto!important}
-                        .print-container{display:block!important;position:static!important;left:auto!important;top:auto!important}
-                        #main-content,#canvas-container,#canvas-wrapper,#label-canvas{display:none!important}
-                        .label-element{print-color-adjust:exact!important;-webkit-print-color-adjust:exact!important}
-                    }
-                `;
+                styleEl.textContent = buildMultiPagePrintStylesheet(profile);
                 
                 // Print
                 window.print();
@@ -7195,7 +7245,7 @@ document.addEventListener('DOMContentLoaded', ()=>{
         printContainer.style.position = 'absolute';
         printContainer.style.left = '-9999px';
         printContainer.style.top = '0';
-        printContainer.style.width = `${profile.width}cm`;
+        printContainer.style.width = `${getBleedLayoutForProfile(profile).pageW}cm`;
         // Height is auto - pages will be stacked naturally
         printContainer.style.height = 'auto';
         
@@ -7209,10 +7259,29 @@ document.addEventListener('DOMContentLoaded', ()=>{
             
             const page = document.createElement('div');
             page.className = 'print-page';
-            page.style.width = `${profile.width}cm`;
-            page.style.height = `${profile.height}cm`;
+            const bleedLayout = getBleedLayoutForProfile(profile);
+            const W = bleedLayout.W;
+            const H = bleedLayout.H;
+            const trim = document.createElement('div');
+            trim.className = 'print-page-trim';
+            trim.style.width = `${W}cm`;
+            trim.style.height = `${H}cm`;
+            trim.style.position = 'relative';
+            trim.style.overflow = 'hidden';
+            trim.style.flexShrink = '0';
+            if(bleedLayout.bleedOn){
+                page.style.width = `${bleedLayout.pageW}cm`;
+                page.style.height = `${bleedLayout.pageH}cm`;
+                page.style.display = 'flex';
+                page.style.alignItems = 'center';
+                page.style.justifyContent = 'center';
+                page.style.background = bleedLayout.pageBg;
+            } else {
+                page.style.width = `${W}cm`;
+                page.style.height = `${H}cm`;
+                page.style.background = '#ffffff';
+            }
             page.style.position = 'relative';
-            page.style.background = '#fff';
             page.style.overflow = 'hidden';
             // Set pageBreakAfter only for last page - let CSS handle the rest
             if(isLastPage){
@@ -7551,8 +7620,9 @@ document.addEventListener('DOMContentLoaded', ()=>{
                     }
                 }
                 
-                page.appendChild(d);
+                trim.appendChild(d);
             });
+            page.appendChild(trim);
             
             return page;
         }
@@ -7609,25 +7679,7 @@ document.addEventListener('DOMContentLoaded', ()=>{
                 styleEl.id = styleId;
                 document.head.appendChild(styleEl);
             }
-            styleEl.textContent = `
-                @media print{
-                    @page{
-                        size: ${profile.width}cm ${profile.height}cm;
-                        margin: 0;
-                        padding: 0;
-                        marks: none;
-                        bleed: 0;
-                    }
-                    html,body{margin:0!important;padding:0!important;background:#fff!important;width:${profile.width}cm!important;height:auto!important}
-                    #toolbar,#sidebar,#marquee,.status-message{display:none!important}
-                    .print-page{width:${profile.width}cm!important;height:${profile.height}cm!important;page-break-inside:avoid!important;overflow:visible!important;background:#fff!important;position:relative!important;margin:0!important;padding:0!important;display:block!important;box-sizing:border-box!important}
-                    .print-page:not(:last-child){page-break-after:always!important}
-                    .print-page:last-child{page-break-after:auto!important}
-                    .print-container{display:block!important;position:static!important;left:auto!important;top:auto!important}
-                    #main-content,#canvas-container,#canvas-wrapper,#label-canvas{display:none!important}
-                    .label-element{print-color-adjust:exact!important;-webkit-print-color-adjust:exact!important}
-                }
-            `;
+            styleEl.textContent = buildMultiPagePrintStylesheet(profile);
             
             // Print
             window.print();
