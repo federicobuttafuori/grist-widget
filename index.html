@@ -8281,6 +8281,18 @@ document.addEventListener('DOMContentLoaded', ()=>{
             const dy = my - ctx.startMouseY;
             let nw = ctx.startWidth + dx;
             let nh = ctx.startHeight + dy;
+            
+            // Shift key constraint: allow only horizontal or vertical resize
+            if(e.shiftKey){
+                if(Math.abs(dx) >= Math.abs(dy)){
+                    // Horizontal resize only
+                    nh = ctx.startHeight;
+                } else {
+                    // Vertical resize only
+                    nw = ctx.startWidth;
+                }
+            }
+            
             if(ctx.el.lockAspectRatio && ctx.startWidth > 0 && ctx.startHeight > 0){
                 const scale = nw / ctx.startWidth;
                 nw = ctx.startWidth * scale;
