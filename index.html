@@ -2769,7 +2769,7 @@ document.addEventListener('DOMContentLoaded', ()=>{
             return result;
         }
 
-        // Helper function to replace **column** or @column@ syntax with actual data
+        // Helper function to replace @column@ syntax with actual data
         function replaceColumnSyntax(str, el, waveContext = null){
             if(!str || typeof str !== 'string') return str;
             const hasR = R && typeof R === 'object';
@@ -3062,9 +3062,9 @@ document.addEventListener('DOMContentLoaded', ()=>{
             const originalPrefix = prefix;
             const originalSuffix = suffix;
             
-            // For text fields, check if **column** or @column@ syntax is used in the text itself (not prefix/suffix)
+            // For text fields, check if @column@ syntax is used in the text itself (not prefix/suffix)
             // Prefix and suffix can have column syntax independently
-            const hasColumnSyntaxInText = text.includes('**') || text.includes('@') || text.includes('$$');
+            const hasColumnSyntaxInText = text.includes('@') || text.includes('$$');
             
             // Handle boundColumn with waveContext support
             // If waveContext is provided and element has boundColumn that matches a wave weight column, use waveContext.weightColumn
@@ -3103,12 +3103,12 @@ document.addEventListener('DOMContentLoaded', ()=>{
                 }
             }
             
-            // Process mathematical expressions first ($$...$$), then **column** syntax
-            // This allows math expressions to use **column** syntax inside them
+            // Process mathematical expressions first ($$...$$), then @column@ syntax
+            // This allows math expressions to use @column@ syntax inside them
             prefix = processMathExpressions(prefix, el, waveContext);
             suffix = processMathExpressions(suffix, el, waveContext);
             
-            // Always process prefix and suffix for **column** syntax (they work independently)
+            // Always process prefix and suffix for @column@ syntax (they work independently)
             prefix = replaceColumnSyntax(prefix, el, waveContext);
             suffix = replaceColumnSyntax(suffix, el, waveContext);
             // Use waveSequenceIndex if waveContext is provided, otherwise use sequenceIndex
@@ -3116,20 +3116,20 @@ document.addEventListener('DOMContentLoaded', ()=>{
             prefix = applySequencePlaceholder(prefix, effectiveSequenceIndex);
             suffix = applySequencePlaceholder(suffix, effectiveSequenceIndex);
             
-            // Handle **column** syntax and math expressions for text, data, barcode, and qr fields
+            // Handle @column@ syntax and math expressions for text, data, barcode, and qr fields
             if(el.type === 'text' || el.type === 'data' || el.type === 'barcode' || el.type === 'qr'){
                 // Process mathematical expressions first ($$...$$)
                 text = processMathExpressions(text, el, waveContext);
                 
-                // Process text for **column** syntax
+                // Process text for @column@ syntax
                 text = replaceColumnSyntax(text, el, waveContext);
                 
-                // Apply **sequence** placeholder after column syntax
+                // Apply @sequence@ placeholder after column syntax
                 text = applySequencePlaceholder(text, effectiveSequenceIndex);
             }
             
-            // Handle boundColumn (legacy support) - only if **column** syntax wasn't used in text itself
-            // For text fields, we can use boundColumn even if prefix/suffix have **column** syntax
+            // Handle boundColumn (legacy support) - only if @column@ syntax wasn't used in text itself
+            // For text fields, we can use boundColumn even if prefix/suffix have @column@ syntax
             // Print single: use overrideWeight when boundColumn is a weight column
             const boundIsWeightColumn = boundColumnToUse && packWaves.some(wave => areSameColumnRef(wave.weightColumn, boundColumnToUse));
             const useOverrideForBound = waveContext && waveContext.overrideWeight !== undefined && boundIsWeightColumn;
@@ -3197,7 +3197,7 @@ document.addEventListener('DOMContentLoaded', ()=>{
         return false;
     }
 
-    /** Column refs from **col** / @col@ (same as replaceColumnSyntax); skips **sequence** placeholder name */
+    /** Column refs from @col@; skips @sequence@ placeholder name */
     function columnRefsFromTextMentions(str){
         if(!str || typeof str !== 'string') return [];
         const seen = Object.create(null);
@@ -3207,7 +3207,6 @@ document.addEventListener('DOMContentLoaded', ()=>{
             if(!t || /^sequence$/i.test(t)) return;
             if(!seen[t]){ seen[t] = 1; refs.push(t); }
         }
-        str.replace(/\*\*([^*]+)\*\*/g, (_, col) => { add(col); return ''; });
         str.replace(/@([^@]+)@/g, (_, col) => { add(col); return ''; });
         return refs;
     }
