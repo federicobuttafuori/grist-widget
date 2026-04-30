@@ -2660,6 +2660,76 @@ document.addEventListener('DOMContentLoaded', ()=>{
             return null;
         }
 
+        // Helper function to process JavaScript expressions delimited by {{}}
+        function processJavaScriptExpressions(str, el, waveContext = null){
+            if(!str || typeof str !== 'string' || !R || typeof R !== 'object') return str;
+            
+            // Helper functions available in JavaScript context
+            const helpers = {
+                TODAY: () => new Date(),
+                NOW: () => new Date(),
+                FORMAT_DATE: (date, format = 'DD/MM/YYYY') => {
+                    if(!date) return '';
+                    const d = new Date(date);
+                    if(isNaN(d.getTime())) return String(date);
+                    const pad = n => String(n).padStart(2, '0');
+                    const Y = d.getFullYear();
+                    const M = pad(d.getMonth() + 1);
+                    const D = pad(d.getDate());
+                    const H = pad(d.getHours());
+                    const m = pad(d.getMinutes());
+                    const s = pad(d.getSeconds());
+                    return format.replace(/YYYY/g, Y).replace(/YY/g, String(Y).slice(-2))
+                        .replace(/MM/g, M).replace(/DD/g, D).replace(/dd/g, D)
+                        .replace(/HH/g, H).replace(/mm/g, m).replace(/ss/g, s);
+                },
+                UPPER: (text) => text ? String(text).toUpperCase() : '',
+                LOWER: (text) => text ? String(text).toLowerCase() : ''
+            };
+            
+            let result = str.replace(/\{\{([^}]+)\}\}/g, (match, expression) => {
+                try {
+                    // Replace @column@ syntax with actual values
+                    let processedExpression = expression.replace(/@([^@]+)@/g, (colMatch, columnId) => {
+                        const columnValue = getRecordValueByColumnRef(columnId.trim());
+                        if(columnValue.found){
+                            const v = columnValue.value;
+                            // Handle different data types
+                            if(v === null || v === undefined) return 'null';
+                            if(typeof v === 'string') return '"' + v.replace(/"/g, '\\"') + '"';
+                            if(typeof v === 'number') return String(v);
+                            if(typeof v === 'boolean') return String(v);
+                            if(v instanceof Date) return 'new Date("' + v.toISOString() + '")';
+                            return '"' + String(v).replace(/"/g, '\\"') + '"';
+                        }
+                        return 'null';
+                    });
+                    
+                    // Create function with helpers in scope
+                    const helperNames = Object.keys(helpers).join(', ');
+                    const helperValues = Object.values(helpers);
+                    const func = new Function(helperNames, `"use strict"; try { return (${processedExpression}); } catch(e) { return '[JS Error: ' + e.message + ']'; }`);
+                    
+                    // Execute the function with helpers
+                    const jsResult = func(...helperValues);
+                    
+                    // Convert result to string
+                    if(jsResult === null || jsResult === undefined) return '';
+                    if(typeof jsResult === 'string') return jsResult;
+                    if(typeof jsResult === 'number') return String(jsResult);
+                    if(typeof jsResult === 'boolean') return String(jsResult);
+                    if(jsResult instanceof Date) return jsResult.toLocaleDateString();
+                    return String(jsResult);
+                    
+                } catch(e) {
+                    // Return original expression if evaluation fails
+                    return match;
+                }
+            });
+            
+            return result;
+        }
+
         // Helper function to process mathematical expressions delimited by $$
         // Supports syntax: $$expression$decimals$ where decimals is optional number of decimal places
         function processMathExpressions(str, el, waveContext = null){
@@ -3064,7 +3134,7 @@ document.addEventListener('DOMContentLoaded', ()=>{
             
             // For text fields, check if @column@ syntax is used in the text itself (not prefix/suffix)
             // Prefix and suffix can have column syntax independently
-            const hasColumnSyntaxInText = text.includes('@') || text.includes('$$');
+            const hasColumnSyntaxInText = text.includes('@') || text.includes('$$') || text.includes('{{');
             
             // Handle boundColumn with waveContext support
             // If waveContext is provided and element has boundColumn that matches a wave weight column, use waveContext.weightColumn
@@ -3090,9 +3160,10 @@ document.addEventListener('DOMContentLoaded', ()=>{
                     // This allows the boundColumn value to be used in math expressions while preserving any text outside $$
                     const combinedExpression = originalPrefix + '@' + boundColumnToUse + '@' + originalSuffix;
                     
-                    // Process the combined expression completely (math expressions first, then column syntax)
-                    // This will process $$...$$ or $$...$number$ expressions and leave other text unchanged
+                    // Process the combined expression completely (math expressions first, then JavaScript, then column syntax)
+                    // This will process $$...$$ or $$...$number$ expressions and {{...}} expressions and leave other text unchanged
                     let processedExpression = processMathExpressions(combinedExpression, el, waveContext);
+                    processedExpression = processJavaScriptExpressions(processedExpression, el, waveContext);
                     processedExpression = replaceColumnSyntax(processedExpression, el, waveContext);
                     
                     // Use waveSequenceIndex if waveContext is provided, otherwise use sequenceIndex
@@ -3103,10 +3174,12 @@ document.addEventListener('DOMContentLoaded', ()=>{
                 }
             }
             
-            // Process mathematical expressions first ($$...$$), then @column@ syntax
-            // This allows math expressions to use @column@ syntax inside them
+            // Process mathematical expressions first ($$...$$), then JavaScript expressions ({{...}}), then @column@ syntax
+            // This allows expressions to use @column@ syntax inside them
             prefix = processMathExpressions(prefix, el, waveContext);
+            prefix = processJavaScriptExpressions(prefix, el, waveContext);
             suffix = processMathExpressions(suffix, el, waveContext);
+            suffix = processJavaScriptExpressions(suffix, el, waveContext);
             
             // Always process prefix and suffix for @column@ syntax (they work independently)
             prefix = replaceColumnSyntax(prefix, el, waveContext);
@@ -3116,11 +3189,12 @@ document.addEventListener('DOMContentLoaded', ()=>{
             prefix = applySequencePlaceholder(prefix, effectiveSequenceIndex);
             suffix = applySequencePlaceholder(suffix, effectiveSequenceIndex);
             
-            // Handle @column@ syntax and math expressions for text, data, barcode, and qr fields
+            // Handle @column@ syntax, math expressions, and JavaScript expressions for text, data, barcode, and qr fields
             if(el.type === 'text' || el.type === 'data' || el.type === 'barcode' || el.type === 'qr'){
                 // Process mathematical expressions first ($$...$$)
                 text = processMathExpressions(text, el, waveContext);
-                
+                // Process JavaScript expressions ({{...}})
+                text = processJavaScriptExpressions(text, el, waveContext);
                 // Process text for @column@ syntax
                 text = replaceColumnSyntax(text, el, waveContext);
                 
