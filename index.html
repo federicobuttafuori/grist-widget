@@ -4057,7 +4057,6 @@ document.addEventListener('DOMContentLoaded', ()=>{
                         if(!el.props.regexRules) el.props.regexRules = [];
                         if(!el.props.regexRules[index]) return;
                         el.props.regexRules[index].pattern = this.value;
-                        render();
                         saveCurrentDesign();
                         if(el.masterThreadId){
                             const t = getMasterThread(el.masterThreadId);
