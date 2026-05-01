@@ -5558,7 +5558,7 @@ document.addEventListener('DOMContentLoaded', ()=>{
             if(!firstElement) return;
             
             const thread = createMasterThread(threadName || undefined, firstElement);
-            ['props.boundColumn','props.prefix','props.suffix','props.text','props.fallbackLink','props.normalizeForBw'].forEach(propKey => {
+            ['props.boundColumn','props.prefix','props.suffix','props.text','props.fallbackLink','props.normalizeForBw','props.regexRules'].forEach(propKey => {
                 const v = getElementPropValue(firstElement, propKey);
                 if(v !== undefined) thread.data[propKey] = v;
             });
