@@ -3108,6 +3108,9 @@ document.addEventListener('DOMContentLoaded', ()=>{
             if(rule.fontSize && rule.fontSize !== '' && rule.fontSize !== 'inherit'){
                 styles.push(`font-size: ${rule.fontSize}px`);
             }
+            if(rule.lineHeight && rule.lineHeight !== '' && rule.lineHeight !== 'inherit'){
+                styles.push(`line-height: ${rule.lineHeight}`);
+            }
             
             const styleStr = styles.length > 0 ? ` style="${styles.join('; ')}"` : '';
             htmlParts.push(`<span${styleStr}>${escapeHtml(match.text)}</span>`);
@@ -3839,6 +3842,10 @@ document.addEventListener('DOMContentLoaded', ()=>{
                     h += `<input type="number" class="regex-size-input" data-rule-index="${index}" placeholder="inherit" value="${rule.fontSize || ''}" min="6" max="200" step="1" style="font-size:12px;padding:4px">`;
                     h += `</div>`;
                     h += `<div class="prop-grid" style="grid-template-columns:1fr 1fr;gap:6px">`;
+                    h += `<label style="font-size:12px">Line Height:</label>`;
+                    h += `<input type="number" class="regex-line-height-input" data-rule-index="${index}" placeholder="inherit" value="${rule.lineHeight || ''}" min="0.5" max="3" step="0.1" style="font-size:12px;padding:4px">`;
+                    h += `</div>`;
+                    h += `<div class="prop-grid" style="grid-template-columns:1fr 1fr;gap:6px">`;
                     h += `<label style="font-size:12px;display:flex;align-items:center;gap:4px"><input type="checkbox" class="regex-italic-checkbox" data-rule-index="${index}" ${rule.italic ? 'checked' : ''} style="width:auto"> Italic</label>`;
                     h += `<label style="font-size:12px;display:flex;align-items:center;gap:4px"><input type="checkbox" class="regex-underline-checkbox" data-rule-index="${index}" ${rule.underline ? 'checked' : ''} style="width:auto"> Underline</label>`;
                     h += `</div>`;
@@ -4087,6 +4094,22 @@ document.addEventListener('DOMContentLoaded', ()=>{
                         if(!el.props.regexRules[index]) return;
                         const val = this.value.trim();
                         el.props.regexRules[index].fontSize = val === '' ? '' : Number(val);
+                        render();
+                        saveCurrentDesign();
+                        if(el.masterThreadId){
+                            const t = getMasterThread(el.masterThreadId);
+                            if(t && isPropSynced(t, 'props.regexRules')) syncPropertyToThread(el.masterThreadId, 'props.regexRules', getElementPropValue(el, 'props.regexRules'));
+                        }
+                    });
+                });
+                
+                pp.querySelectorAll('.regex-line-height-input').forEach(input => {
+                    input.addEventListener('input', function(){
+                        const index = parseInt(this.dataset.ruleIndex);
+                        if(!el.props.regexRules) el.props.regexRules = [];
+                        if(!el.props.regexRules[index]) return;
+                        const val = this.value.trim();
+                        el.props.regexRules[index].lineHeight = val === '' ? '' : Number(val);
                         render();
                         saveCurrentDesign();
                         if(el.masterThreadId){
@@ -10001,6 +10024,10 @@ document.addEventListener('DOMContentLoaded', ()=>{
                     <input type="number" class="global-regex-size-input" data-rule-index="${index}" placeholder="inherit" value="${rule.fontSize || ''}" min="6" max="200" step="1" style="font-size:12px;padding:4px">
                 </div>
                 <div class="prop-grid" style="grid-template-columns:1fr 1fr;gap:6px">
+                    <label style="font-size:12px">Line Height:</label>
+                    <input type="number" class="global-regex-line-height-input" data-rule-index="${index}" placeholder="inherit" value="${rule.lineHeight || ''}" min="0.5" max="3" step="0.1" style="font-size:12px;padding:4px">
+                </div>
+                <div class="prop-grid" style="grid-template-columns:1fr 1fr;gap:6px">
                     <label style="font-size:12px;display:flex;align-items:center;gap:4px"><input type="checkbox" class="global-regex-italic-checkbox" data-rule-index="${index}" ${rule.italic ? 'checked' : ''} style="width:auto"> Italic</label>
                     <label style="font-size:12px;display:flex;align-items:center;gap:4px"><input type="checkbox" class="global-regex-underline-checkbox" data-rule-index="${index}" ${rule.underline ? 'checked' : ''} style="width:auto"> Underline</label>
                 </div>
@@ -10052,7 +10079,8 @@ document.addEventListener('DOMContentLoaded', ()=>{
         if(e.target.classList.contains('global-regex-weight-select') ||
            e.target.classList.contains('global-regex-italic-checkbox') ||
            e.target.classList.contains('global-regex-underline-checkbox') ||
-           e.target.classList.contains('global-regex-size-input')){
+           e.target.classList.contains('global-regex-size-input') ||
+           e.target.classList.contains('global-regex-line-height-input')){
             const index = parseInt(e.target.dataset.ruleIndex);
             if(!globalRegexRules) globalRegexRules = [];
             if(!globalRegexRules[index]) return;
@@ -10066,6 +10094,9 @@ document.addEventListener('DOMContentLoaded', ()=>{
             } else if(e.target.classList.contains('global-regex-size-input')){
                 const val = e.target.value.trim();
                 globalRegexRules[index].fontSize = val === '' ? '' : Number(val);
+            } else if(e.target.classList.contains('global-regex-line-height-input')){
+                const val = e.target.value.trim();
+                globalRegexRules[index].lineHeight = val === '' ? '' : Number(val);
             }
 
             render();
