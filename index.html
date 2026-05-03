@@ -499,6 +499,8 @@ document.addEventListener('DOMContentLoaded', ()=>{
     const pp = document.getElementById('properties-panel');
     /** Evita che grist.onRecord faccia innerHTML sul pannello mentre l'utente edita (tastiera mobile che si chiude). */
     let deferredRecordPropsRefresh = false;
+    /** Dopo sync thread su props.regexRules senza refresh pannello (digitazione pattern), esegui updateProps quando il focus esce dai campi del pannello. */
+    let pendingRegexRulesPropsRefresh = false;
     function isEditingPropertiesPanel(){
         const ae = document.activeElement;
         if(!ae || !pp || !pp.contains(ae)) return false;
@@ -4067,8 +4069,24 @@ document.addEventListener('DOMContentLoaded', ()=>{
                         saveCurrentDesign();
                         if(el.masterThreadId){
                             const t = getMasterThread(el.masterThreadId);
-                            if(t && isPropSynced(t, 'props.regexRules')) syncPropertyToThread(el.masterThreadId, 'props.regexRules', getElementPropValue(el, 'props.regexRules'));
+                            if(t && isPropSynced(t, 'props.regexRules')){
+                                syncPropertyToThread(el.masterThreadId, 'props.regexRules', getElementPropValue(el, 'props.regexRules'), { skipUpdateProps: true });
+                            } else {
+                                render();
+                            }
+                        } else {
+                            render();
                         }
+                    });
+                    input.addEventListener('blur', function(){
+                        requestAnimationFrame(() => {
+                            const ae = document.activeElement;
+                            if(ae && pp.contains(ae) && (ae.tagName === 'INPUT' || ae.tagName === 'TEXTAREA' || ae.tagName === 'SELECT')) return;
+                            if(pendingRegexRulesPropsRefresh){
+                                pendingRegexRulesPropsRefresh = false;
+                                updateProps();
+                            }
+                        });
                     });
                 });
                 
@@ -5385,11 +5403,12 @@ document.addEventListener('DOMContentLoaded', ()=>{
             });
         }
 
-        function syncPropertyToThread(threadId, propKey, value){
+        function syncPropertyToThread(threadId, propKey, value, opts){
             const thread = getMasterThread(threadId);
             if(!thread) return;
             const normalizedKey = ['boundColumn','prefix','suffix','text','fallbackLink'].includes(propKey) ? 'props.' + propKey : propKey;
             if(!thread.syncedProps || !thread.syncedProps.includes(normalizedKey)) return;
+            const skipUpdateProps = opts && opts.skipUpdateProps === true;
             
             pushBeforeChange();
             
@@ -5405,7 +5424,12 @@ document.addEventListener('DOMContentLoaded', ()=>{
 
             saveCurrentDesign();
             render();
-            updateProps();
+            if(skipUpdateProps){
+                pendingRegexRulesPropsRefresh = true;
+            } else {
+                pendingRegexRulesPropsRefresh = false;
+                updateProps();
+            }
         }
 
         /** After resize or multi-edit, push width/height into the master thread so all synced instances match. */
