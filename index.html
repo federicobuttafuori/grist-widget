@@ -8672,6 +8672,15 @@ document.addEventListener('DOMContentLoaded', ()=>{
             }
         }
 
+        // Campi numerici (Font size, Line height, padding, …): con campo vuoto o solo "-" non applicare Number('')===0 né rifare il pannello (perdita focus come col pattern regex)
+        if(target.type === 'number' && prop){
+            const rawNum = String(target.value ?? '').trim();
+            if(rawNum === '' || rawNum === '-'){
+                saveCurrentDesign();
+                return;
+            }
+        }
+
         // Handle bound column search input
         if(prop === 'bind_search'){
                 // Clear previous debounce timer
@@ -8941,16 +8950,27 @@ document.addEventListener('DOMContentLoaded', ()=>{
         }
     });
 
-    // Blur su textarea / input testo column-mention: sync e render
+    // Blur su textarea / input testo column-mention: sync e render; su number svuotato ripristina pannello da modello
     pp.addEventListener('blur', (e)=>{
         if(selectedIds.length === 0) return;
         
         const target = e.target;
+        const prop = target.dataset.prop;
+        const isNumEmptyBlur = target.tagName === 'INPUT' && target.type === 'number' && prop;
+        if(isNumEmptyBlur){
+            const raw = String(target.value ?? '').trim();
+            if(raw === '' || raw === '-'){
+                render();
+                saveCurrentDesign();
+                updateProps();
+                return;
+            }
+        }
+
         const isTa = target.tagName === 'TEXTAREA';
         const isColText = target.tagName === 'INPUT' && target.type === 'text' && target.classList && target.classList.contains('column-mention-input');
         if(!isTa && !isColText) return;
         
-        const prop = target.dataset.prop;
         if(!prop) return;
         
         const id = selectedIds[0];
@@ -8982,6 +9002,16 @@ document.addEventListener('DOMContentLoaded', ()=>{
         // Textarea e input testo column-mention: gestiti da blur
         if(target.tagName === 'TEXTAREA') return;
         if(target.tagName === 'INPUT' && target.type === 'text' && target.classList && target.classList.contains('column-mention-input')) return;
+
+        if(target.type === 'number'){
+            const raw = String(target.value ?? '').trim();
+            if(raw === '' || raw === '-'){
+                render();
+                saveCurrentDesign();
+                updateProps();
+                return;
+            }
+        }
         
         if(selectedIds.length === 1){
             const id = selectedIds[0];
