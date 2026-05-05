@@ -499,7 +499,7 @@ document.addEventListener('DOMContentLoaded', ()=>{
     const pp = document.getElementById('properties-panel');
     /** Evita che grist.onRecord faccia innerHTML sul pannello mentre l'utente edita (tastiera mobile che si chiude). */
     let deferredRecordPropsRefresh = false;
-    /** Dopo sync thread su props.regexRules senza refresh pannello (digitazione pattern), esegui updateProps quando il focus esce dai campi del pannello. */
+    /** Dopo sync thread su regex (pattern-only o props.regexRules) con skipUpdateProps, refresh pannello quando il focus esce dai campi. */
     let pendingRegexRulesPropsRefresh = false;
     function isEditingPropertiesPanel(){
         const ae = document.activeElement;
@@ -3814,7 +3814,7 @@ document.addEventListener('DOMContentLoaded', ()=>{
                 
                 // Regex formatting rules section
                 if(!el.props.regexRules) el.props.regexRules = [];
-                h += `<hr><div style="margin-top:8px"><div class="prop-grid-label-sync" style="margin-bottom:8px"><label>Regex Formatting Rules</label>${syncBtn('props.regexRules')}</div>`;
+                h += `<hr><div style="margin-top:8px"><div class="prop-grid-label-sync" style="margin-bottom:8px;flex-wrap:wrap;gap:8px"><label>Regex Formatting Rules</label><span style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-left:auto"><span style="display:inline-flex;align-items:center;gap:4px;font-size:11px;font-weight:600" title="Sincronizza solo i testi pattern tra elementi collegati; font e stile restano di questo design">${syncBtn('props.regexRules.pattern')}Pattern</span><span style="display:inline-flex;align-items:center;gap:4px;font-size:11px;font-weight:600" title="Sincronizza tutte le regole (pattern + formattazione)">${syncBtn('props.regexRules')}Tutto</span></span></div>`;
                 h += `<div id="regex-rules-container-${el.id}" style="display:flex;flex-direction:column;gap:8px">`;
                 el.props.regexRules.forEach((rule, index) => {
                     h += `<div class="regex-rule-item" data-rule-index="${index}" style="border:1px solid #ddd;border-radius:4px;padding:8px;background:#f9f9f9">`;
@@ -3822,7 +3822,7 @@ document.addEventListener('DOMContentLoaded', ()=>{
                     h += `<label style="font-size:12px;font-weight:600">Rule ${index + 1}</label>`;
                     h += `<button type="button" class="remove-regex-rule-btn" data-rule-index="${index}" style="padding:2px 6px;font-size:11px;background:#ff4444;color:#fff;border:none;border-radius:3px;cursor:pointer">Remove</button>`;
                     h += `</div>`;
-                    h += `<label style="font-size:12px;display:block;margin-bottom:4px">Pattern:</label>`;
+                    h += `<label style="font-size:12px;display:block;margin-bottom:4px" class="${labelClass('props.regexRules.pattern')}">Pattern:</label>`;
                     h += `<textarea class="regex-pattern-input" data-rule-index="${index}" placeholder="e.g., \\d+|[A-Z]+" style="font-size:12px;padding:4px;margin-bottom:6px;font-family:monospace;width:100%;min-height:150px;resize:vertical">${escapeHtml(rule.pattern || '')}</textarea>`;
                     h += `<div class="prop-grid" style="grid-template-columns:1fr 1fr;gap:6px;margin-bottom:4px">`;
                     h += `<label style="font-size:12px">Font Weight:</label>`;
@@ -4036,10 +4036,7 @@ document.addEventListener('DOMContentLoaded', ()=>{
                         updateProps();
                         render();
                         saveCurrentDesign();
-                        if(el.masterThreadId){
-                            const t = getMasterThread(el.masterThreadId);
-                            if(t && isPropSynced(t, 'props.regexRules')) syncPropertyToThread(el.masterThreadId, 'props.regexRules', getElementPropValue(el, 'props.regexRules'));
-                        }
+                        trySyncRegexLinkedProps(el);
                     });
                 }
                 
@@ -4052,10 +4049,7 @@ document.addEventListener('DOMContentLoaded', ()=>{
                         updateProps();
                         render();
                         saveCurrentDesign();
-                        if(el.masterThreadId){
-                            const t = getMasterThread(el.masterThreadId);
-                            if(t && isPropSynced(t, 'props.regexRules')) syncPropertyToThread(el.masterThreadId, 'props.regexRules', getElementPropValue(el, 'props.regexRules'));
-                        }
+                        trySyncRegexLinkedProps(el);
                     });
                 });
                 
@@ -4067,16 +4061,7 @@ document.addEventListener('DOMContentLoaded', ()=>{
                         if(!el.props.regexRules[index]) return;
                         el.props.regexRules[index].pattern = this.value;
                         saveCurrentDesign();
-                        if(el.masterThreadId){
-                            const t = getMasterThread(el.masterThreadId);
-                            if(t && isPropSynced(t, 'props.regexRules')){
-                                syncPropertyToThread(el.masterThreadId, 'props.regexRules', getElementPropValue(el, 'props.regexRules'), { skipUpdateProps: true });
-                            } else {
-                                render();
-                            }
-                        } else {
-                            render();
-                        }
+                        if(!trySyncRegexLinkedProps(el, { skipUpdateProps: true })) render();
                     });
                     input.addEventListener('blur', function(){
                         requestAnimationFrame(() => {
@@ -4098,10 +4083,7 @@ document.addEventListener('DOMContentLoaded', ()=>{
                         el.props.regexRules[index].fontWeight = this.value;
                         render();
                         saveCurrentDesign();
-                        if(el.masterThreadId){
-                            const t = getMasterThread(el.masterThreadId);
-                            if(t && isPropSynced(t, 'props.regexRules')) syncPropertyToThread(el.masterThreadId, 'props.regexRules', getElementPropValue(el, 'props.regexRules'));
-                        }
+                        trySyncRegexLinkedProps(el);
                     });
                 });
                 
@@ -4114,10 +4096,7 @@ document.addEventListener('DOMContentLoaded', ()=>{
                         el.props.regexRules[index].fontSize = val === '' ? '' : Number(val);
                         render();
                         saveCurrentDesign();
-                        if(el.masterThreadId){
-                            const t = getMasterThread(el.masterThreadId);
-                            if(t && isPropSynced(t, 'props.regexRules')) syncPropertyToThread(el.masterThreadId, 'props.regexRules', getElementPropValue(el, 'props.regexRules'));
-                        }
+                        trySyncRegexLinkedProps(el);
                     });
                 });
                 
@@ -4130,10 +4109,7 @@ document.addEventListener('DOMContentLoaded', ()=>{
                         el.props.regexRules[index].lineHeight = val === '' ? '' : Number(val);
                         render();
                         saveCurrentDesign();
-                        if(el.masterThreadId){
-                            const t = getMasterThread(el.masterThreadId);
-                            if(t && isPropSynced(t, 'props.regexRules')) syncPropertyToThread(el.masterThreadId, 'props.regexRules', getElementPropValue(el, 'props.regexRules'));
-                        }
+                        trySyncRegexLinkedProps(el);
                     });
                 });
                 
@@ -4145,10 +4121,7 @@ document.addEventListener('DOMContentLoaded', ()=>{
                         el.props.regexRules[index].italic = this.checked;
                         render();
                         saveCurrentDesign();
-                        if(el.masterThreadId){
-                            const t = getMasterThread(el.masterThreadId);
-                            if(t && isPropSynced(t, 'props.regexRules')) syncPropertyToThread(el.masterThreadId, 'props.regexRules', getElementPropValue(el, 'props.regexRules'));
-                        }
+                        trySyncRegexLinkedProps(el);
                     });
                 });
                 
@@ -4160,6 +4133,7 @@ document.addEventListener('DOMContentLoaded', ()=>{
                         el.props.regexRules[index].underline = this.checked;
                         render();
                         saveCurrentDesign();
+                        trySyncRegexLinkedProps(el);
                     });
                 });
             }
@@ -5353,10 +5327,49 @@ document.addEventListener('DOMContentLoaded', ()=>{
             return true;
         }
 
+        function regexRulesExtractPatterns(rules){
+            if(!rules || !Array.isArray(rules)) return [];
+            return rules.map(r => (r && typeof r.pattern === 'string') ? r.pattern : '');
+        }
+
+        function regexRulesEnsureRuleSlot(el, index){
+            if(!el.props) el.props = {};
+            if(!el.props.regexRules) el.props.regexRules = [];
+            while(el.props.regexRules.length <= index){
+                const ord = el.props.regexRules.length;
+                el.props.regexRules.push({
+                    pattern: '',
+                    fontWeight: 'inherit',
+                    italic: false,
+                    underline: false,
+                    fontSize: '',
+                    lineHeight: '',
+                    enabled: true,
+                    order: ord
+                });
+            }
+        }
+
+        function setElementRegexPatternsFromThread(el, patternArray){
+            if(!el) return;
+            el.props = el.props || {};
+            el.props.regexRules = el.props.regexRules || [];
+            const pa = Array.isArray(patternArray)
+                ? patternArray.map(x => String(x == null ? '' : x))
+                : [];
+            for(let i = 0; i < pa.length; i++){
+                regexRulesEnsureRuleSlot(el, i);
+                el.props.regexRules[i].pattern = pa[i];
+            }
+        }
+
         function getElementPropValue(el, propKey){
             if(!el) return undefined;
             if(propKey === 'props.regexRules'){
                 return (el.props && el.props.regexRules) ? deepCopy(el.props.regexRules) : [];
+            }
+            if(propKey === 'props.regexRules.pattern'){
+                return regexRulesExtractPatterns(el.props && el.props.regexRules);
             }
             if(propKey.includes('.')){
                 const [o, k] = propKey.split('.');
@@ -5373,11 +5386,31 @@ document.addEventListener('DOMContentLoaded', ()=>{
                 el.props.regexRules = (value && (Array.isArray(value) || typeof value === 'object')) ? deepCopy(value) : (value || []);
                 return;
             }
+            if(propKey === 'props.regexRules.pattern'){
+                setElementRegexPatternsFromThread(el, value);
+                return;
+            }
             applyPropToElement(el, propKey, value);
         }
 
         function isPropSynced(thread, propKey){
             return thread && Array.isArray(thread.syncedProps) && thread.syncedProps.includes(propKey);
+        }
+
+        /** Se l'elemento è su un thread con sync regex (solo pattern o regole intere), invia lo stato attuale al thread. Ritorna true se ha chiamato syncPropertyToThread. */
+        function trySyncRegexLinkedProps(el, opts){
+            if(!el || !el.masterThreadId) return false;
+            const t = getMasterThread(el.masterThreadId);
+            if(!t) return false;
+            if(isPropSynced(t, 'props.regexRules.pattern')){
+                syncPropertyToThread(el.masterThreadId, 'props.regexRules.pattern', regexRulesExtractPatterns(el.props && el.props.regexRules), opts || {});
+                return true;
+            }
+            if(isPropSynced(t, 'props.regexRules')){
+                syncPropertyToThread(el.masterThreadId, 'props.regexRules', getElementPropValue(el, 'props.regexRules'), opts || {});
+                return true;
+            }
+            return false;
         }
 
         function isPropOverridden(el, propKey){
@@ -5476,6 +5509,18 @@ document.addEventListener('DOMContentLoaded', ()=>{
             updateProps();
         }
 
+        /** props.regexRules (tutto) e props.regexRules.pattern (solo stringhe) non possono essere attivi insieme sullo stesso thread. */
+        function mutexRegexRulesSyncKeys(thread, activatingKey){
+            if(!thread || !Array.isArray(thread.syncedProps)) return;
+            if(activatingKey === 'props.regexRules.pattern'){
+                thread.syncedProps = thread.syncedProps.filter(p => p !== 'props.regexRules');
+                if(thread.data) delete thread.data['props.regexRules'];
+            } else if(activatingKey === 'props.regexRules'){
+                thread.syncedProps = thread.syncedProps.filter(p => p !== 'props.regexRules.pattern');
+                if(thread.data) delete thread.data['props.regexRules.pattern'];
+            }
+        }
+
         function toggleSyncState(threadId, propKey, el){
             const thread = getMasterThread(threadId);
             if(!thread) return;
@@ -5510,6 +5555,9 @@ document.addEventListener('DOMContentLoaded', ()=>{
                 el.syncedOverrides = el.syncedOverrides.slice();
                 if(!el.syncedOverrides.includes(propKey)) el.syncedOverrides.push(propKey);
             } else {
+                if(propKey === 'props.regexRules' || propKey === 'props.regexRules.pattern'){
+                    mutexRegexRulesSyncKeys(thread, propKey);
+                }
                 thread.syncedProps = thread.syncedProps.slice();
                 thread.syncedProps.push(propKey);
                 const val = getElementPropValue(el, propKey);
