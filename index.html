@@ -1881,7 +1881,7 @@ document.addEventListener('DOMContentLoaded', ()=>{
                     }
                     span.style.wordWrap='break-word';
                     
-                        setTextWithRegexFormatting(span, getData(el, sequenceIndex, waveContext), el.props.regexRules);
+                        const regexHtmlActive = setTextWithRegexFormatting(span, getData(el, sequenceIndex, waveContext), el.props.regexRules, Number(el.props.lineHeight) || 1.2);
                     // Copy font styles to span for overflow calculation
                     span.style.fontFamily = el.props.fontFamily || 'Arial, sans-serif';
                     span.style.fontSize = (el.props.fontSize || 16) + 'px';
@@ -1891,7 +1891,7 @@ document.addEventListener('DOMContentLoaded', ()=>{
                     } else {
                         span.style.fontWeight = fontWeight || 'normal';
                     }
-                    span.style.lineHeight = el.props.lineHeight !== undefined ? String(el.props.lineHeight) : '1.2';
+                    span.style.lineHeight = regexHtmlActive ? 'normal' : (el.props.lineHeight !== undefined ? String(el.props.lineHeight) : '1.2');
                     span.style.color = el.props.color || '#000000';
                     applySvgOutlineToTextContainer(el, span);
                     d.appendChild(span);
@@ -1922,7 +1922,7 @@ document.addEventListener('DOMContentLoaded', ()=>{
                     }
                     span.style.wordWrap='break-word';
                     
-                    setTextWithRegexFormatting(span, getData(el, sequenceIndex, waveContext), el.props.regexRules);
+                    const regexHtmlActiveData = setTextWithRegexFormatting(span, getData(el, sequenceIndex, waveContext), el.props.regexRules, Number(el.props.lineHeight) || 1.2);
                     // Copy font styles to span for overflow calculation
                     span.style.fontFamily = el.props.fontFamily || 'Arial, sans-serif';
                     span.style.fontSize = (el.props.fontSize || 16) + 'px';
@@ -1932,7 +1932,7 @@ document.addEventListener('DOMContentLoaded', ()=>{
                     } else {
                         span.style.fontWeight = fontWeight || 'normal';
                     }
-                    span.style.lineHeight = el.props.lineHeight !== undefined ? String(el.props.lineHeight) : '1.2';
+                    span.style.lineHeight = regexHtmlActiveData ? 'normal' : (el.props.lineHeight !== undefined ? String(el.props.lineHeight) : '1.2');
                     span.style.color = el.props.color || '#000000';
                     applySvgOutlineToTextContainer(el, span);
                     d.appendChild(span);
@@ -2992,7 +2992,7 @@ document.addEventListener('DOMContentLoaded', ()=>{
     }
 
     // Helper function to set text content with regex formatting
-    function setTextWithRegexFormatting(element, text, elementRules){
+    function setTextWithRegexFormatting(element, text, elementRules, baseLineHeight){
         // Combine global rules with element-specific rules
         const allRules = [];
         if(globalRegexRules && Array.isArray(globalRegexRules) && globalRegexRules.length > 0){
@@ -3002,11 +3002,16 @@ document.addEventListener('DOMContentLoaded', ()=>{
             allRules.push(...elementRules.filter(r => r.pattern && r.enabled !== false));
         }
 
+        const baseLh = (baseLineHeight !== undefined && baseLineHeight !== null && Number.isFinite(Number(baseLineHeight)))
+            ? Number(baseLineHeight)
+            : 1.2;
+
         if(allRules.length > 0){
-            element.innerHTML = applyRegexFormatting(text, allRules);
-        } else {
-            element.textContent = text;
+            element.innerHTML = applyRegexFormatting(text, allRules, baseLh);
+            return true;
         }
+        element.textContent = text;
+        return false;
     }
 
     /** Evita ReDoS: | finale crea alternativa vuota che matcha "" ovunque, causando loop infinito e crash. */
@@ -3021,26 +3026,21 @@ document.addEventListener('DOMContentLoaded', ()=>{
         return (p === '') ? '(?!)' : p;
     }
 
-    // Apply regex formatting rules to text
-    function applyRegexFormatting(text, rules){
-        if(!text || typeof text !== 'string' || !rules || !Array.isArray(rules) || rules.length === 0){
-            return text;
-        }
-        
-        // Sort rules by order (if they have an order property, otherwise keep original order)
-        const sortedRules = [...rules].sort((a, b) => (a.order || 0) - (b.order || 0));
-        
+    function ruleLineHeightNumeric(rule){
+        if(!rule || rule.lineHeight === '' || rule.lineHeight === 'inherit') return null;
+        const n = Number(rule.lineHeight);
+        return Number.isFinite(n) ? n : null;
+    }
+
+    function collectNonOverlappingMatchesForSegment(segmentText, sortedRules){
         const matches = [];
-        
-        // Collect all matches from all rules
         sortedRules.forEach((rule, ruleIndex) => {
             if(!rule.pattern || rule.enabled === false) return;
-            
             try {
                 const safePattern = sanitizeRegexPattern(rule.pattern);
                 const regex = new RegExp(safePattern, 'g');
                 let match;
-                while((match = regex.exec(text)) !== null){
+                while((match = regex.exec(segmentText)) !== null){
                     matches.push({
                         ruleIndex,
                         start: match.index,
@@ -3050,54 +3050,46 @@ document.addEventListener('DOMContentLoaded', ()=>{
                     });
                 }
             } catch(e){
-                // Invalid regex, skip this rule
                 console.warn('Invalid regex pattern:', rule.pattern, e);
             }
         });
-        
-        // If no matches, return original text
-        if(matches.length === 0){
-            return escapeHtml(text);
-        }
-        
-        // Sort matches by position
+
+        if(matches.length === 0) return [];
+
         matches.sort((a, b) => {
             if(a.start !== b.start) return a.start - b.start;
-            // If same start, prefer longer matches
             return b.end - a.end;
         });
-        
-        // Remove overlapping matches (keep first/longest)
+
         const nonOverlapping = [];
         for(let i = 0; i < matches.length; i++){
-            const match = matches[i];
+            const m = matches[i];
             let overlaps = false;
             for(let j = 0; j < nonOverlapping.length; j++){
                 const existing = nonOverlapping[j];
-                if(match.start < existing.end && match.end > existing.start){
+                if(m.start < existing.end && m.end > existing.start){
                     overlaps = true;
                     break;
                 }
             }
-            if(!overlaps){
-                nonOverlapping.push(match);
-            }
+            if(!overlaps) nonOverlapping.push(m);
         }
-        
-        // Build HTML with formatting
+        return nonOverlapping;
+    }
+
+    /** Costruisce HTML per un segmento avendo già i match (evita doppie regex). segFloor: interlinea del blocco riga (min base vs regole che matchano). */
+    function buildRegexMatchSpanHtml(segmentText, nonOverlapping, segFloor){
         const htmlParts = [];
         let currentIndex = 0;
-        
+
         nonOverlapping.forEach(match => {
-            // Add text before match
             if(match.start > currentIndex){
-                htmlParts.push(escapeHtml(text.substring(currentIndex, match.start)));
+                htmlParts.push(escapeHtml(segmentText.substring(currentIndex, match.start)));
             }
-            
-            // Build style string for this match
+
             const styles = [];
             const rule = match.rule;
-            
+
             if(rule.fontWeight && rule.fontWeight !== 'inherit'){
                 styles.push(`font-weight: ${rule.fontWeight}`);
             }
@@ -3110,22 +3102,55 @@ document.addEventListener('DOMContentLoaded', ()=>{
             if(rule.fontSize && rule.fontSize !== '' && rule.fontSize !== 'inherit'){
                 styles.push(`font-size: ${rule.fontSize}px`);
             }
+            const rLh = ruleLineHeightNumeric(rule);
             if(rule.lineHeight && rule.lineHeight !== '' && rule.lineHeight !== 'inherit'){
-                styles.push(`line-height: ${rule.lineHeight}`);
+                if(rLh == null || rLh > segFloor + 1e-9){
+                    styles.push(`line-height: ${rule.lineHeight}`);
+                }
             }
-            
+
             const styleStr = styles.length > 0 ? ` style="${styles.join('; ')}"` : '';
             htmlParts.push(`<span${styleStr}>${escapeHtml(match.text)}</span>`);
-            
             currentIndex = match.end;
         });
-        
-        // Add remaining text
-        if(currentIndex < text.length){
-            htmlParts.push(escapeHtml(text.substring(currentIndex)));
+
+        if(currentIndex < segmentText.length){
+            htmlParts.push(escapeHtml(segmentText.substring(currentIndex)));
         }
-        
+
         return htmlParts.join('');
+    }
+
+    /** Segmenti separati da \\n: pavimento line-height per riga = min(base, line-height delle sole regole che matchano su quella riga). */
+    function applyRegexFormatting(text, rules, baseLineHeight){
+        const baseLh = (baseLineHeight !== undefined && baseLineHeight !== null && Number.isFinite(Number(baseLineHeight)))
+            ? Number(baseLineHeight)
+            : 1.2;
+
+        if(!text || typeof text !== 'string' || !rules || !Array.isArray(rules) || rules.length === 0){
+            return escapeHtml(String(text || ''));
+        }
+
+        const sortedRules = [...rules].sort((a, b) => (a.order || 0) - (b.order || 0));
+        const lines = text.split(/\r?\n/);
+
+        return lines.map(lineText => {
+            const nonOverlapping = collectNonOverlappingMatchesForSegment(lineText, sortedRules);
+            if(nonOverlapping.length === 0){
+                const inner = lineText === '' ? '\u00a0' : escapeHtml(lineText);
+                return `<span style="display:block">${inner}</span>`;
+            }
+
+            const lhFromMatchedRules = nonOverlapping
+                .map(m => ruleLineHeightNumeric(m.rule))
+                .filter(x => x != null);
+            const segFloor = lhFromMatchedRules.length > 0
+                ? Math.min(baseLh, ...lhFromMatchedRules)
+                : baseLh;
+
+            const inner = buildRegexMatchSpanHtml(lineText, nonOverlapping, segFloor);
+            return `<span style="display:block;line-height:${segFloor}">${inner}</span>`;
+        }).join('');
     }
 
     function getData(el, sequenceIndex = 1, waveContext = null){
@@ -6489,7 +6514,7 @@ document.addEventListener('DOMContentLoaded', ()=>{
                                 span.style.wordWrap='break-word';
                             }
                             
-                            setTextWithRegexFormatting(span, getData(el, sequenceIndex, waveContext), el.props.regexRules);
+                            const regexLhSeg = setTextWithRegexFormatting(span, getData(el, sequenceIndex, waveContext), el.props.regexRules, Number(el.props.lineHeight) || 1.2);
                             // Copy font styles to span for overflow calculation
                             span.style.fontFamily = el.props.fontFamily || 'Arial, sans-serif';
                             span.style.fontSize = (el.props.fontSize || 16) + 'px';
@@ -6499,7 +6524,7 @@ document.addEventListener('DOMContentLoaded', ()=>{
                             } else {
                                 span.style.fontWeight = fontWeight || 'normal';
                             }
-                            span.style.lineHeight = el.props.lineHeight !== undefined ? String(el.props.lineHeight) : '1.2';
+                            span.style.lineHeight = regexLhSeg ? 'normal' : (el.props.lineHeight !== undefined ? String(el.props.lineHeight) : '1.2');
                             span.style.color = el.props.color || '#000000';
                             applySvgOutlineToTextContainer(el, span);
                             d.appendChild(span);
@@ -6524,7 +6549,7 @@ document.addEventListener('DOMContentLoaded', ()=>{
                                 span.style.wordWrap='break-word';
                             }
                             
-                            setTextWithRegexFormatting(span, getData(el, sequenceIndex, waveContext), el.props.regexRules);
+                            const regexLhSegData = setTextWithRegexFormatting(span, getData(el, sequenceIndex, waveContext), el.props.regexRules, Number(el.props.lineHeight) || 1.2);
                             // Copy font styles to span for overflow calculation
                             span.style.fontFamily = el.props.fontFamily || 'Arial, sans-serif';
                             span.style.fontSize = (el.props.fontSize || 16) + 'px';
@@ -6534,7 +6559,7 @@ document.addEventListener('DOMContentLoaded', ()=>{
                             } else {
                                 span.style.fontWeight = fontWeight || 'normal';
                             }
-                            span.style.lineHeight = el.props.lineHeight !== undefined ? String(el.props.lineHeight) : '1.2';
+                            span.style.lineHeight = regexLhSegData ? 'normal' : (el.props.lineHeight !== undefined ? String(el.props.lineHeight) : '1.2');
                             span.style.color = el.props.color || '#000000';
                             applySvgOutlineToTextContainer(el, span);
                             d.appendChild(span);
@@ -7120,7 +7145,7 @@ document.addEventListener('DOMContentLoaded', ()=>{
                                 span.style.wordWrap='break-word';
                             }
                             
-                            setTextWithRegexFormatting(span, getData(el, sequenceIndex, waveContext), el.props.regexRules);
+                            const regexLhSeg = setTextWithRegexFormatting(span, getData(el, sequenceIndex, waveContext), el.props.regexRules, Number(el.props.lineHeight) || 1.2);
                             // Copy font styles to span for overflow calculation
                             span.style.fontFamily = el.props.fontFamily || 'Arial, sans-serif';
                             span.style.fontSize = (el.props.fontSize || 16) + 'px';
@@ -7130,7 +7155,7 @@ document.addEventListener('DOMContentLoaded', ()=>{
                             } else {
                                 span.style.fontWeight = fontWeight || 'normal';
                             }
-                            span.style.lineHeight = el.props.lineHeight !== undefined ? String(el.props.lineHeight) : '1.2';
+                            span.style.lineHeight = regexLhSeg ? 'normal' : (el.props.lineHeight !== undefined ? String(el.props.lineHeight) : '1.2');
                             span.style.color = el.props.color || '#000000';
                             applySvgOutlineToTextContainer(el, span);
                             d.appendChild(span);
@@ -7155,7 +7180,7 @@ document.addEventListener('DOMContentLoaded', ()=>{
                                 span.style.wordWrap='break-word';
                             }
                             
-                            setTextWithRegexFormatting(span, getData(el, sequenceIndex, waveContext), el.props.regexRules);
+                            const regexLhSegData = setTextWithRegexFormatting(span, getData(el, sequenceIndex, waveContext), el.props.regexRules, Number(el.props.lineHeight) || 1.2);
                             // Copy font styles to span for overflow calculation
                             span.style.fontFamily = el.props.fontFamily || 'Arial, sans-serif';
                             span.style.fontSize = (el.props.fontSize || 16) + 'px';
@@ -7165,7 +7190,7 @@ document.addEventListener('DOMContentLoaded', ()=>{
                             } else {
                                 span.style.fontWeight = fontWeight || 'normal';
                             }
-                            span.style.lineHeight = el.props.lineHeight !== undefined ? String(el.props.lineHeight) : '1.2';
+                            span.style.lineHeight = regexLhSegData ? 'normal' : (el.props.lineHeight !== undefined ? String(el.props.lineHeight) : '1.2');
                             span.style.color = el.props.color || '#000000';
                             applySvgOutlineToTextContainer(el, span);
                             d.appendChild(span);
@@ -7718,9 +7743,10 @@ document.addEventListener('DOMContentLoaded', ()=>{
                             span.style.wordWrap='break-word';
                         }
                         
-                        setTextWithRegexFormatting(span, getData(el, sequenceIndex, waveContext), el.props.regexRules);
+                        const regexLhSnapT = setTextWithRegexFormatting(span, getData(el, sequenceIndex, waveContext), el.props.regexRules, Number(el.props.lineHeight) || 1.2);
                         span.style.fontFamily = el.props.fontFamily || 'Arial, sans-serif';
                         span.style.fontSize = (el.props.fontSize || 16) + 'px';
+                        span.style.lineHeight = regexLhSnapT ? 'normal' : (el.props.lineHeight !== undefined ? String(el.props.lineHeight) : '1.2');
                         span.style.color = el.props.color || '#000000';
                         applySvgOutlineToTextContainer(el, span);
                         d.appendChild(span);
@@ -7745,9 +7771,10 @@ document.addEventListener('DOMContentLoaded', ()=>{
                             span.style.wordWrap='break-word';
                         }
                         
-                        setTextWithRegexFormatting(span, getData(el, sequenceIndex, waveContext), el.props.regexRules);
+                        const regexLhSnapD = setTextWithRegexFormatting(span, getData(el, sequenceIndex, waveContext), el.props.regexRules, Number(el.props.lineHeight) || 1.2);
                         span.style.fontFamily = el.props.fontFamily || 'Arial, sans-serif';
                         span.style.fontSize = (el.props.fontSize || 16) + 'px';
+                        span.style.lineHeight = regexLhSnapD ? 'normal' : (el.props.lineHeight !== undefined ? String(el.props.lineHeight) : '1.2');
                         span.style.color = el.props.color || '#000000';
                         applySvgOutlineToTextContainer(el, span);
                         d.appendChild(span);
