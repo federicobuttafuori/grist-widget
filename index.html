@@ -203,7 +203,7 @@
             <div class="sidebar-section">
                 <h3>Add Element</h3>
                 <div class="add-buttons">
-                    <button type="button" class="add-element" data-type="text">📝 Textttt</button>
+                    <button type="button" class="add-element" data-type="text">📝 Text</button>
                     <button type="button" class="add-element" data-type="data">🔗 Data Field</button>
                     <button type="button" class="add-element" data-type="image">🖼️ Image</button>
                     <button type="button" class="add-element" data-type="qr">📱 QR Code</button>
@@ -4082,16 +4082,6 @@ document.addEventListener('DOMContentLoaded', ()=>{
                             el.props.regexRules.push(newRule);
                         }
                         normalizeRegexRulesOrders(el.props.regexRules);
-                        if(threadId){
-                            const thread = getMasterThread(threadId);
-                            const canonicalRules = deepCopy(el.props.regexRules || []);
-                            if(thread && getSyncedRegexRuleFieldSet(thread).size){
-                                rebuildRegexThreadSyncFromRules(thread, canonicalRules);
-                            }
-                            forEachElementOnThread(threadId, target => {
-                                alignElementRegexRulesToCanonical(target, canonicalRules, thread);
-                            });
-                        }
                         updateProps();
                         render();
                         saveCurrentDesign();
@@ -5388,10 +5378,7 @@ document.addEventListener('DOMContentLoaded', ()=>{
             
             el.masterThreadId = threadId;
             if(!Array.isArray(el.syncedOverrides)) el.syncedOverrides = [];
-            (thread.syncedProps || []).forEach(propKey => {
-                const v = thread.data && thread.data[propKey];
-                if(v !== undefined) setElementPropFromThread(el, propKey, v);
-            });
+            applyThreadDataToElements([el]);
             
             saveCurrentDesign();
             render();
@@ -5450,13 +5437,52 @@ document.addEventListener('DOMContentLoaded', ()=>{
         function getThreadRegexRuleCount(thread){
             if(!thread) return 0;
             let max = 0;
-            const bump = pk => {
+            (thread.syncedProps || []).filter(isRegexRulePropKey).forEach(pk => {
                 const r = parseRegexRulePropKey(pk);
                 if(r) max = Math.max(max, r.index + 1);
-            };
-            (thread.syncedProps || []).forEach(bump);
-            if(thread.data) Object.keys(thread.data).forEach(bump);
+            });
             return max;
+        }
+
+        /** Remove stale regex keys left in thread.data by old rebuild (sync no longer listed in syncedProps). */
+        function pruneRegexThreadData(thread){
+            if(!thread || !thread.data) return;
+            const valid = new Set((thread.syncedProps || []).filter(isRegexRulePropKey));
+            Object.keys(thread.data).forEach(pk => {
+                if(isRegexRulePropKey(pk) && !valid.has(pk)) delete thread.data[pk];
+            });
+        }
+
+        function isEmptyRegexFieldValue(field, value){
+            if(field === 'pattern') return value === '' || value === undefined || value === null;
+            if(field === 'fontSize' || field === 'lineHeight') return value === '' || value === undefined || value === null;
+            if(field === 'italic' || field === 'underline' || field === 'enabled') return !value;
+            if(field === 'fontWeight') return !value || value === 'inherit';
+            return false;
+        }
+
+        /** Undo legacy rebuild that synced empty rule-0 fields because rule-1 had the same field synced. */
+        function repairExpandedRegexSyncKeys(thread){
+            if(!thread) return;
+            REGEX_RULE_SYNC_FIELDS.forEach(field => {
+                const keys = (thread.syncedProps || []).filter(pk => {
+                    const r = parseRegexRulePropKey(pk);
+                    return r && r.field === field;
+                });
+                if(keys.length < 2) return;
+                const byIndex = keys.map(pk => ({ pk, r: parseRegexRulePropKey(pk) }))
+                    .sort((a, b) => a.r.index - b.r.index);
+                let sawNonEmptyAbove = false;
+                for(let i = byIndex.length - 1; i >= 0; i--){
+                    const { pk } = byIndex[i];
+                    const val = thread.data && thread.data[pk];
+                    if(!isEmptyRegexFieldValue(field, val)) sawNonEmptyAbove = true;
+                    else if(sawNonEmptyAbove){
+                        thread.syncedProps = thread.syncedProps.filter(p => p !== pk);
+                        if(thread.data) delete thread.data[pk];
+                    }
+                }
+            });
         }
 
         function ensureRegexRulesLength(el, count){
@@ -5502,19 +5528,28 @@ document.addEventListener('DOMContentLoaded', ()=>{
             return rules;
         }
 
+        /** After rule count changes on thread: match array length, copy only synced fields from canonical; keep local unsynced fields. */
         function alignElementRegexRulesToCanonical(target, canonicalRules, thread){
             if(!target) return;
-            const prev = deepCopy(target.props && target.props.regexRules ? target.props.regexRules : []);
             const canon = deepCopy(canonicalRules || []);
             normalizeRegexRulesOrders(canon);
             target.props = target.props || {};
-            target.props.regexRules = canon;
-            if(!target.syncedOverrides || !target.syncedOverrides.length) return;
-            target.syncedOverrides.forEach(pk => {
-                const r = parseRegexRulePropKey(pk);
-                if(!r || r.index >= canon.length || !prev[r.index]) return;
-                target.props.regexRules[r.index][r.field] = prev[r.index][r.field];
-            });
+            if(!target.props.regexRules) target.props.regexRules = [];
+            while(target.props.regexRules.length > canon.length) target.props.regexRules.pop();
+            while(target.props.regexRules.length < canon.length){
+                target.props.regexRules.push(defaultRegexRule(target.props.regexRules.length));
+            }
+            for(let i = 0; i < canon.length; i++){
+                if(!target.props.regexRules[i]) target.props.regexRules[i] = defaultRegexRule(i);
+                REGEX_RULE_SYNC_FIELDS.forEach(field => {
+                    const pk = `props.regexRules.${i}.${field}`;
+                    if(thread && isPropSynced(thread, pk) && !isPropOverridden(target, pk)){
+                        applyThreadValueToRegexRule(target.props.regexRules[i], field, canon[i][field]);
+                    }
+                });
+                target.props.regexRules[i].order = i;
+            }
+            normalizeRegexRulesOrders(target.props.regexRules);
         }
 
         function applySyncedRegexFieldsFromThread(el, thread){
@@ -5546,31 +5581,40 @@ document.addEventListener('DOMContentLoaded', ()=>{
             return stub[field];
         }
 
-        function rebuildRegexThreadSyncFromRules(thread, rules){
+        /** Rebuild thread regex keys after add/remove — only reindex keys already synced, never expand sync to other rules/fields. */
+        function rebuildRegexThreadSyncFromRules(thread, rules, opts){
             if(!thread) return false;
-            const fieldSet = getSyncedRegexRuleFieldSet(thread);
-            if(!fieldSet.size) return false;
+            const removedIndex = opts && opts.removedIndex;
+            const oldSyncedKeys = (thread.syncedProps || []).filter(isRegexRulePropKey);
+            if(!oldSyncedKeys.length) return false;
             if(!thread.data) thread.data = {};
             Object.keys(thread.data).forEach(pk => {
                 if(isRegexRulePropKey(pk)) delete thread.data[pk];
             });
             thread.syncedProps = (thread.syncedProps || []).filter(pk => !isRegexRulePropKey(pk));
-            (rules || []).forEach((rule, index) => {
-                fieldSet.forEach(field => {
-                    const pk = `props.regexRules.${index}.${field}`;
-                    if(!thread.syncedProps.includes(pk)) thread.syncedProps.push(pk);
-                    thread.data[pk] = regexRuleFieldValueFromRule(rule, field);
-                });
+            const ruleList = rules || [];
+            oldSyncedKeys.forEach(oldPk => {
+                const newPk = reindexRegexRulePropKey(oldPk, removedIndex);
+                if(!newPk) return;
+                const r = parseRegexRulePropKey(newPk);
+                if(!r || r.index >= ruleList.length) return;
+                if(!thread.syncedProps.includes(newPk)) thread.syncedProps.push(newPk);
+                thread.data[newPk] = regexRuleFieldValueFromRule(ruleList[r.index], r.field);
             });
             return true;
         }
 
-        function reindexRegexOverrideKey(propKey, removedIndex){
+        function reindexRegexRulePropKey(propKey, removedIndex){
             const r = parseRegexRulePropKey(propKey);
             if(!r) return propKey;
+            if(removedIndex === undefined || removedIndex === null || isNaN(removedIndex)) return propKey;
             if(r.index === removedIndex) return null;
             if(r.index > removedIndex) return `props.regexRules.${r.index - 1}.${r.field}`;
             return propKey;
+        }
+
+        function reindexRegexOverrideKey(propKey, removedIndex){
+            return reindexRegexRulePropKey(propKey, removedIndex);
         }
 
         function reindexRegexOverridesOnElement(el, removedIndex){
@@ -5618,7 +5662,7 @@ document.addEventListener('DOMContentLoaded', ()=>{
                 normalizeRegexRulesOrders(el.props.regexRules);
                 const canonicalRules = deepCopy(el.props.regexRules || []);
                 const thread = getMasterThread(threadId);
-                if(thread) rebuildRegexThreadSyncFromRules(thread, canonicalRules);
+                if(thread) rebuildRegexThreadSyncFromRules(thread, canonicalRules, { removedIndex });
                 forEachElementOnThread(threadId, target => {
                     alignElementRegexRulesToCanonical(target, canonicalRules, thread);
                 });
@@ -5732,6 +5776,8 @@ document.addEventListener('DOMContentLoaded', ()=>{
                 if(!el.masterThreadId) return;
                 const thread = getMasterThread(el.masterThreadId);
                 if(!thread || !thread.syncedProps || !Array.isArray(thread.syncedProps)) return;
+                pruneRegexThreadData(thread);
+                repairExpandedRegexSyncKeys(thread);
                 if(isPropSynced(thread, 'props.regexRules')){
                     const whole = thread.data && thread.data['props.regexRules'];
                     if(whole !== undefined && !isPropOverridden(el, 'props.regexRules')){
@@ -5776,18 +5822,20 @@ document.addEventListener('DOMContentLoaded', ()=>{
 
             const skipElementId = opts && opts.skipElementId;
             const regexRuleKey = parseRegexRulePropKey(normalizedKey);
+            const applyThreadValueToEl = el => {
+                if(el.masterThreadId !== threadId || isPropOverridden(el, normalizedKey)) return;
+                if(skipElementId && el.id === skipElementId) return;
+                const growRegex = !regexRuleKey;
+                setElementPropFromThread(el, normalizedKey, storeValue, growRegex);
+            };
             if(regexRuleKey){
-                S.forEach(el2 => {
-                    if(el2.masterThreadId === threadId) ensureRegexRulesLength(el2, regexRuleKey.index + 1);
+                forEachElementOnThread(threadId, el2 => {
+                    ensureRegexRulesLength(el2, regexRuleKey.index + 1);
                 });
+                forEachElementOnThread(threadId, applyThreadValueToEl);
+            } else {
+                S.forEach(applyThreadValueToEl);
             }
-            S.forEach(el => {
-                if(el.masterThreadId === threadId && !isPropOverridden(el, normalizedKey)){
-                    if(skipElementId && el.id === skipElementId) return;
-                    const growRegex = !regexRuleKey;
-                    setElementPropFromThread(el, normalizedKey, storeValue, growRegex);
-                }
-            });
 
             saveCurrentDesign();
             render();
