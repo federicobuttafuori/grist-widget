@@ -1886,7 +1886,7 @@ document.addEventListener('DOMContentLoaded', ()=>{
                     }
                     span.style.wordWrap='break-word';
                     
-                        const regexHtmlActive = setTextWithRegexFormatting(span, getData(el, sequenceIndex, waveContext), el.props.regexRules, Number(el.props.lineHeight) || 1.2);
+                        const regexHtmlActive = setTextWithRegexFormatting(span, getData(el, sequenceIndex, waveContext), getEffectiveRegexRulesForElement(el), Number(el.props.lineHeight) || 1.2);
                     // Copy font styles to span for overflow calculation
                     span.style.fontFamily = el.props.fontFamily || 'Arial, sans-serif';
                     span.style.fontSize = (el.props.fontSize || 16) + 'px';
@@ -1927,7 +1927,7 @@ document.addEventListener('DOMContentLoaded', ()=>{
                     }
                     span.style.wordWrap='break-word';
                     
-                    const regexHtmlActiveData = setTextWithRegexFormatting(span, getData(el, sequenceIndex, waveContext), el.props.regexRules, Number(el.props.lineHeight) || 1.2);
+                    const regexHtmlActiveData = setTextWithRegexFormatting(span, getData(el, sequenceIndex, waveContext), getEffectiveRegexRulesForElement(el), Number(el.props.lineHeight) || 1.2);
                     // Copy font styles to span for overflow calculation
                     span.style.fontFamily = el.props.fontFamily || 'Arial, sans-serif';
                     span.style.fontSize = (el.props.fontSize || 16) + 'px';
@@ -3691,6 +3691,12 @@ document.addEventListener('DOMContentLoaded', ()=>{
         function valueFor(pk){
             if(!thread) return getElementPropValue(el, pk);
             if(!isPropSynced(thread, pk) || isPropOverridden(el, pk)) return getElementPropValue(el, pk);
+            const rk = parseRegexRulePropKey(pk);
+            if(rk){
+                const effective = getEffectiveRegexRulesForElement(el);
+                if(effective[rk.index]) return effective[rk.index][rk.field];
+                return getElementPropValue(el, pk);
+            }
             if(thread.data && thread.data[pk] !== undefined) return thread.data[pk];
             return getElementPropValue(el, pk);
         }
@@ -3844,6 +3850,11 @@ document.addEventListener('DOMContentLoaded', ()=>{
                 
                 // Regex formatting rules section
                 if(!el.props.regexRules) el.props.regexRules = [];
+                const threadForRegexPanel = el.masterThreadId ? getMasterThread(el.masterThreadId) : null;
+                if(threadForRegexPanel && threadHasRegexRuleSync(threadForRegexPanel)){
+                    const regexPanelCount = Math.max(el.props.regexRules.length, getThreadRegexRuleCount(threadForRegexPanel));
+                    if(regexPanelCount > 0) ensureRegexRulesLength(el, regexPanelCount);
+                }
                 h += `<hr><div style="margin-top:8px"><div class="prop-grid-label-sync" style="margin-bottom:8px"><label>Regex Formatting Rules</label></div>`;
                 h += `<div id="regex-rules-container-${el.id}" style="display:flex;flex-direction:column;gap:8px">`;
                 el.props.regexRules.forEach((rule, index) => {
@@ -4056,22 +4067,30 @@ document.addEventListener('DOMContentLoaded', ()=>{
                 if(addRuleBtn){
                     addRuleBtn.addEventListener('click', function(){
                         pushBeforeChange();
-                        if(!el.props.regexRules) el.props.regexRules = [];
-                        el.props.regexRules.push({
-                            pattern: '',
-                            fontWeight: 'inherit',
-                            italic: false,
-                            underline: false,
-                            fontSize: '',
-                            lineHeight: '',
-                            enabled: true,
-                            order: el.props.regexRules.length
-                        });
-                        if(el.masterThreadId){
-                            const thread = getMasterThread(el.masterThreadId);
+                        const threadId = el.masterThreadId;
+                        const newRule = defaultRegexRule(0);
+                        if(threadId){
+                            forEachElementOnThread(threadId, target => {
+                                if(!target.props) target.props = {};
+                                if(!target.props.regexRules) target.props.regexRules = [];
+                                newRule.order = target.props.regexRules.length;
+                                target.props.regexRules.push(deepCopy(newRule));
+                            });
+                        } else {
+                            if(!el.props.regexRules) el.props.regexRules = [];
+                            newRule.order = el.props.regexRules.length;
+                            el.props.regexRules.push(newRule);
+                        }
+                        normalizeRegexRulesOrders(el.props.regexRules);
+                        if(threadId){
+                            const thread = getMasterThread(threadId);
+                            const canonicalRules = deepCopy(el.props.regexRules || []);
                             if(thread && getSyncedRegexRuleFieldSet(thread).size){
-                                rebuildRegexThreadSyncFromRules(thread, el.props.regexRules);
+                                rebuildRegexThreadSyncFromRules(thread, canonicalRules);
                             }
+                            forEachElementOnThread(threadId, target => {
+                                alignElementRegexRulesToCanonical(target, canonicalRules, thread);
+                            });
                         }
                         updateProps();
                         render();
@@ -5402,6 +5421,114 @@ document.addEventListener('DOMContentLoaded', ()=>{
             return /^props\.regexRules\.\d+\.(pattern|fontWeight|fontSize|lineHeight|italic|underline|enabled)$/.test(String(propKey || ''));
         }
 
+        const REGEX_RULE_SYNC_FIELDS = ['pattern', 'fontWeight', 'fontSize', 'lineHeight', 'italic', 'underline', 'enabled'];
+
+        function defaultRegexRule(order){
+            return {
+                pattern: '',
+                fontWeight: 'inherit',
+                italic: false,
+                underline: false,
+                fontSize: '',
+                lineHeight: '',
+                enabled: true,
+                order: order
+            };
+        }
+
+        function normalizeRegexRulesOrders(rules){
+            if(!Array.isArray(rules)) return;
+            rules.forEach((rule, i) => { if(rule) rule.order = i; });
+        }
+
+        function threadHasRegexRuleSync(thread){
+            if(!thread) return false;
+            if(isPropSynced(thread, 'props.regexRules')) return true;
+            return (thread.syncedProps || []).some(isRegexRulePropKey);
+        }
+
+        function getThreadRegexRuleCount(thread){
+            if(!thread) return 0;
+            let max = 0;
+            const bump = pk => {
+                const r = parseRegexRulePropKey(pk);
+                if(r) max = Math.max(max, r.index + 1);
+            };
+            (thread.syncedProps || []).forEach(bump);
+            if(thread.data) Object.keys(thread.data).forEach(bump);
+            return max;
+        }
+
+        function ensureRegexRulesLength(el, count){
+            if(!el.props) el.props = {};
+            if(!el.props.regexRules) el.props.regexRules = [];
+            while(el.props.regexRules.length < count){
+                el.props.regexRules.push(defaultRegexRule(el.props.regexRules.length));
+            }
+            while(el.props.regexRules.length > count){
+                el.props.regexRules.pop();
+            }
+            normalizeRegexRulesOrders(el.props.regexRules);
+        }
+
+        function applyThreadValueToRegexRule(rule, field, value){
+            if(!rule) return;
+            if(field === 'italic' || field === 'underline' || field === 'enabled'){
+                rule[field] = !!value;
+            } else if(field === 'fontSize' || field === 'lineHeight'){
+                rule[field] = (value === '' || value === undefined || value === null) ? '' : Number(value);
+            } else if(field === 'pattern'){
+                rule[field] = String(value == null ? '' : value);
+            } else {
+                rule[field] = String(value == null ? '' : value);
+            }
+        }
+
+        function getEffectiveRegexRulesForElement(el){
+            if(!el || !el.props || !Array.isArray(el.props.regexRules)) return [];
+            const rules = deepCopy(el.props.regexRules);
+            normalizeRegexRulesOrders(rules);
+            if(!el.masterThreadId) return rules;
+            const thread = getMasterThread(el.masterThreadId);
+            if(!thread || !threadHasRegexRuleSync(thread)) return rules;
+            rules.forEach((rule, index) => {
+                REGEX_RULE_SYNC_FIELDS.forEach(field => {
+                    const pk = `props.regexRules.${index}.${field}`;
+                    if(!isPropSynced(thread, pk) || isPropOverridden(el, pk)) return;
+                    if(!thread.data || thread.data[pk] === undefined) return;
+                    applyThreadValueToRegexRule(rule, field, thread.data[pk]);
+                });
+            });
+            return rules;
+        }
+
+        function alignElementRegexRulesToCanonical(target, canonicalRules, thread){
+            if(!target) return;
+            const prev = deepCopy(target.props && target.props.regexRules ? target.props.regexRules : []);
+            const canon = deepCopy(canonicalRules || []);
+            normalizeRegexRulesOrders(canon);
+            target.props = target.props || {};
+            target.props.regexRules = canon;
+            if(!target.syncedOverrides || !target.syncedOverrides.length) return;
+            target.syncedOverrides.forEach(pk => {
+                const r = parseRegexRulePropKey(pk);
+                if(!r || r.index >= canon.length || !prev[r.index]) return;
+                target.props.regexRules[r.index][r.field] = prev[r.index][r.field];
+            });
+        }
+
+        function applySyncedRegexFieldsFromThread(el, thread){
+            if(!el || !thread || !thread.data) return;
+            if(!el.props || !Array.isArray(el.props.regexRules)) return;
+            (thread.syncedProps || []).filter(isRegexRulePropKey).forEach(pk => {
+                if(isPropOverridden(el, pk)) return;
+                const r = parseRegexRulePropKey(pk);
+                if(!r || r.index >= el.props.regexRules.length) return;
+                const val = thread.data[pk];
+                if(val !== undefined) setElementPropFromThread(el, pk, val, false);
+            });
+        }
+
         function getSyncedRegexRuleFieldSet(thread){
             const fields = new Set();
             if(!thread || !Array.isArray(thread.syncedProps)) return fields;
@@ -5414,12 +5541,9 @@ document.addEventListener('DOMContentLoaded', ()=>{
 
         function regexRuleFieldValueFromRule(rule, field){
             const val = rule ? rule[field] : undefined;
-            if(field === 'italic' || field === 'underline' || field === 'enabled') return !!val;
-            if(field === 'fontSize' || field === 'lineHeight'){
-                return (val === '' || val === undefined || val === null) ? '' : Number(val);
-            }
-            if(field === 'pattern') return String(val == null ? '' : val);
-            return String(val == null ? '' : val);
+            const stub = {};
+            applyThreadValueToRegexRule(stub, field, val);
+            return stub[field];
         }
 
         function rebuildRegexThreadSyncFromRules(thread, rules){
@@ -5491,23 +5615,16 @@ document.addEventListener('DOMContentLoaded', ()=>{
                     }
                     reindexRegexOverridesOnElement(target, removedIndex);
                 });
-                const thread = getMasterThread(threadId);
+                normalizeRegexRulesOrders(el.props.regexRules);
                 const canonicalRules = deepCopy(el.props.regexRules || []);
+                const thread = getMasterThread(threadId);
                 if(thread) rebuildRegexThreadSyncFromRules(thread, canonicalRules);
-                const targetLen = canonicalRules.length;
                 forEachElementOnThread(threadId, target => {
-                    if(!target.props) target.props = {};
-                    if(!target.props.regexRules) target.props.regexRules = [];
-                    while(target.props.regexRules.length > targetLen) target.props.regexRules.pop();
-                    if(!thread) return;
-                    (thread.syncedProps || []).filter(isRegexRulePropKey).forEach(pk => {
-                        if(isPropOverridden(target, pk)) return;
-                        const val = thread.data[pk];
-                        if(val !== undefined) setElementPropFromThread(target, pk, val);
-                    });
+                    alignElementRegexRulesToCanonical(target, canonicalRules, thread);
                 });
             } else {
                 el.props.regexRules.splice(removedIndex, 1);
+                normalizeRegexRulesOrders(el.props.regexRules);
             }
             updateProps();
             render();
@@ -5518,17 +5635,7 @@ document.addEventListener('DOMContentLoaded', ()=>{
             if(!el.props) el.props = {};
             if(!el.props.regexRules) el.props.regexRules = [];
             while(el.props.regexRules.length <= index){
-                const ord = el.props.regexRules.length;
-                el.props.regexRules.push({
-                    pattern: '',
-                    fontWeight: 'inherit',
-                    italic: false,
-                    underline: false,
-                    fontSize: '',
-                    lineHeight: '',
-                    enabled: true,
-                    order: ord
-                });
+                el.props.regexRules.push(defaultRegexRule(el.props.regexRules.length));
             }
         }
 
@@ -5580,8 +5687,7 @@ document.addEventListener('DOMContentLoaded', ()=>{
             }
             const regexRuleKey = parseRegexRulePropKey(propKey);
             if(regexRuleKey){
-                if(!el.props || !Array.isArray(el.props.regexRules)) return undefined;
-                ensureRegexRuleSlot(el, regexRuleKey.index);
+                if(!el.props || !Array.isArray(el.props.regexRules) || !el.props.regexRules[regexRuleKey.index]) return undefined;
                 return el.props.regexRules[regexRuleKey.index][regexRuleKey.field];
             }
             if(propKey.includes('.')){
@@ -5592,26 +5698,20 @@ document.addEventListener('DOMContentLoaded', ()=>{
             return el[propKey];
         }
 
-        function setElementPropFromThread(el, propKey, value){
+        function setElementPropFromThread(el, propKey, value, allowGrowRegexSlot){
             if(!el) return;
             if(propKey === 'props.regexRules'){
                 el.props = el.props || {};
                 el.props.regexRules = (value && (Array.isArray(value) || typeof value === 'object')) ? deepCopy(value) : (value || []);
+                normalizeRegexRulesOrders(el.props.regexRules);
                 return;
             }
             const regexRuleKey = parseRegexRulePropKey(propKey);
             if(regexRuleKey){
+                const grow = allowGrowRegexSlot !== false;
+                if(!grow && (!el.props.regexRules || regexRuleKey.index >= el.props.regexRules.length)) return;
                 ensureRegexRuleSlot(el, regexRuleKey.index);
-                const field = regexRuleKey.field;
-                if(field === 'italic' || field === 'underline' || field === 'enabled'){
-                    el.props.regexRules[regexRuleKey.index][field] = !!value;
-                } else if(field === 'fontSize' || field === 'lineHeight'){
-                    el.props.regexRules[regexRuleKey.index][field] = (value === '' || value === undefined || value === null) ? '' : Number(value);
-                } else if(field === 'pattern'){
-                    el.props.regexRules[regexRuleKey.index][field] = String(value == null ? '' : value);
-                } else {
-                    el.props.regexRules[regexRuleKey.index][field] = String(value == null ? '' : value);
-                }
+                applyThreadValueToRegexRule(el.props.regexRules[regexRuleKey.index], regexRuleKey.field, value);
                 return;
             }
             applyPropToElement(el, propKey, value);
@@ -5632,8 +5732,25 @@ document.addEventListener('DOMContentLoaded', ()=>{
                 if(!el.masterThreadId) return;
                 const thread = getMasterThread(el.masterThreadId);
                 if(!thread || !thread.syncedProps || !Array.isArray(thread.syncedProps)) return;
+                if(isPropSynced(thread, 'props.regexRules')){
+                    const whole = thread.data && thread.data['props.regexRules'];
+                    if(whole !== undefined && !isPropOverridden(el, 'props.regexRules')){
+                        setElementPropFromThread(el, 'props.regexRules', deepCopy(whole), false);
+                    }
+                }
+                if(threadHasRegexRuleSync(thread)){
+                    const ruleCount = getThreadRegexRuleCount(thread);
+                    if(ruleCount > 0) ensureRegexRulesLength(el, ruleCount);
+                }
                 thread.syncedProps.forEach(propKey => {
                     if(isPropOverridden(el, propKey)) return;
+                    if(propKey === 'props.regexRules') return;
+                    if(isRegexRulePropKey(propKey)){
+                        const val = thread.data[propKey];
+                        if(val === undefined) return;
+                        setElementPropFromThread(el, propKey, val, false);
+                        return;
+                    }
                     let val = thread.data[propKey];
                     if(val === undefined && thread.data){
                         const legacyKey = propKey.replace('props.', '');
@@ -5658,10 +5775,17 @@ document.addEventListener('DOMContentLoaded', ()=>{
             thread.data[normalizedKey] = storeValue;
 
             const skipElementId = opts && opts.skipElementId;
+            const regexRuleKey = parseRegexRulePropKey(normalizedKey);
+            if(regexRuleKey){
+                S.forEach(el2 => {
+                    if(el2.masterThreadId === threadId) ensureRegexRulesLength(el2, regexRuleKey.index + 1);
+                });
+            }
             S.forEach(el => {
                 if(el.masterThreadId === threadId && !isPropOverridden(el, normalizedKey)){
                     if(skipElementId && el.id === skipElementId) return;
-                    setElementPropFromThread(el, normalizedKey, storeValue);
+                    const growRegex = !regexRuleKey;
+                    setElementPropFromThread(el, normalizedKey, storeValue, growRegex);
                 }
             });
 
@@ -6685,7 +6809,7 @@ document.addEventListener('DOMContentLoaded', ()=>{
                                 span.style.wordWrap='break-word';
                             }
                             
-                            const regexLhSeg = setTextWithRegexFormatting(span, getData(el, sequenceIndex, waveContext), el.props.regexRules, Number(el.props.lineHeight) || 1.2);
+                            const regexLhSeg = setTextWithRegexFormatting(span, getData(el, sequenceIndex, waveContext), getEffectiveRegexRulesForElement(el), Number(el.props.lineHeight) || 1.2);
                             // Copy font styles to span for overflow calculation
                             span.style.fontFamily = el.props.fontFamily || 'Arial, sans-serif';
                             span.style.fontSize = (el.props.fontSize || 16) + 'px';
@@ -6720,7 +6844,7 @@ document.addEventListener('DOMContentLoaded', ()=>{
                                 span.style.wordWrap='break-word';
                             }
                             
-                            const regexLhSegData = setTextWithRegexFormatting(span, getData(el, sequenceIndex, waveContext), el.props.regexRules, Number(el.props.lineHeight) || 1.2);
+                            const regexLhSegData = setTextWithRegexFormatting(span, getData(el, sequenceIndex, waveContext), getEffectiveRegexRulesForElement(el), Number(el.props.lineHeight) || 1.2);
                             // Copy font styles to span for overflow calculation
                             span.style.fontFamily = el.props.fontFamily || 'Arial, sans-serif';
                             span.style.fontSize = (el.props.fontSize || 16) + 'px';
@@ -7316,7 +7440,7 @@ document.addEventListener('DOMContentLoaded', ()=>{
                                 span.style.wordWrap='break-word';
                             }
                             
-                            const regexLhSeg = setTextWithRegexFormatting(span, getData(el, sequenceIndex, waveContext), el.props.regexRules, Number(el.props.lineHeight) || 1.2);
+                            const regexLhSeg = setTextWithRegexFormatting(span, getData(el, sequenceIndex, waveContext), getEffectiveRegexRulesForElement(el), Number(el.props.lineHeight) || 1.2);
                             // Copy font styles to span for overflow calculation
                             span.style.fontFamily = el.props.fontFamily || 'Arial, sans-serif';
                             span.style.fontSize = (el.props.fontSize || 16) + 'px';
@@ -7351,7 +7475,7 @@ document.addEventListener('DOMContentLoaded', ()=>{
                                 span.style.wordWrap='break-word';
                             }
                             
-                            const regexLhSegData = setTextWithRegexFormatting(span, getData(el, sequenceIndex, waveContext), el.props.regexRules, Number(el.props.lineHeight) || 1.2);
+                            const regexLhSegData = setTextWithRegexFormatting(span, getData(el, sequenceIndex, waveContext), getEffectiveRegexRulesForElement(el), Number(el.props.lineHeight) || 1.2);
                             // Copy font styles to span for overflow calculation
                             span.style.fontFamily = el.props.fontFamily || 'Arial, sans-serif';
                             span.style.fontSize = (el.props.fontSize || 16) + 'px';
@@ -7914,7 +8038,7 @@ document.addEventListener('DOMContentLoaded', ()=>{
                             span.style.wordWrap='break-word';
                         }
                         
-                        const regexLhSnapT = setTextWithRegexFormatting(span, getData(el, sequenceIndex, waveContext), el.props.regexRules, Number(el.props.lineHeight) || 1.2);
+                        const regexLhSnapT = setTextWithRegexFormatting(span, getData(el, sequenceIndex, waveContext), getEffectiveRegexRulesForElement(el), Number(el.props.lineHeight) || 1.2);
                         span.style.fontFamily = el.props.fontFamily || 'Arial, sans-serif';
                         span.style.fontSize = (el.props.fontSize || 16) + 'px';
                         span.style.lineHeight = regexLhSnapT ? 'normal' : (el.props.lineHeight !== undefined ? String(el.props.lineHeight) : '1.2');
@@ -7942,7 +8066,7 @@ document.addEventListener('DOMContentLoaded', ()=>{
                             span.style.wordWrap='break-word';
                         }
                         
-                        const regexLhSnapD = setTextWithRegexFormatting(span, getData(el, sequenceIndex, waveContext), el.props.regexRules, Number(el.props.lineHeight) || 1.2);
+                        const regexLhSnapD = setTextWithRegexFormatting(span, getData(el, sequenceIndex, waveContext), getEffectiveRegexRulesForElement(el), Number(el.props.lineHeight) || 1.2);
                         span.style.fontFamily = el.props.fontFamily || 'Arial, sans-serif';
                         span.style.fontSize = (el.props.fontSize || 16) + 'px';
                         span.style.lineHeight = regexLhSnapD ? 'normal' : (el.props.lineHeight !== undefined ? String(el.props.lineHeight) : '1.2');
