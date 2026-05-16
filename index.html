@@ -1768,6 +1768,9 @@ document.addEventListener('DOMContentLoaded', ()=>{
         // Helper function to render elements for a specific canvas and sequence index
         function renderElementsForCanvas(canvasData, sequenceIndex, baseOffsetY, waveContext = null){
             const sorted = canvasData.map(normalizeElement).slice().sort((a,b)=> (a.zIndex||0) - (b.zIndex||0));
+            const maxZ = sorted.reduce((mz, e) => Math.max(mz, e.zIndex || 0), 0);
+            const selectedSet = new Set(selectedIds);
+            const elevateSelected = selectedSet.size > 0;
             sorted.forEach(el=>{
             const d = document.createElement('div');
             d.classList.add('label-element');
@@ -1776,10 +1779,12 @@ document.addEventListener('DOMContentLoaded', ()=>{
             d.style.top = `${el.y + baseOffsetY}cm`;
             d.style.width = `${el.width}cm`;
             d.style.height = `${el.height}cm`;
-            // Ensure z-index is set properly for sequence mode
-            // Base z-index from element, but ensure it's at least 0 for interactivity
             const baseZIndex = el.zIndex || 0;
-            d.style.zIndex = baseZIndex >= 0 ? baseZIndex : 0;
+            if(elevateSelected && selectedSet.has(el.id)){
+                d.style.zIndex = String(maxZ + 1 + baseZIndex);
+            } else {
+                d.style.zIndex = baseZIndex >= 0 ? baseZIndex : 0;
+            }
             d.style.fontSize = `${el.props.fontSize || 16}px`;
                 const fontWeight = el.props.fontWeight;
                 if(typeof fontWeight === 'number'){
