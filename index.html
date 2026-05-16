@@ -92,7 +92,7 @@
         .prop-stack{display:flex;flex-direction:column;gap:6px;min-width:0}
         .prop-stack label{font-size:14px;font-weight:500;display:block}
         .prop-stack .prop-stack-row{display:flex;gap:8px;align-items:flex-start;min-width:0}
-        .prop-stack .prop-stack-row .column-mention-input,.prop-stack .prop-stack-row input[type="text"]{flex:1;min-width:0}
+        .prop-stack .prop-stack-row .column-mention-input,.prop-stack .prop-stack-row input[type="text"],.prop-stack .prop-stack-row .regex-pattern-input{flex:1;min-width:0}
         .add-regex-rule-btn{width:100%;padding:6px;margin-top:8px;background:#007aff;color:#fff;border:none;border-radius:4px;cursor:pointer;font-size:12px}
         #btn-delete{background:#fbebeb;border-color:#d9a0a0;color:#c00;margin-top:12px}
         #btn-delete:hover{background:#f7dada}
@@ -3842,40 +3842,42 @@ document.addEventListener('DOMContentLoaded', ()=>{
                 h += `<hr><div style="margin-top:8px"><div class="prop-grid-label-sync" style="margin-bottom:8px"><label>Regex Formatting Rules</label></div>`;
                 h += `<div id="regex-rules-container-${el.id}" style="display:flex;flex-direction:column;gap:8px">`;
                 el.props.regexRules.forEach((rule, index) => {
+                    const pkPattern = `props.regexRules.${index}.pattern`;
+                    const pkFontWeight = `props.regexRules.${index}.fontWeight`;
+                    const pkFontSize = `props.regexRules.${index}.fontSize`;
+                    const pkLineHeight = `props.regexRules.${index}.lineHeight`;
+                    const pkItalic = `props.regexRules.${index}.italic`;
+                    const pkUnderline = `props.regexRules.${index}.underline`;
+                    const patternVal = valueFor(pkPattern);
+                    const weightVal = valueFor(pkFontWeight);
+                    const sizeVal = valueFor(pkFontSize);
+                    const lhVal = valueFor(pkLineHeight);
+                    const italicVal = valueFor(pkItalic);
+                    const underlineVal = valueFor(pkUnderline);
                     h += `<div class="regex-rule-item" data-rule-index="${index}" style="border:1px solid #ddd;border-radius:4px;padding:8px;background:#f9f9f9">`;
                     h += `<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px">`;
                     h += `<label style="font-size:12px;font-weight:600">Rule ${index + 1}</label>`;
                     h += `<button type="button" class="remove-regex-rule-btn" data-rule-index="${index}" style="padding:2px 6px;font-size:11px;background:#ff4444;color:#fff;border:none;border-radius:3px;cursor:pointer">Remove</button>`;
                     h += `</div>`;
-                    h += `<label style="font-size:12px;display:flex;align-items:center;justify-content:space-between;gap:8px;margin-bottom:4px" class="${labelClass(`props.regexRules.${index}.pattern`)}"><span>Pattern:</span>${syncBtn(`props.regexRules.${index}.pattern`)}</label>`;
-                    h += `<textarea class="regex-pattern-input" data-rule-index="${index}" placeholder="e.g., \\d+|[A-Z]+" style="font-size:12px;padding:4px;margin-bottom:6px;font-family:monospace;width:100%;min-height:150px;resize:vertical">${escapeHtml(rule.pattern || '')}</textarea>`;
-                    h += `<div class="prop-grid" style="grid-template-columns:1fr 1fr;gap:6px;margin-bottom:4px">`;
-                    h += `<label style="font-size:12px;display:flex;align-items:center;justify-content:space-between;gap:8px" class="${labelClass(`props.regexRules.${index}.fontWeight`)}"><span>Font Weight:</span>${syncBtn(`props.regexRules.${index}.fontWeight`)}</label>`;
-                    h += `<select class="regex-weight-select" data-rule-index="${index}" style="font-size:12px;padding:4px">`;
-                    h += `<option value="inherit" ${rule.fontWeight === 'inherit' || !rule.fontWeight ? 'selected' : ''}>Inherit</option>`;
-                    h += `<option value="normal" ${rule.fontWeight === 'normal' ? 'selected' : ''}>Normal</option>`;
-                    h += `<option value="bold" ${rule.fontWeight === 'bold' ? 'selected' : ''}>Bold</option>`;
-                    h += `<option value="100" ${rule.fontWeight === '100' ? 'selected' : ''}>100</option>`;
-                    h += `<option value="200" ${rule.fontWeight === '200' ? 'selected' : ''}>200</option>`;
-                    h += `<option value="300" ${rule.fontWeight === '300' ? 'selected' : ''}>300</option>`;
-                    h += `<option value="400" ${rule.fontWeight === '400' ? 'selected' : ''}>400</option>`;
-                    h += `<option value="500" ${rule.fontWeight === '500' ? 'selected' : ''}>500</option>`;
-                    h += `<option value="600" ${rule.fontWeight === '600' ? 'selected' : ''}>600</option>`;
-                    h += `<option value="700" ${rule.fontWeight === '700' ? 'selected' : ''}>700</option>`;
-                    h += `<option value="800" ${rule.fontWeight === '800' ? 'selected' : ''}>800</option>`;
-                    h += `<option value="900" ${rule.fontWeight === '900' ? 'selected' : ''}>900</option>`;
-                    h += `</select>`;
-                    h += `<label style="font-size:12px;display:flex;align-items:center;justify-content:space-between;gap:8px" class="${labelClass(`props.regexRules.${index}.fontSize`)}"><span>Font Size:</span>${syncBtn(`props.regexRules.${index}.fontSize`)}</label>`;
-                    h += `<input type="number" class="regex-size-input" data-rule-index="${index}" placeholder="inherit" value="${rule.fontSize || ''}" min="6" max="200" step="1" style="font-size:12px;padding:4px">`;
-                    h += `</div>`;
-                    h += `<div class="prop-grid" style="grid-template-columns:1fr 1fr;gap:6px">`;
-                    h += `<label style="font-size:12px;display:flex;align-items:center;justify-content:space-between;gap:8px" class="${labelClass(`props.regexRules.${index}.lineHeight`)}"><span>Line Height:</span>${syncBtn(`props.regexRules.${index}.lineHeight`)}</label>`;
-                    h += `<input type="number" class="regex-line-height-input" data-rule-index="${index}" placeholder="inherit" value="${rule.lineHeight || ''}" min="0.5" max="3" step="0.1" style="font-size:12px;padding:4px">`;
-                    h += `</div>`;
-                    h += `<div class="prop-grid" style="grid-template-columns:1fr 1fr;gap:6px">`;
-                    h += `<label style="font-size:12px;display:flex;align-items:center;justify-content:space-between;gap:8px" class="${labelClass(`props.regexRules.${index}.italic`)}"><span style="display:flex;align-items:center;gap:4px"><input type="checkbox" class="regex-italic-checkbox" data-rule-index="${index}" ${rule.italic ? 'checked' : ''} style="width:auto"> Italic</span>${syncBtn(`props.regexRules.${index}.italic`)}</label>`;
-                    h += `<label style="font-size:12px;display:flex;align-items:center;justify-content:space-between;gap:8px" class="${labelClass(`props.regexRules.${index}.underline`)}"><span style="display:flex;align-items:center;gap:4px"><input type="checkbox" class="regex-underline-checkbox" data-rule-index="${index}" ${rule.underline ? 'checked' : ''} style="width:auto"> Underline</span>${syncBtn(`props.regexRules.${index}.underline`)}</label>`;
-                    h += `</div>`;
+                    h += `<div class="prop-stack"><label class="${labelClass(pkPattern)}">Pattern</label><div class="prop-stack-row"><textarea class="regex-pattern-input" data-rule-index="${index}" placeholder="e.g., \\d+|[A-Z]+" style="font-size:12px;padding:4px;font-family:monospace;min-height:150px;resize:vertical">${escapeHtml(String(patternVal != null ? patternVal : ''))}</textarea>${syncBtn(pkPattern)}</div></div>`;
+                    h += `<div class="${grid1Cls}"><label class="${labelClass(pkFontWeight)}">Font Weight</label><select class="regex-weight-select" data-rule-index="${index}" style="font-size:12px;padding:4px">`;
+                    h += `<option value="inherit" ${weightVal === 'inherit' || !weightVal ? 'selected' : ''}>Inherit</option>`;
+                    h += `<option value="normal" ${weightVal === 'normal' ? 'selected' : ''}>Normal</option>`;
+                    h += `<option value="bold" ${weightVal === 'bold' ? 'selected' : ''}>Bold</option>`;
+                    h += `<option value="100" ${weightVal === '100' ? 'selected' : ''}>100</option>`;
+                    h += `<option value="200" ${weightVal === '200' ? 'selected' : ''}>200</option>`;
+                    h += `<option value="300" ${weightVal === '300' ? 'selected' : ''}>300</option>`;
+                    h += `<option value="400" ${weightVal === '400' ? 'selected' : ''}>400</option>`;
+                    h += `<option value="500" ${weightVal === '500' ? 'selected' : ''}>500</option>`;
+                    h += `<option value="600" ${weightVal === '600' ? 'selected' : ''}>600</option>`;
+                    h += `<option value="700" ${weightVal === '700' ? 'selected' : ''}>700</option>`;
+                    h += `<option value="800" ${weightVal === '800' ? 'selected' : ''}>800</option>`;
+                    h += `<option value="900" ${weightVal === '900' ? 'selected' : ''}>900</option>`;
+                    h += `</select>${syncBtn(pkFontWeight)}</div>`;
+                    h += `<div class="${grid1Cls}"><label class="${labelClass(pkFontSize)}">Font Size</label><input type="number" class="regex-size-input" data-rule-index="${index}" placeholder="inherit" value="${sizeVal !== undefined && sizeVal !== '' ? sizeVal : ''}" min="6" max="200" step="1" style="font-size:12px;padding:4px">${syncBtn(pkFontSize)}</div>`;
+                    h += `<div class="${grid1Cls}"><label class="${labelClass(pkLineHeight)}">Line Height</label><input type="number" class="regex-line-height-input" data-rule-index="${index}" placeholder="inherit" value="${lhVal !== undefined && lhVal !== '' ? lhVal : ''}" min="0.5" max="3" step="0.1" style="font-size:12px;padding:4px">${syncBtn(pkLineHeight)}</div>`;
+                    h += `<div class="${grid1Cls}"><label class="${labelClass(pkItalic)}">Italic</label><input type="checkbox" class="regex-italic-checkbox" data-rule-index="${index}" ${italicVal ? 'checked' : ''}>${syncBtn(pkItalic)}</div>`;
+                    h += `<div class="${grid1Cls}"><label class="${labelClass(pkUnderline)}">Underline</label><input type="checkbox" class="regex-underline-checkbox" data-rule-index="${index}" ${underlineVal ? 'checked' : ''}>${syncBtn(pkUnderline)}</div>`;
                     h += `</div>`;
                 });
                 h += `</div>`;
@@ -4061,14 +4063,6 @@ document.addEventListener('DOMContentLoaded', ()=>{
                         updateProps();
                         render();
                         saveCurrentDesign();
-                        if(el.masterThreadId){
-                            const t = getMasterThread(el.masterThreadId);
-                            if(t && Array.isArray(t.syncedProps)){
-                                t.syncedProps.filter(pk => /^props\.regexRules\.\d+\.(pattern|fontWeight|fontSize|lineHeight|italic|underline|enabled)$/.test(pk)).forEach(pk => {
-                                    syncPropertyToThread(el.masterThreadId, pk, getElementPropValue(el, pk));
-                                });
-                            }
-                        }
                     });
                 }
                 
@@ -4081,14 +4075,6 @@ document.addEventListener('DOMContentLoaded', ()=>{
                         updateProps();
                         render();
                         saveCurrentDesign();
-                        if(el.masterThreadId){
-                            const t = getMasterThread(el.masterThreadId);
-                            if(t && Array.isArray(t.syncedProps)){
-                                t.syncedProps.filter(pk => /^props\.regexRules\.\d+\.(pattern|fontWeight|fontSize|lineHeight|italic|underline|enabled)$/.test(pk)).forEach(pk => {
-                                    syncPropertyToThread(el.masterThreadId, pk, getElementPropValue(el, pk));
-                                });
-                            }
-                        }
                     });
                 });
                 
@@ -5420,6 +5406,47 @@ document.addEventListener('DOMContentLoaded', ()=>{
             }
         }
 
+        function readRegexRuleFieldFromPanel(index, field){
+            if(!pp) return null;
+            if(field === 'pattern'){
+                const ta = pp.querySelector('.regex-pattern-input[data-rule-index="' + index + '"]');
+                return ta ? ta.value : null;
+            }
+            if(field === 'fontWeight'){
+                const sel = pp.querySelector('.regex-weight-select[data-rule-index="' + index + '"]');
+                return sel ? sel.value : null;
+            }
+            if(field === 'fontSize'){
+                const inp = pp.querySelector('.regex-size-input[data-rule-index="' + index + '"]');
+                if(!inp) return null;
+                const val = inp.value.trim();
+                return val === '' ? '' : Number(val);
+            }
+            if(field === 'lineHeight'){
+                const inp = pp.querySelector('.regex-line-height-input[data-rule-index="' + index + '"]');
+                if(!inp) return null;
+                const val = inp.value.trim();
+                return val === '' ? '' : Number(val);
+            }
+            if(field === 'italic' || field === 'underline' || field === 'enabled'){
+                const cb = pp.querySelector('.regex-' + (field === 'enabled' ? 'enabled' : field) + '-checkbox[data-rule-index="' + index + '"]');
+                return cb ? cb.checked : null;
+            }
+            return null;
+        }
+
+        function captureRegexRuleValueForSync(el, propKey){
+            const regexRuleKey = parseRegexRulePropKey(propKey);
+            if(!regexRuleKey || !el) return getElementPropValue(el, propKey);
+            ensureRegexRuleSlot(el, regexRuleKey.index);
+            const fromPanel = readRegexRuleFieldFromPanel(regexRuleKey.index, regexRuleKey.field);
+            if(fromPanel !== null){
+                setElementPropFromThread(el, propKey, fromPanel);
+                return getElementPropValue(el, propKey);
+            }
+            return getElementPropValue(el, propKey);
+        }
+
         function getElementPropValue(el, propKey){
             if(!el) return undefined;
             if(propKey === 'props.regexRules'){
@@ -5427,7 +5454,8 @@ document.addEventListener('DOMContentLoaded', ()=>{
             }
             const regexRuleKey = parseRegexRulePropKey(propKey);
             if(regexRuleKey){
-                if(!el.props || !Array.isArray(el.props.regexRules) || !el.props.regexRules[regexRuleKey.index]) return undefined;
+                if(!el.props || !Array.isArray(el.props.regexRules)) return undefined;
+                ensureRegexRuleSlot(el, regexRuleKey.index);
                 return el.props.regexRules[regexRuleKey.index][regexRuleKey.field];
             }
             if(propKey.includes('.')){
@@ -5503,8 +5531,10 @@ document.addEventListener('DOMContentLoaded', ()=>{
             if(!thread.data) thread.data = {};
             thread.data[normalizedKey] = storeValue;
 
+            const skipElementId = opts && opts.skipElementId;
             S.forEach(el => {
                 if(el.masterThreadId === threadId && !isPropOverridden(el, normalizedKey)){
+                    if(skipElementId && el.id === skipElementId) return;
                     setElementPropFromThread(el, normalizedKey, storeValue);
                 }
             });
@@ -5599,11 +5629,12 @@ document.addEventListener('DOMContentLoaded', ()=>{
             } else {
                 thread.syncedProps = thread.syncedProps.slice();
                 thread.syncedProps.push(propKey);
-                const val = getElementPropValue(el, propKey);
+                const val = parseRegexRulePropKey(propKey)
+                    ? captureRegexRuleValueForSync(el, propKey)
+                    : getElementPropValue(el, propKey);
                 if(!thread.data) thread.data = {};
-                if(thread.data[propKey] === undefined) thread.data[propKey] = val;
-                else thread.data[propKey] = (typeof val === 'object' && val !== null) ? deepCopy(val) : val;
-                syncPropertyToThread(threadId, propKey, thread.data[propKey]);
+                thread.data[propKey] = (typeof val === 'object' && val !== null) ? deepCopy(val) : val;
+                syncPropertyToThread(threadId, propKey, thread.data[propKey], { skipElementId: el.id });
                 Object.keys(profiles).forEach(profileKey => {
                     const profile = profiles[profileKey];
                     if(!profile || !profile.designs) return;
@@ -9122,6 +9153,8 @@ document.addEventListener('DOMContentLoaded', ()=>{
             return;
         }
         if(e.target && e.target.classList && e.target.classList.contains('prop-sync-btn')){
+            e.preventDefault();
+            e.stopPropagation();
             const propKey = e.target.dataset.propKey;
             if(!propKey || selectedIds.length !== 1) return;
             const el = S.find(s=>s.id===selectedIds[0]);
