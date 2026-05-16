@@ -4055,6 +4055,7 @@ document.addEventListener('DOMContentLoaded', ()=>{
                 
                 if(addRuleBtn){
                     addRuleBtn.addEventListener('click', function(){
+                        pushBeforeChange();
                         if(!el.props.regexRules) el.props.regexRules = [];
                         el.props.regexRules.push({
                             pattern: '',
@@ -4062,9 +4063,16 @@ document.addEventListener('DOMContentLoaded', ()=>{
                             italic: false,
                             underline: false,
                             fontSize: '',
+                            lineHeight: '',
                             enabled: true,
                             order: el.props.regexRules.length
                         });
+                        if(el.masterThreadId){
+                            const thread = getMasterThread(el.masterThreadId);
+                            if(thread && getSyncedRegexRuleFieldSet(thread).size){
+                                rebuildRegexThreadSyncFromRules(thread, el.props.regexRules);
+                            }
+                        }
                         updateProps();
                         render();
                         saveCurrentDesign();
@@ -4074,12 +4082,9 @@ document.addEventListener('DOMContentLoaded', ()=>{
                 // Remove rule buttons
                 pp.querySelectorAll('.remove-regex-rule-btn').forEach(btn => {
                     btn.addEventListener('click', function(){
-                        const index = parseInt(this.dataset.ruleIndex);
-                        if(!el.props.regexRules) el.props.regexRules = [];
-                        el.props.regexRules.splice(index, 1);
-                        updateProps();
-                        render();
-                        saveCurrentDesign();
+                        const index = parseInt(this.dataset.ruleIndex, 10);
+                        if(isNaN(index)) return;
+                        removeRegexRuleAtIndex(el, index);
                     });
                 });
                 
@@ -5391,6 +5396,122 @@ document.addEventListener('DOMContentLoaded', ()=>{
             const m = /^props\.regexRules\.(\d+)\.(pattern|fontWeight|fontSize|lineHeight|italic|underline|enabled)$/.exec(String(propKey || ''));
             if(!m) return null;
             return { index: Number(m[1]), field: m[2] };
+        }
+
+        function isRegexRulePropKey(propKey){
+            return /^props\.regexRules\.\d+\.(pattern|fontWeight|fontSize|lineHeight|italic|underline|enabled)$/.test(String(propKey || ''));
+        }
+
+        function getSyncedRegexRuleFieldSet(thread){
+            const fields = new Set();
+            if(!thread || !Array.isArray(thread.syncedProps)) return fields;
+            thread.syncedProps.forEach(pk => {
+                const r = parseRegexRulePropKey(pk);
+                if(r) fields.add(r.field);
+            });
+            return fields;
+        }
+
+        function regexRuleFieldValueFromRule(rule, field){
+            const val = rule ? rule[field] : undefined;
+            if(field === 'italic' || field === 'underline' || field === 'enabled') return !!val;
+            if(field === 'fontSize' || field === 'lineHeight'){
+                return (val === '' || val === undefined || val === null) ? '' : Number(val);
+            }
+            if(field === 'pattern') return String(val == null ? '' : val);
+            return String(val == null ? '' : val);
+        }
+
+        function rebuildRegexThreadSyncFromRules(thread, rules){
+            if(!thread) return false;
+            const fieldSet = getSyncedRegexRuleFieldSet(thread);
+            if(!fieldSet.size) return false;
+            if(!thread.data) thread.data = {};
+            Object.keys(thread.data).forEach(pk => {
+                if(isRegexRulePropKey(pk)) delete thread.data[pk];
+            });
+            thread.syncedProps = (thread.syncedProps || []).filter(pk => !isRegexRulePropKey(pk));
+            (rules || []).forEach((rule, index) => {
+                fieldSet.forEach(field => {
+                    const pk = `props.regexRules.${index}.${field}`;
+                    if(!thread.syncedProps.includes(pk)) thread.syncedProps.push(pk);
+                    thread.data[pk] = regexRuleFieldValueFromRule(rule, field);
+                });
+            });
+            return true;
+        }
+
+        function reindexRegexOverrideKey(propKey, removedIndex){
+            const r = parseRegexRulePropKey(propKey);
+            if(!r) return propKey;
+            if(r.index === removedIndex) return null;
+            if(r.index > removedIndex) return `props.regexRules.${r.index - 1}.${r.field}`;
+            return propKey;
+        }
+
+        function reindexRegexOverridesOnElement(el, removedIndex){
+            if(!el || !Array.isArray(el.syncedOverrides)) return;
+            const next = [];
+            el.syncedOverrides.forEach(pk => {
+                const updated = reindexRegexOverrideKey(pk, removedIndex);
+                if(updated && !next.includes(updated)) next.push(updated);
+            });
+            el.syncedOverrides = next;
+        }
+
+        function forEachElementOnThread(threadId, fn){
+            if(!threadId || typeof fn !== 'function') return;
+            S.forEach(el => { if(el.masterThreadId === threadId) fn(el); });
+            Object.keys(profiles).forEach(profileKey => {
+                const profile = profiles[profileKey];
+                if(!profile || !profile.designs) return;
+                Object.keys(profile.designs).forEach(designKey => {
+                    const design = profile.designs[designKey];
+                    if(!design) return;
+                    ['canvas1', 'canvas2'].forEach(canvasKey => {
+                        (design[canvasKey] || []).forEach(el => {
+                            if(el.masterThreadId === threadId) fn(el);
+                        });
+                    });
+                });
+            });
+        }
+
+        function removeRegexRuleAtIndex(el, removedIndex){
+            if(!el || removedIndex < 0 || isNaN(removedIndex)) return;
+            if(!el.props.regexRules || removedIndex >= el.props.regexRules.length) return;
+            pushBeforeChange();
+            const threadId = el.masterThreadId;
+            if(threadId){
+                forEachElementOnThread(threadId, target => {
+                    if(!target.props) target.props = {};
+                    if(!target.props.regexRules) target.props.regexRules = [];
+                    if(removedIndex < target.props.regexRules.length){
+                        target.props.regexRules.splice(removedIndex, 1);
+                    }
+                    reindexRegexOverridesOnElement(target, removedIndex);
+                });
+                const thread = getMasterThread(threadId);
+                const canonicalRules = deepCopy(el.props.regexRules || []);
+                if(thread) rebuildRegexThreadSyncFromRules(thread, canonicalRules);
+                const targetLen = canonicalRules.length;
+                forEachElementOnThread(threadId, target => {
+                    if(!target.props) target.props = {};
+                    if(!target.props.regexRules) target.props.regexRules = [];
+                    while(target.props.regexRules.length > targetLen) target.props.regexRules.pop();
+                    if(!thread) return;
+                    (thread.syncedProps || []).filter(isRegexRulePropKey).forEach(pk => {
+                        if(isPropOverridden(target, pk)) return;
+                        const val = thread.data[pk];
+                        if(val !== undefined) setElementPropFromThread(target, pk, val);
+                    });
+                });
+            } else {
+                el.props.regexRules.splice(removedIndex, 1);
+            }
+            updateProps();
+            render();
+            saveCurrentDesign();
         }
 
         function ensureRegexRuleSlot(el, index){
