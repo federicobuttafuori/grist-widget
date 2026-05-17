@@ -501,6 +501,78 @@ document.addEventListener('DOMContentLoaded', ()=>{
     let deferredRecordPropsRefresh = false;
     /** Dopo sync thread su regex (pattern-only o props.regexRules) con skipUpdateProps, refresh pannello quando il focus esce dai campi. */
     let pendingRegexRulesPropsRefresh = false;
+
+    // ---------- Regex sync debugging ----------
+    window.REGEX_DEBUG = true;
+    function rdbg(stage, info){
+        if(!window.REGEX_DEBUG) return;
+        try { console.log('[regex]', stage, info); } catch(e){}
+    }
+    function rdbgSummarizeRules(rules){
+        if(!Array.isArray(rules)) return rules;
+        return rules.map((r, i) => ({
+            i,
+            pattern: r && r.pattern,
+            fw: r && r.fontWeight,
+            fs: r && r.fontSize,
+            lh: r && r.lineHeight,
+            it: r && r.italic,
+            un: r && r.underline,
+            en: r && r.enabled,
+            order: r && r.order
+        }));
+    }
+    function rdbgSummarizeElement(el){
+        if(!el) return null;
+        return {
+            id: el.id,
+            type: el.type,
+            threadId: el.masterThreadId || null,
+            overrides: Array.isArray(el.syncedOverrides) ? el.syncedOverrides.slice() : [],
+            rulesLen: el.props && Array.isArray(el.props.regexRules) ? el.props.regexRules.length : 0,
+            rules: rdbgSummarizeRules(el.props && el.props.regexRules)
+        };
+    }
+    function rdbgSummarizeThread(thread){
+        if(!thread) return null;
+        const regexSynced = (thread.syncedProps || []).filter(p => /^props\.regexRules\./.test(p));
+        const regexData = {};
+        if(thread.data) Object.keys(thread.data).forEach(k => { if(/^props\.regexRules\./.test(k)) regexData[k] = thread.data[k]; });
+        return {
+            id: thread.id,
+            name: thread.name,
+            regexRuleCount: thread.regexRuleCount,
+            regexSyncedProps: regexSynced,
+            regexData
+        };
+    }
+    /** Inspect full regex state for a given thread (or by elementId). Usage from devtools: dumpRegexState('thread_xxx') */
+    window.dumpRegexState = function(threadIdOrElementId){
+        let threadId = threadIdOrElementId;
+        if(typeof threadIdOrElementId === 'string' && !threadIdOrElementId.startsWith('thread_')){
+            const el = S.find(e => e.id === threadIdOrElementId);
+            if(el && el.masterThreadId) threadId = el.masterThreadId;
+        }
+        const thread = (typeof getMasterThread === 'function') ? getMasterThread(threadId) : null;
+        const elementsOnThread = [];
+        S.forEach(el => { if(el.masterThreadId === threadId) elementsOnThread.push({ where: 'S', ...rdbgSummarizeElement(el) }); });
+        Object.keys(profiles || {}).forEach(profileKey => {
+            const profile = profiles[profileKey];
+            if(!profile || !profile.designs) return;
+            Object.keys(profile.designs).forEach(designKey => {
+                const d = profile.designs[designKey];
+                if(!d) return;
+                ['canvas1','canvas2'].forEach(canvasKey => {
+                    (d[canvasKey] || []).forEach(el => {
+                        if(el.masterThreadId === threadId) elementsOnThread.push({ where: `${profileKey}/${designKey}/${canvasKey}`, ...rdbgSummarizeElement(el) });
+                    });
+                });
+            });
+        });
+        const out = { thread: rdbgSummarizeThread(thread), elementsOnThread };
+        console.log('[regex] dumpRegexState', out);
+        return out;
+    };
     function isEditingPropertiesPanel(){
         const ae = document.activeElement;
         if(!ae || !pp || !pp.contains(ae)) return false;
@@ -1300,7 +1372,9 @@ document.addEventListener('DOMContentLoaded', ()=>{
             });
 
             // Lazy sync: apply thread data to this design's elements when loading (so synced values show without having pushed to all designs)
+            rdbg('loadCurrentDesign (before applyThreadDataToElements)', { profile: currentProfile, design: currentDesign, canvas: currentCanvas, elements: S.map(rdbgSummarizeElement).filter(e => e.threadId || e.rulesLen) });
             applyThreadDataToElements(S);
+            rdbg('loadCurrentDesign (after applyThreadDataToElements)', { elements: S.map(rdbgSummarizeElement).filter(e => e.threadId || e.rulesLen) });
             
             selectedIds = [];
             // Reset history when switching design/profile/canvas
@@ -4066,6 +4140,7 @@ document.addEventListener('DOMContentLoaded', ()=>{
                 
                 if(addRuleBtn){
                     addRuleBtn.addEventListener('click', function(){
+                        rdbg('addRuleBtn click (start)', { elId: el.id, threadId: el.masterThreadId, beforeEl: rdbgSummarizeElement(el) });
                         pushBeforeChange();
                         const threadId = el.masterThreadId;
                         if(threadId){
@@ -4076,15 +4151,18 @@ document.addEventListener('DOMContentLoaded', ()=>{
                                 if(len > currentCount) currentCount = len;
                             });
                             const newCount = currentCount + 1;
+                            rdbg('addRuleBtn (computed count)', { threadRuleCount: thread && thread.regexRuleCount, currentCount, newCount });
                             forEachElementOnThread(threadId, target => {
                                 ensureRegexRulesLength(target, newCount);
                             });
                             setThreadRegexRuleCount(thread, newCount);
+                            rdbg('addRuleBtn (thread after add)', rdbgSummarizeThread(thread));
                         } else {
                             if(!el.props.regexRules) el.props.regexRules = [];
                             el.props.regexRules.push(defaultRegexRule(el.props.regexRules.length));
                             normalizeRegexRulesOrders(el.props.regexRules);
                         }
+                        rdbg('addRuleBtn (end)', { elId: el.id, afterEl: rdbgSummarizeElement(el) });
                         updateProps();
                         render();
                         saveCurrentDesign();
@@ -4107,6 +4185,7 @@ document.addEventListener('DOMContentLoaded', ()=>{
                         if(!el.props.regexRules) el.props.regexRules = [];
                         if(!el.props.regexRules[index]) return;
                         el.props.regexRules[index].pattern = this.value;
+                        rdbg('pattern input', { elId: el.id, index, value: this.value, rules: rdbgSummarizeRules(el.props.regexRules) });
                         saveCurrentDesign();
                         const propKey = `props.regexRules.${index}.pattern`;
                         if(el.masterThreadId){
@@ -4138,6 +4217,7 @@ document.addEventListener('DOMContentLoaded', ()=>{
                         if(!el.props.regexRules) el.props.regexRules = [];
                         if(!el.props.regexRules[index]) return;
                         el.props.regexRules[index].fontWeight = this.value;
+                        rdbg('weight change', { elId: el.id, index, value: this.value });
                         render();
                         saveCurrentDesign();
                         const propKey = `props.regexRules.${index}.fontWeight`;
@@ -4155,6 +4235,7 @@ document.addEventListener('DOMContentLoaded', ()=>{
                         if(!el.props.regexRules[index]) return;
                         const val = this.value.trim();
                         el.props.regexRules[index].fontSize = val === '' ? '' : Number(val);
+                        rdbg('size input', { elId: el.id, index, value: el.props.regexRules[index].fontSize });
                         render();
                         saveCurrentDesign();
                         const propKey = `props.regexRules.${index}.fontSize`;
@@ -5484,10 +5565,14 @@ document.addEventListener('DOMContentLoaded', ()=>{
         function ensureRegexRulesLength(el, minCount){
             if(!el.props) el.props = {};
             if(!el.props.regexRules) el.props.regexRules = [];
+            const before = el.props.regexRules.length;
             while(el.props.regexRules.length < minCount){
                 el.props.regexRules.push(defaultRegexRule(el.props.regexRules.length));
             }
             normalizeRegexRulesOrders(el.props.regexRules);
+            if(before !== el.props.regexRules.length){
+                rdbg('ensureRegexRulesLength', { elId: el.id, threadId: el.masterThreadId, before, minCount, after: el.props.regexRules.length });
+            }
         }
 
         function applyThreadValueToRegexRule(rule, field, value){
@@ -5507,17 +5592,38 @@ document.addEventListener('DOMContentLoaded', ()=>{
             if(!el || !el.props || !Array.isArray(el.props.regexRules)) return [];
             const rules = deepCopy(el.props.regexRules);
             normalizeRegexRulesOrders(rules);
-            if(!el.masterThreadId) return rules;
+            if(!el.masterThreadId){
+                if(window.REGEX_DEBUG && rules.length){
+                    rdbg('getEffectiveRegexRulesForElement (no thread)', { elId: el.id, rules: rdbgSummarizeRules(rules) });
+                }
+                return rules;
+            }
             const thread = getMasterThread(el.masterThreadId);
-            if(!thread || !threadHasRegexRuleSync(thread)) return rules;
+            if(!thread || !threadHasRegexRuleSync(thread)){
+                if(window.REGEX_DEBUG && rules.length){
+                    rdbg('getEffectiveRegexRulesForElement (no thread sync)', { elId: el.id, threadId: el.masterThreadId, rules: rdbgSummarizeRules(rules) });
+                }
+                return rules;
+            }
+            const overlays = [];
             rules.forEach((rule, index) => {
                 REGEX_RULE_SYNC_FIELDS.forEach(field => {
                     const pk = `props.regexRules.${index}.${field}`;
                     if(!isPropSynced(thread, pk) || isPropOverridden(el, pk)) return;
                     if(!thread.data || thread.data[pk] === undefined) return;
                     applyThreadValueToRegexRule(rule, field, thread.data[pk]);
+                    overlays.push({ index, field, val: thread.data[pk] });
                 });
             });
+            if(window.REGEX_DEBUG && rules.length){
+                rdbg('getEffectiveRegexRulesForElement', {
+                    elId: el.id,
+                    threadId: el.masterThreadId,
+                    localRules: rdbgSummarizeRules(el.props.regexRules),
+                    overlaysApplied: overlays,
+                    effectiveRules: rdbgSummarizeRules(rules)
+                });
+            }
             return rules;
         }
 
@@ -5537,6 +5643,7 @@ document.addEventListener('DOMContentLoaded', ()=>{
         function rebuildRegexThreadSyncOnRemoval(thread, removedIndex){
             if(!thread || removedIndex === undefined || removedIndex === null || isNaN(removedIndex)) return;
             const oldSyncedKeys = (thread.syncedProps || []).filter(isRegexRulePropKey);
+            rdbg('rebuildRegexThreadSyncOnRemoval (before)', { threadId: thread.id, removedIndex, oldSyncedKeys, threadData: rdbgSummarizeThread(thread).regexData });
             if(!oldSyncedKeys.length) return;
             if(!thread.data) thread.data = {};
             const oldData = {};
@@ -5544,10 +5651,12 @@ document.addEventListener('DOMContentLoaded', ()=>{
             thread.syncedProps = (thread.syncedProps || []).filter(pk => !isRegexRulePropKey(pk));
             oldSyncedKeys.forEach(oldPk => {
                 const newPk = reindexRegexRulePropKey(oldPk, removedIndex);
-                if(!newPk) return;
+                if(!newPk){ rdbg('rebuildRegexThreadSyncOnRemoval (drop)', { oldPk }); return; }
                 if(!thread.syncedProps.includes(newPk)) thread.syncedProps.push(newPk);
                 thread.data[newPk] = oldData[oldPk];
+                if(oldPk !== newPk) rdbg('rebuildRegexThreadSyncOnRemoval (rename)', { oldPk, newPk, val: oldData[oldPk] });
             });
+            rdbg('rebuildRegexThreadSyncOnRemoval (after)', rdbgSummarizeThread(thread));
         }
 
         function reindexRegexRulePropKey(propKey, removedIndex){
@@ -5594,6 +5703,7 @@ document.addEventListener('DOMContentLoaded', ()=>{
         function removeRegexRuleAtIndex(el, removedIndex){
             if(!el || removedIndex < 0 || isNaN(removedIndex)) return;
             if(!el.props.regexRules || removedIndex >= el.props.regexRules.length) return;
+            rdbg('removeRegexRuleAtIndex (start)', { elId: el.id, threadId: el.masterThreadId, removedIndex, beforeEl: rdbgSummarizeElement(el) });
             pushBeforeChange();
             const threadId = el.masterThreadId;
             if(threadId){
@@ -5601,21 +5711,25 @@ document.addEventListener('DOMContentLoaded', ()=>{
                 forEachElementOnThread(threadId, target => {
                     if(!target.props) target.props = {};
                     if(!target.props.regexRules) target.props.regexRules = [];
+                    const beforeLen = target.props.regexRules.length;
                     if(removedIndex < target.props.regexRules.length){
                         target.props.regexRules.splice(removedIndex, 1);
                     }
                     normalizeRegexRulesOrders(target.props.regexRules);
                     reindexRegexOverridesOnElement(target, removedIndex);
+                    rdbg('removeRegexRuleAtIndex (target spliced)', { targetId: target.id, beforeLen, afterLen: target.props.regexRules.length, overrides: target.syncedOverrides });
                 });
                 if(thread){
                     rebuildRegexThreadSyncOnRemoval(thread, removedIndex);
                     const newCount = Math.max(0, (getThreadRegexRuleCount(thread) || (el.props.regexRules.length + 1)) - 1);
                     setThreadRegexRuleCount(thread, Math.max(newCount, el.props.regexRules.length));
+                    rdbg('removeRegexRuleAtIndex (thread updated)', rdbgSummarizeThread(thread));
                 }
             } else {
                 el.props.regexRules.splice(removedIndex, 1);
                 normalizeRegexRulesOrders(el.props.regexRules);
             }
+            rdbg('removeRegexRuleAtIndex (end)', { elId: el.id, afterEl: rdbgSummarizeElement(el) });
             updateProps();
             render();
             saveCurrentDesign();
@@ -5722,6 +5836,7 @@ document.addEventListener('DOMContentLoaded', ()=>{
                 if(!el.masterThreadId) return;
                 const thread = getMasterThread(el.masterThreadId);
                 if(!thread || !thread.syncedProps || !Array.isArray(thread.syncedProps)) return;
+                const elBefore = rdbgSummarizeElement(el);
                 pruneRegexThreadData(thread);
                 ensureThreadRegexRuleCountHealed(thread);
                 if(isPropSynced(thread, 'props.regexRules')){
@@ -5734,6 +5849,7 @@ document.addEventListener('DOMContentLoaded', ()=>{
                     const ruleCount = getThreadRegexRuleCount(thread);
                     if(ruleCount > 0) ensureRegexRulesLength(el, ruleCount);
                 }
+                const appliedKeys = [];
                 thread.syncedProps.forEach(propKey => {
                     if(isPropOverridden(el, propKey)) return;
                     if(propKey === 'props.regexRules') return;
@@ -5741,6 +5857,7 @@ document.addEventListener('DOMContentLoaded', ()=>{
                         const val = thread.data[propKey];
                         if(val === undefined) return;
                         setElementPropFromThread(el, propKey, val, false);
+                        appliedKeys.push({ k: propKey, v: val });
                         return;
                     }
                     let val = thread.data[propKey];
@@ -5750,6 +5867,10 @@ document.addEventListener('DOMContentLoaded', ()=>{
                     }
                     if(val !== undefined) setElementPropFromThread(el, propKey, (typeof val === 'object' && val !== null) ? deepCopy(val) : val);
                 });
+                const elAfter = rdbgSummarizeElement(el);
+                if(elBefore.rulesLen !== elAfter.rulesLen || JSON.stringify(elBefore.rules) !== JSON.stringify(elAfter.rules) || appliedKeys.length){
+                    rdbg('applyThreadDataToElements (per element)', { thread: rdbgSummarizeThread(thread), before: elBefore, appliedRegexKeys: appliedKeys, after: elAfter });
+                }
             });
         }
 
@@ -5757,7 +5878,10 @@ document.addEventListener('DOMContentLoaded', ()=>{
             const thread = getMasterThread(threadId);
             if(!thread) return;
             const normalizedKey = ['boundColumn','prefix','suffix','text','fallbackLink'].includes(propKey) ? 'props.' + propKey : propKey;
-            if(!thread.syncedProps || !thread.syncedProps.includes(normalizedKey)) return;
+            if(!thread.syncedProps || !thread.syncedProps.includes(normalizedKey)){
+                rdbg('syncPropertyToThread (early-return: not synced)', { threadId, propKey, normalizedKey });
+                return;
+            }
             const skipUpdateProps = opts && opts.skipUpdateProps === true;
             
             pushBeforeChange();
@@ -5765,23 +5889,29 @@ document.addEventListener('DOMContentLoaded', ()=>{
             const storeValue = (typeof value === 'object' && value !== null) ? deepCopy(value) : value;
             if(!thread.data) thread.data = {};
             thread.data[normalizedKey] = storeValue;
+            rdbg('syncPropertyToThread (set thread.data)', { threadId, key: normalizedKey, value: storeValue });
 
             const skipElementId = opts && opts.skipElementId;
             const regexRuleKey = parseRegexRulePropKey(normalizedKey);
+            let affected = 0, skipped = 0, padded = 0;
             const applyThreadValueToEl = el => {
-                if(el.masterThreadId !== threadId || isPropOverridden(el, normalizedKey)) return;
-                if(skipElementId && el.id === skipElementId) return;
+                if(el.masterThreadId !== threadId || isPropOverridden(el, normalizedKey)){ skipped++; return; }
+                if(skipElementId && el.id === skipElementId){ skipped++; return; }
                 const growRegex = !regexRuleKey;
                 setElementPropFromThread(el, normalizedKey, storeValue, growRegex);
+                affected++;
             };
             if(regexRuleKey){
                 forEachElementOnThread(threadId, el2 => {
+                    const before = (el2.props && el2.props.regexRules) ? el2.props.regexRules.length : 0;
                     ensureRegexRulesLength(el2, regexRuleKey.index + 1);
+                    if(((el2.props && el2.props.regexRules) ? el2.props.regexRules.length : 0) !== before) padded++;
                 });
                 forEachElementOnThread(threadId, applyThreadValueToEl);
             } else {
                 S.forEach(applyThreadValueToEl);
             }
+            rdbg('syncPropertyToThread (propagation done)', { threadId, normalizedKey, affected, skipped, padded });
 
             saveCurrentDesign();
             render();
@@ -5840,6 +5970,7 @@ document.addEventListener('DOMContentLoaded', ()=>{
         function toggleSyncState(threadId, propKey, el){
             const thread = getMasterThread(threadId);
             if(!thread) return;
+            rdbg('toggleSyncState (start)', { threadId, propKey, elId: el && el.id, action: el && el.syncedOverrides && el.syncedOverrides.includes(propKey) ? 'unsync(remove override)' : (thread.syncedProps && thread.syncedProps.includes(propKey) ? 'override' : 'add sync'), threadBefore: rdbgSummarizeThread(thread), elBefore: rdbgSummarizeElement(el) });
             pushBeforeChange();
             if(!Array.isArray(thread.syncedProps)) thread.syncedProps = [];
             if(!Array.isArray(el.syncedOverrides)) el.syncedOverrides = [];
@@ -5901,6 +6032,7 @@ document.addEventListener('DOMContentLoaded', ()=>{
                 });
             }
             
+            rdbg('toggleSyncState (end)', { threadId, propKey, threadAfter: rdbgSummarizeThread(thread), elAfter: rdbgSummarizeElement(el) });
             saveCurrentDesign();
             render();
             updateProps();
