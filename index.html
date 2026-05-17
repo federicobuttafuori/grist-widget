@@ -510,17 +510,10 @@ document.addEventListener('DOMContentLoaded', ()=>{
     }
     function rdbgSummarizeRules(rules){
         if(!Array.isArray(rules)) return rules;
-        return rules.map((r, i) => ({
-            i,
-            pattern: r && r.pattern,
-            fw: r && r.fontWeight,
-            fs: r && r.fontSize,
-            lh: r && r.lineHeight,
-            it: r && r.italic,
-            un: r && r.underline,
-            en: r && r.enabled,
-            order: r && r.order
-        }));
+        return rules.map((r, i) => {
+            if(!r) return { i, NULL: true };
+            return `[${i}] pat=${JSON.stringify(r.pattern)} fw=${r.fontWeight} fs=${r.fontSize} lh=${r.lineHeight} it=${r.italic} un=${r.underline} en=${r.enabled}`;
+        });
     }
     function rdbgSummarizeElement(el){
         if(!el) return null;
@@ -535,14 +528,14 @@ document.addEventListener('DOMContentLoaded', ()=>{
     }
     function rdbgSummarizeThread(thread){
         if(!thread) return null;
-        const regexSynced = (thread.syncedProps || []).filter(p => /^props\.regexRules\./.test(p));
+        const allSyncedRegexish = (thread.syncedProps || []).filter(p => /^props\.regexRules(\.|$)/.test(p));
         const regexData = {};
-        if(thread.data) Object.keys(thread.data).forEach(k => { if(/^props\.regexRules\./.test(k)) regexData[k] = thread.data[k]; });
+        if(thread.data) Object.keys(thread.data).forEach(k => { if(/^props\.regexRules(\.|$)/.test(k)) regexData[k] = thread.data[k]; });
         return {
             id: thread.id,
             name: thread.name,
             regexRuleCount: thread.regexRuleCount,
-            regexSyncedProps: regexSynced,
+            regexSyncedProps: allSyncedRegexish,
             regexData
         };
     }
@@ -3925,7 +3918,11 @@ document.addEventListener('DOMContentLoaded', ()=>{
                 // Regex formatting rules section
                 if(!el.props.regexRules) el.props.regexRules = [];
                 const threadForRegexPanel = el.masterThreadId ? getMasterThread(el.masterThreadId) : null;
-                if(threadForRegexPanel && threadHasRegexRuleSync(threadForRegexPanel)){
+                if(threadForRegexPanel){
+                    pruneRegexThreadData(threadForRegexPanel);
+                    ensureThreadRegexRuleCountHealed(threadForRegexPanel);
+                }
+                if(threadForRegexPanel && threadHasRegexRules(threadForRegexPanel)){
                     const regexPanelCount = Math.max(el.props.regexRules.length, getThreadRegexRuleCount(threadForRegexPanel));
                     if(regexPanelCount > 0) ensureRegexRulesLength(el, regexPanelCount);
                 }
@@ -5522,6 +5519,13 @@ document.addEventListener('DOMContentLoaded', ()=>{
             return (thread.syncedProps || []).some(isRegexRulePropKey);
         }
 
+        /** Wider check: thread has ANY regex info (count tracked, whole sync, or per-field sync). Used to decide whether to keep element rule counts aligned with the thread. */
+        function threadHasRegexRules(thread){
+            if(!thread) return false;
+            if(Number.isFinite(thread.regexRuleCount) && thread.regexRuleCount > 0) return true;
+            return threadHasRegexRuleSync(thread);
+        }
+
         /** Canonical rule count for a thread. Stored on thread to keep all synced elements aligned across designs. Falls back to max synced index for legacy data. */
         function getThreadRegexRuleCount(thread){
             if(!thread) return 0;
@@ -5539,12 +5543,31 @@ document.addEventListener('DOMContentLoaded', ()=>{
             thread.regexRuleCount = Math.max(0, Math.floor(count || 0));
         }
 
-        /** Remove stale regex keys left in thread.data by old rebuild (sync no longer listed in syncedProps). */
+        /** Clean stale/legacy regex keys from BOTH syncedProps and thread.data.
+         *  Keeps only: 'props.regexRules' (whole) and `props.regexRules.\d+.field` (valid per-field).
+         *  Drops legacy non-conforming keys like 'props.regexRules.pattern' (no index) from old code. */
         function pruneRegexThreadData(thread){
-            if(!thread || !thread.data) return;
-            const valid = new Set((thread.syncedProps || []).filter(isRegexRulePropKey));
+            if(!thread) return;
+            const validSynced = new Set();
+            if(Array.isArray(thread.syncedProps)){
+                const before = thread.syncedProps.length;
+                thread.syncedProps = thread.syncedProps.filter(pk => {
+                    if(!/^props\.regexRules(\.|$)/.test(pk)) return true;
+                    const keep = isRegexRulePropKey(pk) || pk === 'props.regexRules';
+                    if(keep) validSynced.add(pk);
+                    else rdbg('pruneRegexThreadData (dropped legacy syncedProp)', { threadId: thread.id, pk });
+                    return keep;
+                });
+                if(before !== thread.syncedProps.length){
+                    rdbg('pruneRegexThreadData (syncedProps cleaned)', { threadId: thread.id, before, after: thread.syncedProps.length });
+                }
+            }
+            if(!thread.data) return;
             Object.keys(thread.data).forEach(pk => {
-                if(isRegexRulePropKey(pk) && !valid.has(pk)) delete thread.data[pk];
+                if(/^props\.regexRules(\.|$)/.test(pk) && !validSynced.has(pk)){
+                    rdbg('pruneRegexThreadData (dropped legacy data key)', { threadId: thread.id, pk, val: thread.data[pk] });
+                    delete thread.data[pk];
+                }
             });
         }
 
@@ -5845,7 +5868,7 @@ document.addEventListener('DOMContentLoaded', ()=>{
                         setElementPropFromThread(el, 'props.regexRules', deepCopy(whole), false);
                     }
                 }
-                if(threadHasRegexRuleSync(thread)){
+                if(threadHasRegexRules(thread)){
                     const ruleCount = getThreadRegexRuleCount(thread);
                     if(ruleCount > 0) ensureRegexRulesLength(el, ruleCount);
                 }
