@@ -2997,6 +2997,17 @@ document.addEventListener('DOMContentLoaded', ()=>{
         img.style.printColorAdjust = 'exact';
     }
 
+    /** True se almeno una regola produce un match sul testo (righe \\n considerate separatamente). */
+    function regexRulesHaveAnyMatch(text, rules){
+        if(!text || typeof text !== 'string' || !rules || !rules.length) return false;
+        const sortedRules = [...rules].sort((a, b) => (a.order || 0) - (b.order || 0));
+        const lines = text.split(/\r?\n/);
+        for(let i = 0; i < lines.length; i++){
+            if(collectNonOverlappingMatchesForSegment(lines[i], sortedRules).length > 0) return true;
+        }
+        return false;
+    }
+
     // Helper function to set text content with regex formatting
     function setTextWithRegexFormatting(element, text, elementRules, baseLineHeight){
         // Combine global rules with element-specific rules
@@ -3012,7 +3023,9 @@ document.addEventListener('DOMContentLoaded', ()=>{
             ? Number(baseLineHeight)
             : 1.2;
 
-        if(allRules.length > 0){
+        // Regole con pattern ma zero match: stesso rendering del testo plain (textContent + line-height elemento).
+        // Evita il salto visivo (interlinea/aspetto) appena si digita un carattere nel pattern.
+        if(allRules.length > 0 && regexRulesHaveAnyMatch(text, allRules)){
             element.innerHTML = applyRegexFormatting(text, allRules, baseLh);
             return true;
         }
