@@ -3108,6 +3108,14 @@ document.addEventListener('DOMContentLoaded', ()=>{
             if(rule.fontSize && rule.fontSize !== '' && rule.fontSize !== 'inherit'){
                 styles.push(`font-size: ${rule.fontSize}px`);
             }
+            ['Top', 'Bottom', 'Left', 'Right'].forEach(side => {
+                const key = 'padding' + side;
+                const pv = rule[key];
+                if(pv !== '' && pv !== undefined && pv !== null && pv !== 'inherit'){
+                    const n = Number(pv);
+                    if(Number.isFinite(n)) styles.push(`padding-${side.toLowerCase()}: ${n}px`);
+                }
+            });
             const rLh = ruleLineHeightNumeric(rule);
             if(rule.lineHeight && rule.lineHeight !== '' && rule.lineHeight !== 'inherit'){
                 if(rLh == null || rLh > segFloor + 1e-9){
@@ -3873,12 +3881,20 @@ document.addEventListener('DOMContentLoaded', ()=>{
                     const pkLineHeight = `props.regexRules.${index}.lineHeight`;
                     const pkItalic = `props.regexRules.${index}.italic`;
                     const pkUnderline = `props.regexRules.${index}.underline`;
+                    const pkPaddingTop = `props.regexRules.${index}.paddingTop`;
+                    const pkPaddingBottom = `props.regexRules.${index}.paddingBottom`;
+                    const pkPaddingLeft = `props.regexRules.${index}.paddingLeft`;
+                    const pkPaddingRight = `props.regexRules.${index}.paddingRight`;
                     const patternVal = valueFor(pkPattern);
                     const weightVal = valueFor(pkFontWeight);
                     const sizeVal = valueFor(pkFontSize);
                     const lhVal = valueFor(pkLineHeight);
                     const italicVal = valueFor(pkItalic);
                     const underlineVal = valueFor(pkUnderline);
+                    const padTopVal = valueFor(pkPaddingTop);
+                    const padBottomVal = valueFor(pkPaddingBottom);
+                    const padLeftVal = valueFor(pkPaddingLeft);
+                    const padRightVal = valueFor(pkPaddingRight);
                     h += `<div class="regex-rule-item" data-rule-index="${index}" style="border:1px solid #ddd;border-radius:4px;padding:8px;background:#f9f9f9">`;
                     h += `<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px">`;
                     h += `<label style="font-size:12px;font-weight:600">Rule ${index + 1}</label>`;
@@ -3903,6 +3919,11 @@ document.addEventListener('DOMContentLoaded', ()=>{
                     h += `<div class="${grid1Cls}"><label class="${labelClass(pkLineHeight)}">Line Height</label><input type="number" class="regex-line-height-input" data-rule-index="${index}" placeholder="inherit" value="${lhVal !== undefined && lhVal !== '' ? lhVal : ''}" min="0.5" max="3" step="0.1" style="font-size:12px;padding:4px">${syncBtn(pkLineHeight)}</div>`;
                     h += `<div class="${grid1Cls}"><label class="${labelClass(pkItalic)}">Italic</label><input type="checkbox" class="regex-italic-checkbox" data-rule-index="${index}" ${italicVal ? 'checked' : ''}>${syncBtn(pkItalic)}</div>`;
                     h += `<div class="${grid1Cls}"><label class="${labelClass(pkUnderline)}">Underline</label><input type="checkbox" class="regex-underline-checkbox" data-rule-index="${index}" ${underlineVal ? 'checked' : ''}>${syncBtn(pkUnderline)}</div>`;
+                    h += `<div style="margin-top:6px"><label style="font-size:12px;font-weight:600;display:block;margin-bottom:4px">Padding (px)</label></div>`;
+                    h += `<div class="${grid1Cls}"><label class="${labelClass(pkPaddingTop)}">Top</label><input type="number" class="regex-padding-top-input" data-rule-index="${index}" placeholder="0" value="${padTopVal !== undefined && padTopVal !== '' ? padTopVal : ''}" min="0" step="1" style="font-size:12px;padding:4px">${syncBtn(pkPaddingTop)}</div>`;
+                    h += `<div class="${grid1Cls}"><label class="${labelClass(pkPaddingBottom)}">Bottom</label><input type="number" class="regex-padding-bottom-input" data-rule-index="${index}" placeholder="0" value="${padBottomVal !== undefined && padBottomVal !== '' ? padBottomVal : ''}" min="0" step="1" style="font-size:12px;padding:4px">${syncBtn(pkPaddingBottom)}</div>`;
+                    h += `<div class="${grid1Cls}"><label class="${labelClass(pkPaddingLeft)}">Left</label><input type="number" class="regex-padding-left-input" data-rule-index="${index}" placeholder="0" value="${padLeftVal !== undefined && padLeftVal !== '' ? padLeftVal : ''}" min="0" step="1" style="font-size:12px;padding:4px">${syncBtn(pkPaddingLeft)}</div>`;
+                    h += `<div class="${grid1Cls}"><label class="${labelClass(pkPaddingRight)}">Right</label><input type="number" class="regex-padding-right-input" data-rule-index="${index}" placeholder="0" value="${padRightVal !== undefined && padRightVal !== '' ? padRightVal : ''}" min="0" step="1" style="font-size:12px;padding:4px">${syncBtn(pkPaddingRight)}</div>`;
                     h += `</div>`;
                 });
                 h += `</div>`;
@@ -4220,6 +4241,31 @@ document.addEventListener('DOMContentLoaded', ()=>{
                             const t = getMasterThread(el.masterThreadId);
                             if(t && isPropSynced(t, propKey)) syncPropertyToThread(el.masterThreadId, propKey, this.checked);
                         }
+                    });
+                });
+
+                const paddingFieldMap = [
+                    { cls: 'regex-padding-top-input', field: 'paddingTop' },
+                    { cls: 'regex-padding-bottom-input', field: 'paddingBottom' },
+                    { cls: 'regex-padding-left-input', field: 'paddingLeft' },
+                    { cls: 'regex-padding-right-input', field: 'paddingRight' }
+                ];
+                paddingFieldMap.forEach(({ cls, field }) => {
+                    pp.querySelectorAll('.' + cls).forEach(input => {
+                        input.addEventListener('input', function(){
+                            const index = parseInt(this.dataset.ruleIndex);
+                            if(!el.props.regexRules) el.props.regexRules = [];
+                            if(!el.props.regexRules[index]) return;
+                            const val = this.value.trim();
+                            el.props.regexRules[index][field] = val === '' ? '' : Number(val);
+                            render();
+                            saveCurrentDesign();
+                            const propKey = `props.regexRules.${index}.${field}`;
+                            if(el.masterThreadId){
+                                const t = getMasterThread(el.masterThreadId);
+                                if(t && isPropSynced(t, propKey)) syncPropertyToThread(el.masterThreadId, propKey, el.props.regexRules[index][field]);
+                            }
+                        });
                     });
                 });
             }
@@ -5414,17 +5460,20 @@ document.addEventListener('DOMContentLoaded', ()=>{
             return true;
         }
 
+        const REGEX_RULE_FIELD_NAMES = 'pattern|fontWeight|fontSize|lineHeight|italic|underline|enabled|paddingTop|paddingBottom|paddingLeft|paddingRight';
+        const REGEX_RULE_NUMERIC_FIELDS = new Set(['fontSize', 'lineHeight', 'paddingTop', 'paddingBottom', 'paddingLeft', 'paddingRight']);
+
         function parseRegexRulePropKey(propKey){
-            const m = /^props\.regexRules\.(\d+)\.(pattern|fontWeight|fontSize|lineHeight|italic|underline|enabled)$/.exec(String(propKey || ''));
+            const m = new RegExp('^props\\.regexRules\\.(\\d+)\\.(' + REGEX_RULE_FIELD_NAMES + ')$').exec(String(propKey || ''));
             if(!m) return null;
             return { index: Number(m[1]), field: m[2] };
         }
 
         function isRegexRulePropKey(propKey){
-            return /^props\.regexRules\.\d+\.(pattern|fontWeight|fontSize|lineHeight|italic|underline|enabled)$/.test(String(propKey || ''));
+            return new RegExp('^props\\.regexRules\\.\\d+\\.(' + REGEX_RULE_FIELD_NAMES + ')$').test(String(propKey || ''));
         }
 
-        const REGEX_RULE_SYNC_FIELDS = ['pattern', 'fontWeight', 'fontSize', 'lineHeight', 'italic', 'underline', 'enabled'];
+        const REGEX_RULE_SYNC_FIELDS = ['pattern', 'fontWeight', 'fontSize', 'lineHeight', 'italic', 'underline', 'enabled', 'paddingTop', 'paddingBottom', 'paddingLeft', 'paddingRight'];
 
         function defaultRegexRule(order){
             return {
@@ -5434,6 +5483,10 @@ document.addEventListener('DOMContentLoaded', ()=>{
                 underline: false,
                 fontSize: '',
                 lineHeight: '',
+                paddingTop: '',
+                paddingBottom: '',
+                paddingLeft: '',
+                paddingRight: '',
                 enabled: true,
                 order: order
             };
@@ -5523,7 +5576,7 @@ document.addEventListener('DOMContentLoaded', ()=>{
             if(!rule) return;
             if(field === 'italic' || field === 'underline' || field === 'enabled'){
                 rule[field] = !!value;
-            } else if(field === 'fontSize' || field === 'lineHeight'){
+            } else if(REGEX_RULE_NUMERIC_FIELDS.has(field)){
                 rule[field] = (value === '' || value === undefined || value === null) ? '' : Number(value);
             } else if(field === 'pattern'){
                 rule[field] = String(value == null ? '' : value);
@@ -5676,6 +5729,13 @@ document.addEventListener('DOMContentLoaded', ()=>{
             }
             if(field === 'lineHeight'){
                 const inp = pp.querySelector('.regex-line-height-input[data-rule-index="' + index + '"]');
+                if(!inp) return null;
+                const val = inp.value.trim();
+                return val === '' ? '' : Number(val);
+            }
+            if(field === 'paddingTop' || field === 'paddingBottom' || field === 'paddingLeft' || field === 'paddingRight'){
+                const clsMap = { paddingTop: 'regex-padding-top-input', paddingBottom: 'regex-padding-bottom-input', paddingLeft: 'regex-padding-left-input', paddingRight: 'regex-padding-right-input' };
+                const inp = pp.querySelector('.' + clsMap[field] + '[data-rule-index="' + index + '"]');
                 if(!inp) return null;
                 const val = inp.value.trim();
                 return val === '' ? '' : Number(val);
@@ -10480,6 +10540,19 @@ document.addEventListener('DOMContentLoaded', ()=>{
                     <label style="font-size:12px;display:flex;align-items:center;gap:4px"><input type="checkbox" class="global-regex-italic-checkbox" data-rule-index="${index}" ${rule.italic ? 'checked' : ''} style="width:auto"> Italic</label>
                     <label style="font-size:12px;display:flex;align-items:center;gap:4px"><input type="checkbox" class="global-regex-underline-checkbox" data-rule-index="${index}" ${rule.underline ? 'checked' : ''} style="width:auto"> Underline</label>
                 </div>
+                <label style="font-size:12px;font-weight:600;display:block;margin:8px 0 4px">Padding (px)</label>
+                <div class="prop-grid" style="grid-template-columns:1fr 1fr;gap:6px;margin-bottom:4px">
+                    <label style="font-size:12px">Top</label>
+                    <input type="number" class="global-regex-padding-top-input" data-rule-index="${index}" placeholder="0" value="${rule.paddingTop || ''}" min="0" step="1" style="font-size:12px;padding:4px">
+                    <label style="font-size:12px">Bottom</label>
+                    <input type="number" class="global-regex-padding-bottom-input" data-rule-index="${index}" placeholder="0" value="${rule.paddingBottom || ''}" min="0" step="1" style="font-size:12px;padding:4px">
+                </div>
+                <div class="prop-grid" style="grid-template-columns:1fr 1fr;gap:6px">
+                    <label style="font-size:12px">Left</label>
+                    <input type="number" class="global-regex-padding-left-input" data-rule-index="${index}" placeholder="0" value="${rule.paddingLeft || ''}" min="0" step="1" style="font-size:12px;padding:4px">
+                    <label style="font-size:12px">Right</label>
+                    <input type="number" class="global-regex-padding-right-input" data-rule-index="${index}" placeholder="0" value="${rule.paddingRight || ''}" min="0" step="1" style="font-size:12px;padding:4px">
+                </div>
             `;
 
             container.appendChild(ruleDiv);
@@ -10496,6 +10569,11 @@ document.addEventListener('DOMContentLoaded', ()=>{
                 italic: false,
                 underline: false,
                 fontSize: '',
+                lineHeight: '',
+                paddingTop: '',
+                paddingBottom: '',
+                paddingLeft: '',
+                paddingRight: '',
                 enabled: true,
                 order: globalRegexRules.length
             });
@@ -10521,6 +10599,25 @@ document.addEventListener('DOMContentLoaded', ()=>{
             if(!globalRegexRules[index]) return;
             globalRegexRules[index].pattern = e.target.value;
             render();
+            return;
+        }
+        const globalPadField = {
+            'global-regex-padding-top-input': 'paddingTop',
+            'global-regex-padding-bottom-input': 'paddingBottom',
+            'global-regex-padding-left-input': 'paddingLeft',
+            'global-regex-padding-right-input': 'paddingRight'
+        };
+        for(const [cls, field] of Object.entries(globalPadField)){
+            if(e.target.classList.contains(cls)){
+                const index = parseInt(e.target.dataset.ruleIndex);
+                if(!globalRegexRules) globalRegexRules = [];
+                if(!globalRegexRules[index]) return;
+                const val = e.target.value.trim();
+                globalRegexRules[index][field] = val === '' ? '' : Number(val);
+                render();
+                saveCurrentDesign();
+                return;
+            }
         }
     });
 
