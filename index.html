@@ -3014,10 +3014,9 @@ document.addEventListener('DOMContentLoaded', ()=>{
 
         if(allRules.length > 0){
             element.innerHTML = applyRegexFormatting(text, allRules, baseLh);
-            return true;
+        } else {
+            element.textContent = text;
         }
-        element.textContent = text;
-        return false;
     }
 
     /** Evita ReDoS: | finale crea alternativa vuota che matcha "" ovunque, causando loop infinito e crash. */
@@ -3083,7 +3082,7 @@ document.addEventListener('DOMContentLoaded', ()=>{
         return nonOverlapping;
     }
 
-    /** Costruisce HTML per un segmento avendo già i match (evita doppie regex). segFloor: interlinea del blocco riga (min base vs regole che matchano). */
+    /** Costruisce HTML inline per un segmento; segFloor limita line-height sulle sole porzioni matchate. */
     function buildRegexMatchSpanHtml(segmentText, nonOverlapping, segFloor){
         const htmlParts = [];
         let currentIndex = 0;
