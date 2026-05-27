@@ -9516,6 +9516,20 @@ document.addEventListener('DOMContentLoaded', ()=>{
             let columnMentionSelectedIndex = 0;
             let columnMentionLastAt = -1;
 
+            function insertColumnMention(col){
+                if(!columnMentionInput || col == null) return;
+                const val = columnMentionInput.value;
+                const start = columnMentionInput.selectionStart;
+                const from = val.lastIndexOf('@', start - 1);
+                if(from === -1) return;
+                const insert = '@' + col + '@';
+                const newVal = val.substring(0, from) + insert + val.substring(start);
+                columnMentionInput.value = newVal;
+                columnMentionInput.selectionStart = columnMentionInput.selectionEnd = from + insert.length;
+                columnMentionInput.dispatchEvent(new Event('input', { bubbles: true }));
+                hideColumnMentionDropdown();
+            }
+
             function hideColumnMentionDropdown(){
                 dropdown.classList.remove('column-mention-dropdown-visible');
                 dropdown.innerHTML = '';
@@ -9530,22 +9544,9 @@ document.addEventListener('DOMContentLoaded', ()=>{
                 columnMentionInput = inputEl;
                 columnMentionSelectedIndex = 0;
                 dropdown.innerHTML = list.map((col, i) => `<div class="column-mention-dropdown-item" data-col="${escapeHtml(col)}" data-index="${i}">${escapeHtml(col)}</div>`).join('');
-                dropdown.querySelectorAll('.column-mention-dropdown-item').forEach((item, i) => {
+                dropdown.querySelectorAll('.column-mention-dropdown-item').forEach((item) => {
                     item.addEventListener('click', () => {
-                        const col = item.getAttribute('data-col');
-                        if(columnMentionInput && col != null){
-                            const val = columnMentionInput.value;
-                            const start = columnMentionInput.selectionStart;
-                            const from = val.lastIndexOf('@', start - 1);
-                            if(from !== -1){
-                                const insert = '@' + col + '@';
-                                const newVal = val.substring(0, from) + insert + val.substring(start);
-                                columnMentionInput.value = newVal;
-                                columnMentionInput.selectionStart = columnMentionInput.selectionEnd = from + insert.length;
-                                columnMentionInput.dispatchEvent(new Event('input', { bubbles: true }));
-                            }
-                        }
-                        hideColumnMentionDropdown();
+                        insertColumnMention(item.getAttribute('data-col'));
                     });
                 });
                 const rect = inputEl.getBoundingClientRect();
@@ -9576,40 +9577,36 @@ document.addEventListener('DOMContentLoaded', ()=>{
                 showColumnMentionDropdown(el, query);
             }, true);
 
+            function cycleColumnMentionSelection(delta){
+                const items = dropdown.querySelectorAll('.column-mention-dropdown-item');
+                if(!items.length) return;
+                columnMentionSelectedIndex = (columnMentionSelectedIndex + delta + items.length) % items.length;
+                updateColumnMentionSelection();
+                items[columnMentionSelectedIndex].scrollIntoView({ block: 'nearest' });
+            }
+
+            function confirmColumnMentionSelection(){
+                const items = dropdown.querySelectorAll('.column-mention-dropdown-item');
+                const item = items[columnMentionSelectedIndex];
+                if(item) insertColumnMention(item.getAttribute('data-col'));
+            }
+
             pp.addEventListener('keydown', (e) => {
                 const el = e.target;
                 if(!el.matches || !el.matches('.column-mention-input')) return;
                 if(!dropdown.classList.contains('column-mention-dropdown-visible')) return;
                 const items = dropdown.querySelectorAll('.column-mention-dropdown-item');
-                if(e.key === 'ArrowDown'){
+                if(!items.length) return;
+
+                if(e.key === 'ArrowDown' || (e.key === 'Tab' && !e.shiftKey)){
                     e.preventDefault();
-                    columnMentionSelectedIndex = Math.min(columnMentionSelectedIndex + 1, items.length - 1);
-                    updateColumnMentionSelection();
-                    items[columnMentionSelectedIndex] && items[columnMentionSelectedIndex].scrollIntoView({ block: 'nearest' });
-                } else if(e.key === 'ArrowUp'){
+                    cycleColumnMentionSelection(1);
+                } else if(e.key === 'ArrowUp' || (e.key === 'Tab' && e.shiftKey)){
                     e.preventDefault();
-                    columnMentionSelectedIndex = Math.max(columnMentionSelectedIndex - 1, 0);
-                    updateColumnMentionSelection();
-                    items[columnMentionSelectedIndex] && items[columnMentionSelectedIndex].scrollIntoView({ block: 'nearest' });
+                    cycleColumnMentionSelection(-1);
                 } else if(e.key === 'Enter'){
                     e.preventDefault();
-                    const item = items[columnMentionSelectedIndex];
-                    if(item && columnMentionInput){
-                        const col = item.getAttribute('data-col');
-                        if(col != null){
-                            const val = columnMentionInput.value;
-                            const start = columnMentionInput.selectionStart;
-                            const from = val.lastIndexOf('@', start - 1);
-                            if(from !== -1){
-                                const insert = '@' + col + '@';
-                                const newVal = val.substring(0, from) + insert + val.substring(start);
-                                columnMentionInput.value = newVal;
-                                columnMentionInput.selectionStart = columnMentionInput.selectionEnd = from + insert.length;
-                                columnMentionInput.dispatchEvent(new Event('input', { bubbles: true }));
-                            }
-                        }
-                    }
-                    hideColumnMentionDropdown();
+                    confirmColumnMentionSelection();
                 } else if(e.key === 'Escape'){
                     e.preventDefault();
                     hideColumnMentionDropdown();
