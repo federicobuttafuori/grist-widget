@@ -105,10 +105,10 @@
         .label-element.selected{border:2px dashed #007aff;box-shadow:0 0 0 1px rgba(0,122,255,.1)}
         .label-element.synchronized-selected{border:2px dashed #4CAF50;box-shadow:0 0 0 1px rgba(76,175,80,.2), 0 0 8px rgba(76,175,80,.3)}
         .label-element.layer-pick-focus{outline:2px dashed #9c27b0!important;box-shadow:0 0 0 2px rgba(156,39,176,0.35)!important}
-        .layer-pick-peek-fragment{pointer-events:none;box-sizing:border-box;border:2px dashed rgba(156,39,176,0.75);box-shadow:0 0 0 1px rgba(156,39,176,0.22)}
+        .layer-pick-peek-fragment{pointer-events:none;box-sizing:border-box}
         .layer-pick-peek-fragment .layer-pick-peek-clip{position:absolute;inset:0;overflow:hidden;pointer-events:none}
-        .layer-pick-peek-fragment .layer-pick-peek-clone{pointer-events:none;opacity:1;border-color:transparent!important;box-shadow:none!important;outline:none!important}
-        .layer-pick-peek-fragment .layer-pick-peek-clip::after{content:'';position:absolute;inset:0;background:rgba(156,39,176,0.06);pointer-events:none}
+        .layer-pick-peek-fragment .layer-pick-peek-clone{pointer-events:none;opacity:0.72;border-color:transparent!important;box-shadow:none!important;outline:none!important}
+        .layer-pick-peek-element-outline{pointer-events:none;box-sizing:border-box;border:2px dashed rgba(156,39,176,0.75);box-shadow:0 0 0 1px rgba(156,39,176,0.22);background:transparent}
         .resize-handle{position:absolute;width:24px;height:24px;bottom:-12px;right:-12px;cursor:nwse-resize;display:none;z-index:10000;pointer-events:auto;background:transparent}
         .resize-handle-inner{position:absolute;width:12px;height:12px;background:#007aff;border:2px solid #fff;border-radius:50%;top:50%;left:50%;transform:translate(-50%,-50%);box-shadow:0 2px 4px rgba(0,0,0,.2)}
         .label-element.selected .resize-handle{display:block}
@@ -1803,19 +1803,6 @@ document.addEventListener('DOMContentLoaded', ()=>{
         return zTop + 1;
     }
 
-    function getLayerPickPeekClipBackground(el){
-        if(el.type === 'box'){
-            const fc = el.props.fillColor;
-            if(fc && fc !== 'transparent') return fc;
-            return '#ffffff';
-        }
-        if(el.type === 'text' || el.type === 'data' || el.type === 'image'){
-            const bg = el.props.backgroundColor;
-            if(bg && bg !== 'transparent') return bg;
-        }
-        return '#ffffff';
-    }
-
     function appendLayerPickPeekFragments(canvasEl, sourceDiv, el, sorted, baseOffsetY){
         const rects = getOccludedRectsForElement(el, sorted);
         if(!rects.length) return;
@@ -1837,7 +1824,6 @@ document.addEventListener('DOMContentLoaded', ()=>{
 
             const clip = document.createElement('div');
             clip.className = 'layer-pick-peek-clip';
-            clip.style.backgroundColor = getLayerPickPeekClipBackground(el);
 
             const inner = sourceDiv.cloneNode(true);
             inner.classList.add('layer-pick-peek-clone');
@@ -1854,6 +1840,18 @@ document.addEventListener('DOMContentLoaded', ()=>{
             frag.appendChild(clip);
             canvasEl.appendChild(frag);
         });
+
+        const outline = document.createElement('div');
+        outline.className = 'layer-pick-peek-element-outline';
+        outline.style.position = 'absolute';
+        outline.style.left = `${el.x}cm`;
+        outline.style.top = `${el.y + baseOffsetY}cm`;
+        outline.style.width = `${el.width}cm`;
+        outline.style.height = `${el.height}cm`;
+        outline.style.pointerEvents = 'none';
+        outline.style.zIndex = String(zPeek + rects.length);
+        outline.style.boxSizing = 'border-box';
+        canvasEl.appendChild(outline);
     }
 
     /** Piani di sovrapposizione (dietro→davanti); ogni slice = id elementi allo stesso piano. */
@@ -2382,7 +2380,8 @@ document.addEventListener('DOMContentLoaded', ()=>{
             }
 
             if(layerPickMode && focusSliceIds.has(el.id)){
-                d.classList.add('layer-pick-focus');
+                const hasOccludedPeek = getOccludedRectsForElement(el, sorted).length > 0;
+                if(!hasOccludedPeek) d.classList.add('layer-pick-focus');
             }
 
             // selection visuals
