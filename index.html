@@ -1555,7 +1555,7 @@ document.addEventListener('DOMContentLoaded', ()=>{
                 textOutlineWidth: 0, textOutlineColor: '#000000', textOutlineEnabled: false, textOutline2Width: 0, textOutline2Color: '#ffffff', textOutline2Enabled: false,
                 thickness:2, format:'CODE128', displayValue:true,
                     fillColor:'transparent', decimals:2, asPercent:false,
-                    lineHeight: 1.2, textOverflow: 'clip',
+                    lineHeight: 1.2, letterSpacing: 0, textOverflow: 'clip',
                 qrErrorCorrectLevel: 'M', qrColorDark: '#000000', qrColorLight: '#ffffff',
                 imageOpacity: 100
             }
@@ -1599,6 +1599,7 @@ document.addEventListener('DOMContentLoaded', ()=>{
         base.lockAspectRatio = !!base.lockAspectRatio;
         base.props.fontSize = Number(base.props.fontSize) || 16;
             base.props.lineHeight = Number(base.props.lineHeight) || 1.2;
+        base.props.letterSpacing = Number.isFinite(Number(base.props.letterSpacing)) ? Number(base.props.letterSpacing) : 0;
         base.props.decimals = Number(base.props.decimals) || 0;
         {
             const rawTh = Number(base.props.thickness);
@@ -1888,16 +1889,7 @@ document.addEventListener('DOMContentLoaded', ()=>{
                     span.style.wordWrap='break-word';
                     
                         setTextWithRegexFormatting(span, getData(el, sequenceIndex, waveContext), getEffectiveRegexRulesForElement(el), Number(el.props.lineHeight) || 1.2);
-                    // Copy font styles to span for overflow calculation
-                    span.style.fontFamily = el.props.fontFamily || 'Arial, sans-serif';
-                    span.style.fontSize = (el.props.fontSize || 16) + 'px';
-                    const fontWeight = el.props.fontWeight;
-                    if(typeof fontWeight === 'number'){
-                        span.style.fontWeight = fontWeight;
-                    } else {
-                        span.style.fontWeight = fontWeight || 'normal';
-                    }
-                    span.style.lineHeight = el.props.lineHeight !== undefined ? String(el.props.lineHeight) : '1.2';
+                    applyTextSpanStyles(span, el);
                     span.style.color = el.props.color || '#000000';
                     applySvgOutlineToTextContainer(el, span);
                     d.appendChild(span);
@@ -1929,16 +1921,7 @@ document.addEventListener('DOMContentLoaded', ()=>{
                     span.style.wordWrap='break-word';
                     
                     setTextWithRegexFormatting(span, getData(el, sequenceIndex, waveContext), getEffectiveRegexRulesForElement(el), Number(el.props.lineHeight) || 1.2);
-                    // Copy font styles to span for overflow calculation
-                    span.style.fontFamily = el.props.fontFamily || 'Arial, sans-serif';
-                    span.style.fontSize = (el.props.fontSize || 16) + 'px';
-                    const fontWeight = el.props.fontWeight;
-                    if(typeof fontWeight === 'number'){
-                        span.style.fontWeight = fontWeight;
-                    } else {
-                        span.style.fontWeight = fontWeight || 'normal';
-                    }
-                    span.style.lineHeight = el.props.lineHeight !== undefined ? String(el.props.lineHeight) : '1.2';
+                    applyTextSpanStyles(span, el);
                     span.style.color = el.props.color || '#000000';
                     applySvgOutlineToTextContainer(el, span);
                     d.appendChild(span);
@@ -2503,7 +2486,7 @@ document.addEventListener('DOMContentLoaded', ()=>{
                     measureDiv.style.fontSize = span.style.fontSize || (el.props.fontSize || 16) + 'px';
                     measureDiv.style.fontWeight = span.style.fontWeight || el.props.fontWeight || 'normal';
                     measureDiv.style.lineHeight = span.style.lineHeight || el.props.lineHeight || '1.2';
-                    measureDiv.style.letterSpacing = span.style.letterSpacing || 'normal';
+                    measureDiv.style.letterSpacing = span.style.letterSpacing || formatLetterSpacingPx(el.props.letterSpacing);
                     document.body.appendChild(measureDiv);
                     
                     // Measure text width
@@ -2615,6 +2598,7 @@ document.addEventListener('DOMContentLoaded', ()=>{
                 measureDiv.style.fontFamily = span.style.fontFamily || el.props.fontFamily || 'Arial, sans-serif';
                 measureDiv.style.fontWeight = span.style.fontWeight || el.props.fontWeight || 'normal';
                 measureDiv.style.lineHeight = span.style.lineHeight || el.props.lineHeight || '1.2';
+                measureDiv.style.letterSpacing = span.style.letterSpacing || formatLetterSpacingPx(el.props.letterSpacing);
                 measureDiv.style.whiteSpace = span.style.whiteSpace || 'pre-wrap';
                 measureDiv.style.wordWrap = span.style.wordWrap || 'break-word';
                 document.body.appendChild(measureDiv);
@@ -2997,6 +2981,22 @@ document.addEventListener('DOMContentLoaded', ()=>{
         img.style.printColorAdjust = 'exact';
     }
 
+    function formatLetterSpacingPx(val){
+        if(val === '' || val === undefined || val === null) return 'normal';
+        const n = Number(val);
+        return Number.isFinite(n) ? (n + 'px') : 'normal';
+    }
+
+    function applyTextSpanStyles(span, el){
+        span.style.fontFamily = el.props.fontFamily || 'Arial, sans-serif';
+        span.style.fontSize = (el.props.fontSize || 16) + 'px';
+        const fontWeight = el.props.fontWeight;
+        if(typeof fontWeight === 'number') span.style.fontWeight = fontWeight;
+        else span.style.fontWeight = fontWeight || 'normal';
+        span.style.lineHeight = el.props.lineHeight !== undefined ? String(el.props.lineHeight) : '1.2';
+        span.style.letterSpacing = formatLetterSpacingPx(el.props.letterSpacing);
+    }
+
     // Helper function to set text content with regex formatting
     function setTextWithRegexFormatting(element, text, elementRules, baseLineHeight){
         // Combine global rules with element-specific rules
@@ -3106,6 +3106,10 @@ document.addEventListener('DOMContentLoaded', ()=>{
             }
             if(rule.fontSize && rule.fontSize !== '' && rule.fontSize !== 'inherit'){
                 styles.push(`font-size: ${rule.fontSize}px`);
+            }
+            if(rule.letterSpacing !== '' && rule.letterSpacing !== undefined && rule.letterSpacing !== null && rule.letterSpacing !== 'inherit'){
+                const ls = Number(rule.letterSpacing);
+                if(Number.isFinite(ls)) styles.push(`letter-spacing: ${ls}px`);
             }
             ['Top', 'Bottom', 'Left', 'Right'].forEach(side => {
                 const key = 'padding' + side;
@@ -3838,11 +3842,12 @@ document.addEventListener('DOMContentLoaded', ()=>{
 
             if(el.type==='text' || el.type==='data'){
                 const currentFontFamily = valueFor('props.fontFamily') || 'Arial, sans-serif';
-                const fontSizeVal = valueFor('props.fontSize'); const lineHVal = valueFor('props.lineHeight'); const weightVal = valueFor('props.fontWeight');
+                const fontSizeVal = valueFor('props.fontSize'); const lineHVal = valueFor('props.lineHeight'); const letterSpacingVal = valueFor('props.letterSpacing'); const weightVal = valueFor('props.fontWeight');
                 h += `<hr><div class="${grid1Cls}"><label class="${labelClass('props.fontSize')}">Font Size</label><input type="number" step="1" data-prop="props.fontSize" value="${fontSizeVal!==undefined?fontSizeVal:16}" min="6" max="200">${syncBtn('props.fontSize')}</div>`;
                 h += `<div class="${grid1Cls}"><label class="${labelClass('props.fontFamily')}">Font Family</label><div style="display:flex;gap:4px;align-items:center;min-width:0"><select data-prop="props.fontFamily" id="font-family-select-${el.id}" style="flex:1;min-width:0">${generateFontOptions(currentFontFamily)}</select><button type="button" id="font-favorite-btn-${el.id}" style="padding:4px 8px;font-size:16px;background:transparent;border:1px solid #ccc;border-radius:4px;cursor:pointer;flex-shrink:0" title="${fontFavorites.includes(currentFontFamily) ? 'Remove from favorites' : 'Add to favorites'}">${fontFavorites.includes(currentFontFamily) ? '⭐' : '☆'}</button></div>${syncBtn('props.fontFamily')}</div>`;
                 h += `<div class="${grid1Cls}"><label class="${labelClass('props.fontWeight')}">Weight</label><select data-prop="props.fontWeight" id="font-weight-select-${el.id}">${generateWeightOptions(currentFontFamily, weightVal)}</select>${syncBtn('props.fontWeight')}</div>`;
                 h += `<div class="${grid1Cls}"><label class="${labelClass('props.lineHeight')}">Line Height</label><input type="number" step="0.1" data-prop="props.lineHeight" value="${lineHVal!==undefined?lineHVal:1.2}" min="0.5" max="3">${syncBtn('props.lineHeight')}</div>`;
+                h += `<div class="${grid1Cls}"><label class="${labelClass('props.letterSpacing')}">Letter spacing (px)</label><input type="number" step="0.1" data-prop="props.letterSpacing" value="${letterSpacingVal!==undefined?letterSpacingVal:0}">${syncBtn('props.letterSpacing')}</div>`;
                 const taVal = valueFor('props.textAlign'); const vaVal = valueFor('props.valign'); const overflowVal = valueFor('props.textOverflow'); const rotVal = valueFor('props.rotation');
                 h += `<div class="${grid1Cls}"><label class="${labelClass('props.textAlign')}">H. Align</label><select data-prop="props.textAlign"><option value="left" ${taVal==='left'?'selected':''}>Left</option><option value="center" ${taVal==='center'?'selected':''}>Center</option><option value="right" ${taVal==='right'?'selected':''}>Right</option></select>${syncBtn('props.textAlign')}</div>`;
                 h += `<div class="${grid1Cls}"><label class="${labelClass('props.valign')}">V. Align</label><select data-prop="props.valign"><option value="top" ${vaVal==='top'?'selected':''}>Top</option><option value="middle" ${vaVal==='middle'?'selected':''}>Middle</option><option value="bottom" ${vaVal==='bottom'?'selected':''}>Bottom</option></select>${syncBtn('props.valign')}</div>`;
@@ -3872,6 +3877,7 @@ document.addEventListener('DOMContentLoaded', ()=>{
                     const pkFontWeight = `props.regexRules.${index}.fontWeight`;
                     const pkFontSize = `props.regexRules.${index}.fontSize`;
                     const pkLineHeight = `props.regexRules.${index}.lineHeight`;
+                    const pkLetterSpacing = `props.regexRules.${index}.letterSpacing`;
                     const pkItalic = `props.regexRules.${index}.italic`;
                     const pkUnderline = `props.regexRules.${index}.underline`;
                     const pkPaddingTop = `props.regexRules.${index}.paddingTop`;
@@ -3882,6 +3888,7 @@ document.addEventListener('DOMContentLoaded', ()=>{
                     const weightVal = valueFor(pkFontWeight);
                     const sizeVal = valueFor(pkFontSize);
                     const lhVal = valueFor(pkLineHeight);
+                    const lsVal = valueFor(pkLetterSpacing);
                     const italicVal = valueFor(pkItalic);
                     const underlineVal = valueFor(pkUnderline);
                     const padTopVal = valueFor(pkPaddingTop);
@@ -3910,6 +3917,7 @@ document.addEventListener('DOMContentLoaded', ()=>{
                     h += `</select>${syncBtn(pkFontWeight)}</div>`;
                     h += `<div class="${grid1Cls}"><label class="${labelClass(pkFontSize)}">Font Size</label><input type="number" class="regex-size-input" data-rule-index="${index}" placeholder="inherit" value="${sizeVal !== undefined && sizeVal !== '' ? sizeVal : ''}" min="6" max="200" step="1" style="font-size:12px;padding:4px">${syncBtn(pkFontSize)}</div>`;
                     h += `<div class="${grid1Cls}"><label class="${labelClass(pkLineHeight)}">Line Height</label><input type="number" class="regex-line-height-input" data-rule-index="${index}" placeholder="inherit" value="${lhVal !== undefined && lhVal !== '' ? lhVal : ''}" min="0.5" max="3" step="0.1" style="font-size:12px;padding:4px">${syncBtn(pkLineHeight)}</div>`;
+                    h += `<div class="${grid1Cls}"><label class="${labelClass(pkLetterSpacing)}">Letter spacing (px)</label><input type="number" class="regex-letter-spacing-input" data-rule-index="${index}" placeholder="inherit" value="${lsVal !== undefined && lsVal !== '' ? lsVal : ''}" step="0.1" style="font-size:12px;padding:4px">${syncBtn(pkLetterSpacing)}</div>`;
                     h += `<div class="${grid1Cls}"><label class="${labelClass(pkItalic)}">Italic</label><input type="checkbox" class="regex-italic-checkbox" data-rule-index="${index}" ${italicVal ? 'checked' : ''}>${syncBtn(pkItalic)}</div>`;
                     h += `<div class="${grid1Cls}"><label class="${labelClass(pkUnderline)}">Underline</label><input type="checkbox" class="regex-underline-checkbox" data-rule-index="${index}" ${underlineVal ? 'checked' : ''}>${syncBtn(pkUnderline)}</div>`;
                     h += `<div style="margin-top:6px"><label style="font-size:12px;font-weight:600;display:block;margin-bottom:4px">Padding (px)</label></div>`;
@@ -4204,6 +4212,23 @@ document.addEventListener('DOMContentLoaded', ()=>{
                         }
                     });
                 });
+
+                pp.querySelectorAll('.regex-letter-spacing-input').forEach(input => {
+                    input.addEventListener('input', function(){
+                        const index = parseInt(this.dataset.ruleIndex);
+                        if(!el.props.regexRules) el.props.regexRules = [];
+                        if(!el.props.regexRules[index]) return;
+                        const val = this.value.trim();
+                        el.props.regexRules[index].letterSpacing = val === '' ? '' : Number(val);
+                        render();
+                        saveCurrentDesign();
+                        const propKey = `props.regexRules.${index}.letterSpacing`;
+                        if(el.masterThreadId){
+                            const t = getMasterThread(el.masterThreadId);
+                            if(t && isPropSynced(t, propKey)) syncPropertyToThread(el.masterThreadId, propKey, el.props.regexRules[index].letterSpacing);
+                        }
+                    });
+                });
                 
                 pp.querySelectorAll('.regex-italic-checkbox').forEach(checkbox => {
                     checkbox.addEventListener('change', function(){
@@ -4361,6 +4386,7 @@ document.addEventListener('DOMContentLoaded', ()=>{
             h += `<div class="prop-grid"><label>Height</label><div style="display:flex;align-items:center;gap:8px;min-width:0"><input type="number" step="0.01" data-prop="multi.height" value="${common('height')}" style="flex:1;min-width:0"><button type="button" class="prop-aspect-link-btn ${allLockedAspect ? 'active' : ''}" id="multi-prop-aspect-link-toggle" title="Blocca/sblocca proporzioni su tutti gli elementi selezionati">🔗</button></div></div><hr>`;
                 h += `<div class="prop-grid"><label>Font Size</label><input type="number" step="0.1" data-prop="multi.props.fontSize" value="${common('props.fontSize')}" min="6"><label>Font Family</label><div style="display:flex;gap:4px;align-items:center"><select data-prop="multi.props.fontFamily" id="multi-font-family-select" style="flex:1">${generateFontOptions(commonFontFamily)}</select><button type="button" id="multi-font-favorite-btn" style="padding:4px 8px;font-size:16px;background:transparent;border:1px solid #ccc;border-radius:4px;cursor:pointer;flex-shrink:0" title="${fontFavorites.includes(commonFontFamily) ? 'Remove from favorites' : 'Add to favorites'}">${fontFavorites.includes(commonFontFamily) ? '⭐' : '☆'}</button></div></div>`;
             h += `<div class="prop-grid"><label>Font Weight</label><select data-prop="multi.props.fontWeight" id="multi-font-weight-select">${generateWeightOptions(commonFontFamily, commonWeight)}</select><label>Line Height</label><input type="number" step="0.1" data-prop="multi.props.lineHeight" value="${common('props.lineHeight')}" min="0.5" max="3"></div>`;
+            h += `<div class="prop-grid"><label>Letter spacing (px)</label><input type="number" step="0.1" data-prop="multi.props.letterSpacing" value="${common('props.letterSpacing')}"></div>`;
             h += `<div class="prop-grid"><label>H. Align</label><select data-prop="multi.props.textAlign"><option value="">—</option><option value="left" ${common('props.textAlign')==='left'?'selected':''}>Left</option><option value="center" ${common('props.textAlign')==='center'?'selected':''}>Center</option><option value="right" ${common('props.textAlign')==='right'?'selected':''}>Right</option></select><label>V. Align</label><select data-prop="multi.props.valign"><option value="">—</option><option value="top" ${common('props.valign')==='top'?'selected':''}>Top</option><option value="middle" ${common('props.valign')==='middle'?'selected':''}>Middle</option><option value="bottom" ${common('props.valign')==='bottom'?'selected':''}>Bottom</option></select></div>`;
             const hasTextOrData = elems.some(el => el.type === 'text' || el.type === 'data');
             if(hasTextOrData){
@@ -5453,8 +5479,8 @@ document.addEventListener('DOMContentLoaded', ()=>{
             return true;
         }
 
-        const REGEX_RULE_FIELD_NAMES = 'pattern|fontWeight|fontSize|lineHeight|italic|underline|enabled|paddingTop|paddingBottom|paddingLeft|paddingRight';
-        const REGEX_RULE_NUMERIC_FIELDS = new Set(['fontSize', 'lineHeight', 'paddingTop', 'paddingBottom', 'paddingLeft', 'paddingRight']);
+        const REGEX_RULE_FIELD_NAMES = 'pattern|fontWeight|fontSize|lineHeight|letterSpacing|italic|underline|enabled|paddingTop|paddingBottom|paddingLeft|paddingRight';
+        const REGEX_RULE_NUMERIC_FIELDS = new Set(['fontSize', 'lineHeight', 'letterSpacing', 'paddingTop', 'paddingBottom', 'paddingLeft', 'paddingRight']);
 
         function parseRegexRulePropKey(propKey){
             const m = new RegExp('^props\\.regexRules\\.(\\d+)\\.(' + REGEX_RULE_FIELD_NAMES + ')$').exec(String(propKey || ''));
@@ -5466,7 +5492,7 @@ document.addEventListener('DOMContentLoaded', ()=>{
             return new RegExp('^props\\.regexRules\\.\\d+\\.(' + REGEX_RULE_FIELD_NAMES + ')$').test(String(propKey || ''));
         }
 
-        const REGEX_RULE_SYNC_FIELDS = ['pattern', 'fontWeight', 'fontSize', 'lineHeight', 'italic', 'underline', 'enabled', 'paddingTop', 'paddingBottom', 'paddingLeft', 'paddingRight'];
+        const REGEX_RULE_SYNC_FIELDS = ['pattern', 'fontWeight', 'fontSize', 'lineHeight', 'letterSpacing', 'italic', 'underline', 'enabled', 'paddingTop', 'paddingBottom', 'paddingLeft', 'paddingRight'];
 
         function defaultRegexRule(order){
             return {
@@ -5476,6 +5502,7 @@ document.addEventListener('DOMContentLoaded', ()=>{
                 underline: false,
                 fontSize: '',
                 lineHeight: '',
+                letterSpacing: '',
                 paddingTop: '',
                 paddingBottom: '',
                 paddingLeft: '',
@@ -5722,6 +5749,12 @@ document.addEventListener('DOMContentLoaded', ()=>{
             }
             if(field === 'lineHeight'){
                 const inp = pp.querySelector('.regex-line-height-input[data-rule-index="' + index + '"]');
+                if(!inp) return null;
+                const val = inp.value.trim();
+                return val === '' ? '' : Number(val);
+            }
+            if(field === 'letterSpacing'){
+                const inp = pp.querySelector('.regex-letter-spacing-input[data-rule-index="' + index + '"]');
                 if(!inp) return null;
                 const val = inp.value.trim();
                 return val === '' ? '' : Number(val);
@@ -6886,16 +6919,7 @@ document.addEventListener('DOMContentLoaded', ()=>{
                             }
                             
                             setTextWithRegexFormatting(span, getData(el, sequenceIndex, waveContext), getEffectiveRegexRulesForElement(el), Number(el.props.lineHeight) || 1.2);
-                            // Copy font styles to span for overflow calculation
-                            span.style.fontFamily = el.props.fontFamily || 'Arial, sans-serif';
-                            span.style.fontSize = (el.props.fontSize || 16) + 'px';
-                            const fontWeight = el.props.fontWeight;
-                            if(typeof fontWeight === 'number'){
-                                span.style.fontWeight = fontWeight;
-                            } else {
-                                span.style.fontWeight = fontWeight || 'normal';
-                            }
-                            span.style.lineHeight = el.props.lineHeight !== undefined ? String(el.props.lineHeight) : '1.2';
+                            applyTextSpanStyles(span, el);
                             span.style.color = el.props.color || '#000000';
                             applySvgOutlineToTextContainer(el, span);
                             d.appendChild(span);
@@ -6921,16 +6945,7 @@ document.addEventListener('DOMContentLoaded', ()=>{
                             }
                             
                             setTextWithRegexFormatting(span, getData(el, sequenceIndex, waveContext), getEffectiveRegexRulesForElement(el), Number(el.props.lineHeight) || 1.2);
-                            // Copy font styles to span for overflow calculation
-                            span.style.fontFamily = el.props.fontFamily || 'Arial, sans-serif';
-                            span.style.fontSize = (el.props.fontSize || 16) + 'px';
-                            const fontWeight = el.props.fontWeight;
-                            if(typeof fontWeight === 'number'){
-                                span.style.fontWeight = fontWeight;
-                            } else {
-                                span.style.fontWeight = fontWeight || 'normal';
-                            }
-                            span.style.lineHeight = el.props.lineHeight !== undefined ? String(el.props.lineHeight) : '1.2';
+                            applyTextSpanStyles(span, el);
                             span.style.color = el.props.color || '#000000';
                             applySvgOutlineToTextContainer(el, span);
                             d.appendChild(span);
@@ -7517,16 +7532,7 @@ document.addEventListener('DOMContentLoaded', ()=>{
                             }
                             
                             setTextWithRegexFormatting(span, getData(el, sequenceIndex, waveContext), getEffectiveRegexRulesForElement(el), Number(el.props.lineHeight) || 1.2);
-                            // Copy font styles to span for overflow calculation
-                            span.style.fontFamily = el.props.fontFamily || 'Arial, sans-serif';
-                            span.style.fontSize = (el.props.fontSize || 16) + 'px';
-                            const fontWeight = el.props.fontWeight;
-                            if(typeof fontWeight === 'number'){
-                                span.style.fontWeight = fontWeight;
-                            } else {
-                                span.style.fontWeight = fontWeight || 'normal';
-                            }
-                            span.style.lineHeight = el.props.lineHeight !== undefined ? String(el.props.lineHeight) : '1.2';
+                            applyTextSpanStyles(span, el);
                             span.style.color = el.props.color || '#000000';
                             applySvgOutlineToTextContainer(el, span);
                             d.appendChild(span);
@@ -7552,16 +7558,7 @@ document.addEventListener('DOMContentLoaded', ()=>{
                             }
                             
                             setTextWithRegexFormatting(span, getData(el, sequenceIndex, waveContext), getEffectiveRegexRulesForElement(el), Number(el.props.lineHeight) || 1.2);
-                            // Copy font styles to span for overflow calculation
-                            span.style.fontFamily = el.props.fontFamily || 'Arial, sans-serif';
-                            span.style.fontSize = (el.props.fontSize || 16) + 'px';
-                            const fontWeight = el.props.fontWeight;
-                            if(typeof fontWeight === 'number'){
-                                span.style.fontWeight = fontWeight;
-                            } else {
-                                span.style.fontWeight = fontWeight || 'normal';
-                            }
-                            span.style.lineHeight = el.props.lineHeight !== undefined ? String(el.props.lineHeight) : '1.2';
+                            applyTextSpanStyles(span, el);
                             span.style.color = el.props.color || '#000000';
                             applySvgOutlineToTextContainer(el, span);
                             d.appendChild(span);
@@ -8115,9 +8112,7 @@ document.addEventListener('DOMContentLoaded', ()=>{
                         }
                         
                         setTextWithRegexFormatting(span, getData(el, sequenceIndex, waveContext), getEffectiveRegexRulesForElement(el), Number(el.props.lineHeight) || 1.2);
-                        span.style.fontFamily = el.props.fontFamily || 'Arial, sans-serif';
-                        span.style.fontSize = (el.props.fontSize || 16) + 'px';
-                        span.style.lineHeight = el.props.lineHeight !== undefined ? String(el.props.lineHeight) : '1.2';
+                        applyTextSpanStyles(span, el);
                         span.style.color = el.props.color || '#000000';
                         applySvgOutlineToTextContainer(el, span);
                         d.appendChild(span);
@@ -8143,9 +8138,7 @@ document.addEventListener('DOMContentLoaded', ()=>{
                         }
                         
                         setTextWithRegexFormatting(span, getData(el, sequenceIndex, waveContext), getEffectiveRegexRulesForElement(el), Number(el.props.lineHeight) || 1.2);
-                        span.style.fontFamily = el.props.fontFamily || 'Arial, sans-serif';
-                        span.style.fontSize = (el.props.fontSize || 16) + 'px';
-                        span.style.lineHeight = el.props.lineHeight !== undefined ? String(el.props.lineHeight) : '1.2';
+                        applyTextSpanStyles(span, el);
                         span.style.color = el.props.color || '#000000';
                         applySvgOutlineToTextContainer(el, span);
                         d.appendChild(span);
@@ -9074,7 +9067,7 @@ document.addEventListener('DOMContentLoaded', ()=>{
         if(p.includes('.')){
             const [o,k] = p.split('.');
             if(!el[o]) el[o] = {};
-                if(['fontSize','decimals','thickness','borderWidth','rotation','paddingTop','paddingRight','paddingBottom','paddingLeft','marginTop','marginRight','marginBottom','marginLeft','textOutlineWidth','textOutline2Width','imageOpacity','x','y','width','height','borderRadiusTopLeft','borderRadiusTopRight','borderRadiusBottomRight','borderRadiusBottomLeft'].includes(k)) el[o][k] = Number(v);
+                if(['fontSize','lineHeight','letterSpacing','decimals','thickness','borderWidth','rotation','paddingTop','paddingRight','paddingBottom','paddingLeft','marginTop','marginRight','marginBottom','marginLeft','textOutlineWidth','textOutline2Width','imageOpacity','x','y','width','height','borderRadiusTopLeft','borderRadiusTopRight','borderRadiusBottomRight','borderRadiusBottomLeft'].includes(k)) el[o][k] = Number(v);
                 else if(['showBorder','displayValue','asPercent','borderTop','borderRight','borderBottom','borderLeft','textOutlineEnabled','textOutline2Enabled'].includes(k)) el[o][k] = !!v;
                 else if(k === 'fontWeight'){
                     // Handle fontWeight: can be number (100-900) or string ('normal', 'bold')
@@ -9236,7 +9229,7 @@ document.addEventListener('DOMContentLoaded', ()=>{
                 if(keyPath.includes('.')){
                     const [o,k] = keyPath.split('.');
                     if(!el[o]) el[o] = {};
-                        if(['fontSize','lineHeight','decimals','thickness','borderWidth','rotation','paddingTop','paddingRight','paddingBottom','paddingLeft','marginTop','marginRight','marginBottom','marginLeft','textOutlineWidth','textOutline2Width','x','y','width','height'].includes(k)) el[o][k] = Number(value);
+                        if(['fontSize','lineHeight','letterSpacing','decimals','thickness','borderWidth','rotation','paddingTop','paddingRight','paddingBottom','paddingLeft','marginTop','marginRight','marginBottom','marginLeft','textOutlineWidth','textOutline2Width','x','y','width','height'].includes(k)) el[o][k] = Number(value);
                         else if(['showBorder','displayValue','asPercent','borderTop','borderRight','borderBottom','borderLeft','textOutlineEnabled','textOutline2Enabled'].includes(k)) el[o][k] = !!value;
                         else if(k === 'fontWeight'){
                             // Handle fontWeight: can be number (100-900) or string ('normal', 'bold')
@@ -10527,6 +10520,10 @@ document.addEventListener('DOMContentLoaded', ()=>{
                     <input type="number" class="global-regex-line-height-input" data-rule-index="${index}" placeholder="inherit" value="${rule.lineHeight || ''}" min="0.5" max="3" step="0.1" style="font-size:12px;padding:4px">
                 </div>
                 <div class="prop-grid" style="grid-template-columns:1fr 1fr;gap:6px">
+                    <label style="font-size:12px">Letter spacing (px):</label>
+                    <input type="number" class="global-regex-letter-spacing-input" data-rule-index="${index}" placeholder="inherit" value="${rule.letterSpacing || ''}" step="0.1" style="font-size:12px;padding:4px">
+                </div>
+                <div class="prop-grid" style="grid-template-columns:1fr 1fr;gap:6px">
                     <label style="font-size:12px;display:flex;align-items:center;gap:4px"><input type="checkbox" class="global-regex-italic-checkbox" data-rule-index="${index}" ${rule.italic ? 'checked' : ''} style="width:auto"> Italic</label>
                     <label style="font-size:12px;display:flex;align-items:center;gap:4px"><input type="checkbox" class="global-regex-underline-checkbox" data-rule-index="${index}" ${rule.underline ? 'checked' : ''} style="width:auto"> Underline</label>
                 </div>
@@ -10560,6 +10557,7 @@ document.addEventListener('DOMContentLoaded', ()=>{
                 underline: false,
                 fontSize: '',
                 lineHeight: '',
+                letterSpacing: '',
                 paddingTop: '',
                 paddingBottom: '',
                 paddingLeft: '',
@@ -10609,6 +10607,15 @@ document.addEventListener('DOMContentLoaded', ()=>{
                 return;
             }
         }
+        if(e.target.classList.contains('global-regex-letter-spacing-input')){
+            const index = parseInt(e.target.dataset.ruleIndex);
+            if(!globalRegexRules) globalRegexRules = [];
+            if(!globalRegexRules[index]) return;
+            const val = e.target.value.trim();
+            globalRegexRules[index].letterSpacing = val === '' ? '' : Number(val);
+            render();
+            saveCurrentDesign();
+        }
     });
 
     document.addEventListener('change', function(e){
@@ -10616,7 +10623,8 @@ document.addEventListener('DOMContentLoaded', ()=>{
            e.target.classList.contains('global-regex-italic-checkbox') ||
            e.target.classList.contains('global-regex-underline-checkbox') ||
            e.target.classList.contains('global-regex-size-input') ||
-           e.target.classList.contains('global-regex-line-height-input')){
+           e.target.classList.contains('global-regex-line-height-input') ||
+           e.target.classList.contains('global-regex-letter-spacing-input')){
             const index = parseInt(e.target.dataset.ruleIndex);
             if(!globalRegexRules) globalRegexRules = [];
             if(!globalRegexRules[index]) return;
@@ -10633,6 +10641,9 @@ document.addEventListener('DOMContentLoaded', ()=>{
             } else if(e.target.classList.contains('global-regex-line-height-input')){
                 const val = e.target.value.trim();
                 globalRegexRules[index].lineHeight = val === '' ? '' : Number(val);
+            } else if(e.target.classList.contains('global-regex-letter-spacing-input')){
+                const val = e.target.value.trim();
+                globalRegexRules[index].letterSpacing = val === '' ? '' : Number(val);
             }
 
             render();
