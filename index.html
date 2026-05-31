@@ -105,6 +105,7 @@
         .label-element.selected{border:2px dashed #007aff;box-shadow:0 0 0 1px rgba(0,122,255,.1)}
         .label-element.synchronized-selected{border:2px dashed #4CAF50;box-shadow:0 0 0 1px rgba(76,175,80,.2), 0 0 8px rgba(76,175,80,.3)}
         .label-element.layer-pick-focus{outline:2px dashed #9c27b0!important;box-shadow:0 0 0 2px rgba(156,39,176,0.35)!important}
+        .label-element.layer-pick-peek{opacity:0.72}
         .resize-handle{position:absolute;width:24px;height:24px;bottom:-12px;right:-12px;cursor:nwse-resize;display:none;z-index:10000;pointer-events:auto;background:transparent}
         .resize-handle-inner{position:absolute;width:12px;height:12px;background:#007aff;border:2px solid #fff;border-radius:50%;top:50%;left:50%;transform:translate(-50%,-50%);box-shadow:0 2px 4px rgba(0,0,0,.2)}
         .label-element.selected .resize-handle{display:block}
@@ -126,6 +127,7 @@
             #mini-toolbar .mini-toolbar-col3 select{width:100%;min-width:7em;padding:4px 8px;font-size:12px;border:1px solid #ccc;border-radius:4px;background:#fff;box-sizing:border-box}
             #mini-toolbar .mini-toolbar-col3 button{padding:6px 10px;font-size:13px;white-space:nowrap;align-self:stretch}
             .widget-mode #canvas-container .label-element{pointer-events:none;cursor:default}
+            .widget-mode #canvas-container #layer-stack-indicator{display:none!important}
             .widget-mode #canvas-container{cursor:default}
         .column-mention-dropdown{position:fixed;z-index:10000;background:#fff;border:1px solid #ccc;border-radius:4px;box-shadow:0 4px 12px rgba(0,0,0,.15);max-height:200px;overflow-y:auto;min-width:160px;display:none}
         .column-mention-dropdown.column-mention-dropdown-visible{display:block}
@@ -133,6 +135,10 @@
         .column-mention-dropdown-item:last-child{border-bottom:none}
         .column-mention-dropdown-item:hover,.column-mention-dropdown-item.column-mention-dropdown-item-selected{background:#e8f0fe;color:#1967d2}
         #canvas-wrapper{position:relative}
+        #layer-stack-indicator{position:absolute;top:12px;left:12px;z-index:10002;display:none;flex-direction:column-reverse;align-items:flex-start;gap:5px;pointer-events:none;padding:6px 8px;border-radius:8px;background:rgba(255,255,255,0.9);box-shadow:0 1px 4px rgba(0,0,0,0.15)}
+        #layer-stack-indicator.visible{display:flex}
+        .layer-stack-bar{height:5px;width:18px;border-radius:999px;background:rgba(156,39,176,0.35);transition:width 0.15s ease,background 0.15s ease}
+        .layer-stack-bar.active{width:40px;background:rgba(156,39,176,0.92)}
         #bw-preview-overlay{position:absolute;left:0;top:0;pointer-events:none;display:none;z-index:2}
         #bw-preview-overlay.bw-preview-visible{display:block}
         #canvas-wrapper.bw-preview-active #label-canvas{visibility:hidden}
@@ -295,6 +301,7 @@
         </div>
 
         <div id="canvas-container">
+            <div id="layer-stack-indicator" aria-hidden="true"></div>
             <div id="canvas-wrapper">
                 <div id="label-canvas"></div>
                 <canvas id="bw-preview-overlay"></canvas>
@@ -1755,6 +1762,20 @@ document.addEventListener('DOMContentLoaded', ()=>{
             a.y < b.y + b.height && a.y + a.height > b.y;
     }
 
+    /** True se un altro elemento con z-order maggiore copre (anche in parte) questo. */
+    function elementHasOccluderAbove(el, elements){
+        const elIdx = elements.findIndex(e => e.id === el.id);
+        if(elIdx < 0) return false;
+        const zEl = el.zIndex || 0;
+        return elements.some((other, oidx) => {
+            if(other.id === el.id) return false;
+            if(!elementsOverlapOnCanvas(el, other)) return false;
+            const zOther = other.zIndex || 0;
+            if(zOther > zEl) return true;
+            return zOther === zEl && oidx > elIdx;
+        });
+    }
+
     /** Piani di sovrapposizione (dietro→davanti); ogni slice = id elementi allo stesso piano. */
     function computeOverlapStackSlices(){
         const els = S.map(normalizeElement).slice().sort((a, b) => {
@@ -1794,6 +1815,7 @@ document.addEventListener('DOMContentLoaded', ()=>{
     function clearShiftLayerPick(){
         if(shiftLayerPickIndex < 0) return;
         shiftLayerPickIndex = -1;
+        updateLayerStackIndicator();
         render();
     }
 
@@ -1826,6 +1848,25 @@ document.addEventListener('DOMContentLoaded', ()=>{
         if(next < 0) next = slices.length - 1;
         if(next >= slices.length) next = 0;
         setShiftLayerPickByIndex(next);
+    }
+
+    function updateLayerStackIndicator(){
+        const indicator = document.getElementById('layer-stack-indicator');
+        if(!indicator) return;
+        const slices = computeOverlapStackSlices();
+        const show = shiftLayerPickIndex >= 0 && slices.length > 0 && shiftLayerPickIndex < slices.length;
+        if(!show){
+            indicator.classList.remove('visible');
+            indicator.innerHTML = '';
+            indicator.setAttribute('aria-hidden', 'true');
+            return;
+        }
+        indicator.classList.add('visible');
+        indicator.setAttribute('aria-hidden', 'false');
+        indicator.innerHTML = slices.map((_, i) => {
+            const active = i === shiftLayerPickIndex;
+            return `<div class="layer-stack-bar${active ? ' active' : ''}" role="presentation" data-layer-index="${i}"></div>`;
+        }).join('');
     }
 
     function canvasPointFromClient(clientX, clientY){
@@ -1883,10 +1924,15 @@ document.addEventListener('DOMContentLoaded', ()=>{
             d.style.width = `${el.width}cm`;
             d.style.height = `${el.height}cm`;
             const baseZIndex = el.zIndex || 0;
-            if(elevateSelected && selectedSet.has(el.id)){
+            const peekOccluded = layerPickMode && focusSliceIds.has(el.id) &&
+                elementHasOccluderAbove(el, sorted);
+            if(peekOccluded){
+                d.classList.add('layer-pick-peek');
+                d.style.zIndex = String(maxZ + 100 + baseZIndex);
+            } else if(elevateSelected && selectedSet.has(el.id)){
                 d.style.zIndex = String(maxZ + 1 + baseZIndex);
             } else {
-                d.style.zIndex = baseZIndex >= 0 ? baseZIndex : 0;
+                d.style.zIndex = baseZIndex >= 0 ? String(baseZIndex) : '0';
             }
             d.style.fontSize = `${el.props.fontSize || 16}px`;
                 const fontWeight = el.props.fontWeight;
@@ -2340,6 +2386,7 @@ document.addEventListener('DOMContentLoaded', ()=>{
         renderElementsForCanvas(S, 1, 0);
         // Reset container height to single label height
         lc.style.height = `${H}cm`;
+        updateLayerStackIndicator();
         if(bwModeEnabled) scheduleBwPreviewUpdate();
     }
 
@@ -9047,7 +9094,7 @@ document.addEventListener('DOMContentLoaded', ()=>{
         if(!isFullScreen || !e.shiftKey) return;
         if(e.target.closest && e.target.closest('#sidebar')) return;
         e.preventDefault();
-        const delta = e.deltaY > 0 ? 1 : -1;
+        const delta = e.deltaY > 0 ? -1 : 1;
         cycleShiftLayerPick(delta);
     }, { passive: false });
 
