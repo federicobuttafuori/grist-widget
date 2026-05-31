@@ -105,7 +105,8 @@
         .label-element.selected{border:2px dashed #007aff;box-shadow:0 0 0 1px rgba(0,122,255,.1)}
         .label-element.synchronized-selected{border:2px dashed #4CAF50;box-shadow:0 0 0 1px rgba(76,175,80,.2), 0 0 8px rgba(76,175,80,.3)}
         .label-element.layer-pick-focus{outline:2px dashed #9c27b0!important;box-shadow:0 0 0 2px rgba(156,39,176,0.35)!important}
-        .label-element.layer-pick-peek{opacity:0.72}
+        .layer-pick-peek-fragment{pointer-events:none;opacity:0.72;box-sizing:border-box}
+        .layer-pick-peek-fragment .layer-pick-peek-clone{pointer-events:none;border-color:transparent!important;box-shadow:none!important}
         .resize-handle{position:absolute;width:24px;height:24px;bottom:-12px;right:-12px;cursor:nwse-resize;display:none;z-index:10000;pointer-events:auto;background:transparent}
         .resize-handle-inner{position:absolute;width:12px;height:12px;background:#007aff;border:2px solid #fff;border-radius:50%;top:50%;left:50%;transform:translate(-50%,-50%);box-shadow:0 2px 4px rgba(0,0,0,.2)}
         .label-element.selected .resize-handle{display:block}
@@ -1762,17 +1763,77 @@ document.addEventListener('DOMContentLoaded', ()=>{
             a.y < b.y + b.height && a.y + a.height > b.y;
     }
 
-    /** True se un altro elemento con z-order maggiore copre (anche in parte) questo. */
-    function elementHasOccluderAbove(el, elements){
-        const elIdx = elements.findIndex(e => e.id === el.id);
-        if(elIdx < 0) return false;
+    function isElementAboveOther(other, otherIdx, el, elIdx){
         const zEl = el.zIndex || 0;
-        return elements.some((other, oidx) => {
-            if(other.id === el.id) return false;
-            if(!elementsOverlapOnCanvas(el, other)) return false;
-            const zOther = other.zIndex || 0;
-            if(zOther > zEl) return true;
-            return zOther === zEl && oidx > elIdx;
+        const zOther = other.zIndex || 0;
+        return zOther > zEl || (zOther === zEl && otherIdx > elIdx);
+    }
+
+    /** Rettangoli (cm) dell’elemento coperti da qualcosa sopra. */
+    function getOccludedRectsForElement(el, elements){
+        const elIdx = elements.findIndex(e => e.id === el.id);
+        if(elIdx < 0) return [];
+        const rects = [];
+        elements.forEach((other, oidx) => {
+            if(other.id === el.id) return;
+            if(!elementsOverlapOnCanvas(el, other)) return;
+            if(!isElementAboveOther(other, oidx, el, elIdx)) return;
+            const ix1 = Math.max(el.x, other.x);
+            const iy1 = Math.max(el.y, other.y);
+            const ix2 = Math.min(el.x + el.width, other.x + other.width);
+            const iy2 = Math.min(el.y + el.height, other.y + other.height);
+            if(ix2 > ix1 && iy2 > iy1){
+                rects.push({ x: ix1, y: iy1, width: ix2 - ix1, height: iy2 - iy1 });
+            }
+        });
+        return rects;
+    }
+
+    function getZIndexAboveOccluders(el, sorted){
+        const elIdx = sorted.findIndex(e => e.id === el.id);
+        let zTop = el.zIndex || 0;
+        sorted.forEach((other, oidx) => {
+            if(other.id === el.id) return;
+            if(!elementsOverlapOnCanvas(el, other)) return;
+            if(!isElementAboveOther(other, oidx, el, elIdx)) return;
+            zTop = Math.max(zTop, other.zIndex || 0);
+        });
+        return zTop + 1;
+    }
+
+    function appendLayerPickPeekFragments(canvasEl, sourceDiv, el, sorted, baseOffsetY){
+        const rects = getOccludedRectsForElement(el, sorted);
+        if(!rects.length) return;
+        const zPeek = getZIndexAboveOccluders(el, sorted);
+        const ex = el.x;
+        const ey = el.y;
+        rects.forEach((r, fragIdx) => {
+            const frag = document.createElement('div');
+            frag.className = 'layer-pick-peek-fragment';
+            frag.style.position = 'absolute';
+            frag.style.left = `${r.x}cm`;
+            frag.style.top = `${r.y + baseOffsetY}cm`;
+            frag.style.width = `${r.width}cm`;
+            frag.style.height = `${r.height}cm`;
+            frag.style.overflow = 'hidden';
+            frag.style.pointerEvents = 'none';
+            frag.style.zIndex = String(zPeek + fragIdx);
+            frag.style.opacity = '0.72';
+            frag.style.boxSizing = 'border-box';
+
+            const inner = sourceDiv.cloneNode(true);
+            inner.classList.add('layer-pick-peek-clone');
+            inner.classList.remove('label-element', 'selected', 'synchronized-selected', 'layer-pick-focus');
+            inner.style.position = 'absolute';
+            inner.style.left = `${-(r.x - ex)}cm`;
+            inner.style.top = `${-(r.y - ey)}cm`;
+            inner.style.width = `${el.width}cm`;
+            inner.style.height = `${el.height}cm`;
+            inner.style.margin = '0';
+            inner.style.pointerEvents = 'none';
+            inner.querySelectorAll('.resize-handle').forEach(h => h.remove());
+            frag.appendChild(inner);
+            canvasEl.appendChild(frag);
         });
     }
 
@@ -1924,12 +1985,7 @@ document.addEventListener('DOMContentLoaded', ()=>{
             d.style.width = `${el.width}cm`;
             d.style.height = `${el.height}cm`;
             const baseZIndex = el.zIndex || 0;
-            const peekOccluded = layerPickMode && focusSliceIds.has(el.id) &&
-                elementHasOccluderAbove(el, sorted);
-            if(peekOccluded){
-                d.classList.add('layer-pick-peek');
-                d.style.zIndex = String(maxZ + 100 + baseZIndex);
-            } else if(elevateSelected && selectedSet.has(el.id)){
+            if(elevateSelected && selectedSet.has(el.id)){
                 d.style.zIndex = String(maxZ + 1 + baseZIndex);
             } else {
                 d.style.zIndex = baseZIndex >= 0 ? String(baseZIndex) : '0';
@@ -2377,6 +2433,9 @@ document.addEventListener('DOMContentLoaded', ()=>{
             }
 
             lc.appendChild(d);
+            if(layerPickMode && focusSliceIds.has(el.id)){
+                appendLayerPickPeekFragments(lc, d, el, sorted, baseOffsetY);
+            }
             });
         }
         
