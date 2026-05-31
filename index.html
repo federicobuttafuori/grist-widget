@@ -346,6 +346,7 @@ document.addEventListener('DOMContentLoaded', ()=>{
         let groups = [];                   // array of groups: [{id: 'group_xxx', elementIds: ['el_xxx', ...], bounds: {x, y, width, height}}]
     let z = 1;
     let isManuallyEditingGroupScale = false; // Flag to prevent updateProps from overwriting user input
+    let colorPickerUndoPending = false; // Un solo undo step per sessione color picker (drag nella tavolozza nativa)
     let R = {}, C = [];
     let columnCatalog = [];
     let columnRefToRecordKey = new Map();
@@ -4311,13 +4312,6 @@ document.addEventListener('DOMContentLoaded', ()=>{
                         }
                         render(); saveCurrentDesign(); updateProps();
                     });
-                    bgInput.addEventListener('input', function(){
-                        pushBeforeChange();
-                        el.props.backgroundColor = this.value;
-                        enableBgCb.checked = true;
-                        bgInput.disabled = false;
-                        render(); saveCurrentDesign(); updateProps();
-                    });
                 }
             }
             // Formato Data/Ora: select + custom input (senza data-prop per gestione custom)
@@ -4358,13 +4352,6 @@ document.addEventListener('DOMContentLoaded', ()=>{
                             el.props.fillColor = fillInput.value || '#ffffff';
                             fillInput.disabled = false;
                         }
-                        render(); saveCurrentDesign(); updateProps();
-                    });
-                    fillInput.addEventListener('input', function(){
-                        pushBeforeChange();
-                        el.props.fillColor = this.value;
-                        noFillCb.checked = false;
-                        fillInput.disabled = false;
                         render(); saveCurrentDesign(); updateProps();
                     });
                 }
@@ -9120,6 +9107,40 @@ document.addEventListener('DOMContentLoaded', ()=>{
             }
         }
 
+        // Color picker nativo: anteprima su canvas senza rifare il pannello (updateProps chiude la tavolozza al primo pixel)
+        if(target.type === 'color' && prop){
+            const parsedValue = target.value;
+            if(prop.startsWith('multi.')){
+                const keyPath = prop.slice('multi.'.length);
+                selectedIds.forEach(id => {
+                    const el = S.find(s => s.id === id);
+                    if(!el) return;
+                    if(keyPath.includes('.')){
+                        const parts = keyPath.split('.');
+                        let o = el;
+                        for(let i = 0; i < parts.length - 1; i++){
+                            if(!o[parts[i]]) o[parts[i]] = {};
+                            o = o[parts[i]];
+                        }
+                        o[parts[parts.length - 1]] = parsedValue;
+                    } else {
+                        el[keyPath] = parsedValue;
+                    }
+                });
+            } else if(selectedIds.length > 1){
+                selectedIds.forEach(id => {
+                    const el = S.find(s => s.id === id);
+                    if(el) applyPropToElement(el, prop, parsedValue);
+                });
+            } else {
+                const el = S.find(s => s.id === selectedIds[0]);
+                if(el) applyPropToElement(el, prop, parsedValue);
+            }
+            render();
+            saveCurrentDesign();
+            return;
+        }
+
         // Campi numerici (Font size, Line height, padding, …): con campo vuoto o solo "-" non applicare Number('')===0 né rifare il pannello (perdita focus come col pattern regex)
         if(target.type === 'number' && prop){
             const rawNum = String(target.value ?? '').trim();
@@ -9440,12 +9461,40 @@ document.addEventListener('DOMContentLoaded', ()=>{
         }
     }, true);
 
+    pp.addEventListener('pointerdown', (e)=>{
+        const target = e.target;
+        if(target && target.tagName === 'INPUT' && target.type === 'color' && target.dataset.prop && !target.disabled){
+            if(!colorPickerUndoPending){
+                pushBeforeChange();
+                colorPickerUndoPending = true;
+            }
+        }
+    }, true);
+
     pp.addEventListener('change', (e)=>{
         if(selectedIds.length === 0) return;
         
         const target = e.target;
         const prop = target.dataset.prop;
         if(!prop) return;
+
+        if(target.type === 'color'){
+            colorPickerUndoPending = false;
+            const value = target.value || '';
+            if(prop === 'props.backgroundColor' || prop === 'props.fillColor' || prop === 'multi.props.fillColor' || prop === 'multi.props.backgroundColor'){
+                updateProps();
+            }
+            if(selectedIds.length === 1){
+                const el = S.find(s => s.id === selectedIds[0]);
+                if(el && el.masterThreadId){
+                    const thread = getMasterThread(el.masterThreadId);
+                    if(thread && isPropSynced(thread, prop) && !isPropOverridden(el, prop)){
+                        syncPropertyToThread(el.masterThreadId, prop, value);
+                    }
+                }
+            }
+            return;
+        }
         
         // Textarea e input testo column-mention: gestiti da blur
         if(target.tagName === 'TEXTAREA') return;
