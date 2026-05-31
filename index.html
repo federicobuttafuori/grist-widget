@@ -104,6 +104,7 @@
         .label-element{position:absolute;cursor:move;border:1px solid transparent;font-size:16px;line-height:1.2;overflow:hidden;word-wrap:break-word;user-select:none;transform-origin:center center}
         .label-element.selected{border:2px dashed #007aff;box-shadow:0 0 0 1px rgba(0,122,255,.1)}
         .label-element.synchronized-selected{border:2px dashed #4CAF50;box-shadow:0 0 0 1px rgba(76,175,80,.2), 0 0 8px rgba(76,175,80,.3)}
+        .label-element.layer-pick-focus{outline:2px dashed #9c27b0!important;box-shadow:0 0 0 2px rgba(156,39,176,0.35)!important}
         .resize-handle{position:absolute;width:24px;height:24px;bottom:-12px;right:-12px;cursor:nwse-resize;display:none;z-index:10000;pointer-events:auto;background:transparent}
         .resize-handle-inner{position:absolute;width:12px;height:12px;background:#007aff;border:2px solid #fff;border-radius:50%;top:50%;left:50%;transform:translate(-50%,-50%);box-shadow:0 2px 4px rgba(0,0,0,.2)}
         .label-element.selected .resize-handle{display:block}
@@ -344,6 +345,7 @@ document.addEventListener('DOMContentLoaded', ()=>{
     let z = 1;
     let isManuallyEditingGroupScale = false; // Flag to prevent updateProps from overwriting user input
     let colorPickerUndoPending = false; // Un solo undo step per sessione color picker (drag nella tavolozza nativa)
+    let shiftLayerPickIndex = -1; // indice slice stack (sovrapposizioni), 0=dietro, mentre Shift è premuto
     let R = {}, C = [];
     let columnCatalog = [];
     let columnRefToRecordKey = new Map();
@@ -1747,6 +1749,101 @@ document.addEventListener('DOMContentLoaded', ()=>{
         })));
     }
 
+    function elementsOverlapOnCanvas(a, b){
+        if(!a || !b || a.id === b.id) return false;
+        return a.x < b.x + b.width && a.x + a.width > b.x &&
+            a.y < b.y + b.height && a.y + a.height > b.y;
+    }
+
+    /** Piani di sovrapposizione (dietro→davanti); ogni slice = id elementi allo stesso piano. */
+    function computeOverlapStackSlices(){
+        const els = S.map(normalizeElement).slice().sort((a, b) => {
+            const dz = (a.zIndex || 0) - (b.zIndex || 0);
+            return dz !== 0 ? dz : String(a.id).localeCompare(String(b.id));
+        });
+        if(els.length < 2) return [];
+
+        const levelById = new Map();
+        els.forEach((el, idx) => {
+            let maxBelow = -1;
+            els.forEach((other, oidx) => {
+                if(other.id === el.id || !elementsOverlapOnCanvas(el, other)) return;
+                const zEl = el.zIndex || 0;
+                const zOther = other.zIndex || 0;
+                if(zOther > zEl || (zOther === zEl && oidx >= idx)) return;
+                const otherLevel = levelById.get(other.id);
+                if(otherLevel !== undefined && otherLevel > maxBelow) maxBelow = otherLevel;
+            });
+            levelById.set(el.id, maxBelow + 1);
+        });
+
+        const maxLevel = Math.max(...levelById.values(), -1);
+        const slices = [];
+        for(let L = 0; L <= maxLevel; L++){
+            const ids = els.filter(e => levelById.get(e.id) === L).map(e => e.id);
+            if(!ids.length) continue;
+            const hasOverlap = ids.some(id => {
+                const el = els.find(e => e.id === id);
+                return els.some(o => o.id !== id && elementsOverlapOnCanvas(el, o));
+            });
+            if(hasOverlap) slices.push(ids);
+        }
+        return slices;
+    }
+
+    function clearShiftLayerPick(){
+        if(shiftLayerPickIndex < 0) return;
+        shiftLayerPickIndex = -1;
+        render();
+    }
+
+    function setShiftLayerPickByIndex(index){
+        const slices = computeOverlapStackSlices();
+        if(!slices.length){
+            shiftLayerPickIndex = -1;
+            msg('Nessuno stack sovrapposto sul canvas', false, 1500);
+            render();
+            return;
+        }
+        shiftLayerPickIndex = Math.max(0, Math.min(index, slices.length - 1));
+        const n = slices[shiftLayerPickIndex].length;
+        msg(`Layer ${shiftLayerPickIndex + 1}/${slices.length} · ${n} element${n === 1 ? 'o' : 'i'}`, false, 1200);
+        render();
+    }
+
+    function cycleShiftLayerPick(delta){
+        const slices = computeOverlapStackSlices();
+        if(!slices.length){
+            clearShiftLayerPick();
+            msg('Nessuno stack sovrapposto sul canvas', false, 1500);
+            return;
+        }
+        if(shiftLayerPickIndex < 0){
+            setShiftLayerPickByIndex(slices.length - 1);
+            return;
+        }
+        let next = shiftLayerPickIndex + delta;
+        if(next < 0) next = slices.length - 1;
+        if(next >= slices.length) next = 0;
+        setShiftLayerPickByIndex(next);
+    }
+
+    function canvasPointFromClient(clientX, clientY){
+        const cr = lc.getBoundingClientRect();
+        return {
+            x: (clientX - cr.left) / cr.width * W,
+            y: (clientY - cr.top) / cr.height * H
+        };
+    }
+
+    function isPointInResizeHandleZone(el, x, y){
+        if(!el) return false;
+        const handleCm = 0.55;
+        const right = el.x + el.width;
+        const bottom = el.y + el.height;
+        return x >= right - handleCm && x <= right + 0.15 && y >= bottom - handleCm && y <= bottom + 0.15;
+    }
+
     // ---------- Rendering ----------
     function render(){
         lc.innerHTML = '';
@@ -1773,7 +1870,10 @@ document.addEventListener('DOMContentLoaded', ()=>{
             const sorted = canvasData.map(normalizeElement).slice().sort((a,b)=> (a.zIndex||0) - (b.zIndex||0));
             const maxZ = sorted.reduce((mz, e) => Math.max(mz, e.zIndex || 0), 0);
             const selectedSet = new Set(selectedIds);
-            const elevateSelected = selectedSet.size > 0;
+            const stackSlices = computeOverlapStackSlices();
+            const layerPickMode = shiftLayerPickIndex >= 0 && shiftLayerPickIndex < stackSlices.length;
+            const focusSliceIds = layerPickMode ? new Set(stackSlices[shiftLayerPickIndex]) : new Set();
+            const elevateSelected = selectedSet.size > 0 && !layerPickMode;
             sorted.forEach(el=>{
             const d = document.createElement('div');
             d.classList.add('label-element');
@@ -2158,6 +2258,10 @@ document.addEventListener('DOMContentLoaded', ()=>{
             } else if(el.type === 'text' || el.type === 'data' || el.type === 'image'){
                 const bg = el.props.backgroundColor;
                 d.style.backgroundColor = (bg && bg !== 'transparent') ? bg : 'transparent';
+            }
+
+            if(layerPickMode && focusSliceIds.has(el.id)){
+                d.classList.add('layer-pick-focus');
             }
 
             // selection visuals
@@ -8499,12 +8603,32 @@ document.addEventListener('DOMContentLoaded', ()=>{
             return;
         }
 
-        // clicked element
-        const te = t.closest('.label-element');
-        if(!te) return;
-        const id = te.dataset.id;
-        const clickedElement = S.find(x=>x.id===id);
-        if(!clickedElement) return;
+        const pt = canvasPointFromClient(e.clientX, e.clientY);
+        let id = null;
+        let clickedElement = null;
+
+        if(e.shiftKey && shiftLayerPickIndex >= 0){
+            const slices = computeOverlapStackSlices();
+            const sliceIds = shiftLayerPickIndex < slices.length ? slices[shiftLayerPickIndex] : null;
+            if(sliceIds){
+                const pickSet = new Set(sliceIds);
+                const candidates = S.filter(x => pickSet.has(x.id) &&
+                    pt.x >= x.x && pt.x <= x.x + x.width && pt.y >= x.y && pt.y <= x.y + x.height)
+                    .sort((a, b) => (b.zIndex || 0) - (a.zIndex || 0) || String(b.id).localeCompare(String(a.id)));
+                if(candidates.length){
+                    clickedElement = candidates[0];
+                    id = clickedElement.id;
+                }
+            }
+        }
+
+        if(!id){
+            const te = t.closest('.label-element');
+            if(!te) return;
+            id = te.dataset.id;
+            clickedElement = S.find(x => x.id === id);
+            if(!clickedElement) return;
+        }
 
         // selection logic
         if(e.ctrlKey || e.metaKey){
@@ -8523,16 +8647,20 @@ document.addEventListener('DOMContentLoaded', ()=>{
             }
         }
 
-        const cr = lc.getBoundingClientRect();
-        const smx = (e.clientX - cr.left) / cr.width * W;
-        const smy = (e.clientY - cr.top) / cr.height * H;
+        const smx = pt.x;
+        const smy = pt.y;
 
             // Check if clicked element is in a group
             const group = getGroupForElement(id);
             const isGrouped = group !== undefined;
             
             // Check if clicked on resize handle (including inner element)
-            const resizeHandle = t.classList.contains('resize-handle') ? t : t.closest('.resize-handle');
+            let resizeHandle = t.classList.contains('resize-handle') ? t : t.closest('.resize-handle');
+            if(!resizeHandle && e.shiftKey && shiftLayerPickIndex >= 0 && id){
+                const slices = computeOverlapStackSlices();
+                const sliceIds = shiftLayerPickIndex < slices.length ? slices[shiftLayerPickIndex] : [];
+                if(sliceIds.includes(id) && isPointInResizeHandleZone(clickedElement, smx, smy)) resizeHandle = true;
+            }
             if(resizeHandle){
                 if(isGrouped){
                     // Resize group - check if all group elements are selected or just this one
@@ -8912,6 +9040,19 @@ document.addEventListener('DOMContentLoaded', ()=>{
                 saveCurrentDesign();
         }
         drag = false; resizeMode = false; ctx = {};
+    });
+
+    // Shift + rotella: cicla piani di sovrapposizione; rilascio Shift azzera
+    cc.addEventListener('wheel', (e) => {
+        if(!isFullScreen || !e.shiftKey) return;
+        if(e.target.closest && e.target.closest('#sidebar')) return;
+        e.preventDefault();
+        const delta = e.deltaY > 0 ? 1 : -1;
+        cycleShiftLayerPick(delta);
+    }, { passive: false });
+
+    window.addEventListener('keyup', (e) => {
+        if(e.key === 'Shift') clearShiftLayerPick();
     });
 
     // ---------- Keyboard shortcuts (undo/redo/multi) ----------
