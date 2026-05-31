@@ -102,11 +102,13 @@
             #label-canvas{background:#fff;box-shadow:0 4px 12px rgba(0,0,0,.15);position:relative;overflow:hidden}
         #marquee{position:absolute;border:1px dashed #007aff;background:rgba(0,122,255,0.08);pointer-events:none;display:none;z-index:9999}
         .label-element{position:absolute;cursor:move;border:1px solid transparent;font-size:16px;line-height:1.2;overflow:hidden;word-wrap:break-word;user-select:none;transform-origin:center center}
-        .label-element.selected{border:2px dashed #007aff;box-shadow:0 0 0 1px rgba(0,122,255,.1)}
-        .label-element.synchronized-selected{border:2px dashed #4CAF50;box-shadow:0 0 0 1px rgba(76,175,80,.2), 0 0 8px rgba(76,175,80,.3)}
-        .resize-handle{position:absolute;width:24px;height:24px;bottom:-12px;right:-12px;cursor:nwse-resize;display:none;z-index:10000;pointer-events:auto;background:transparent}
+        .label-element.selected,.label-element.synchronized-selected{border-color:transparent!important;box-shadow:none!important}
+        #selection-overlay{position:absolute;left:0;top:0;width:100%;height:100%;pointer-events:none;z-index:100000}
+        .selection-shim{position:absolute;pointer-events:auto;cursor:move;box-sizing:border-box;border:2px dashed #007aff;box-shadow:0 0 0 1px rgba(0,122,255,.1);background:transparent}
+        .selection-shim.synchronized-selected{border-color:#4CAF50;box-shadow:0 0 0 1px rgba(76,175,80,.2), 0 0 8px rgba(76,175,80,.3)}
+        .selection-shim.group-selected{border-color:#ff6b00;border-style:dashed;border-radius:3px;box-shadow:0 0 0 1px rgba(255,107,0,0.15), inset 0 0 0 1px rgba(255,107,0,0.05);opacity:0.9}
+        .resize-handle{position:absolute;width:24px;height:24px;bottom:-12px;right:-12px;cursor:nwse-resize;z-index:1;pointer-events:auto;background:transparent}
         .resize-handle-inner{position:absolute;width:12px;height:12px;background:#007aff;border:2px solid #fff;border-radius:50%;top:50%;left:50%;transform:translate(-50%,-50%);box-shadow:0 2px 4px rgba(0,0,0,.2)}
-        .label-element.selected .resize-handle{display:block}
             .resize-handle.group-resize{width:28px;height:28px;bottom:-14px;right:-14px;z-index:10001}
             .resize-handle.group-resize .resize-handle-inner{background:#ff6b00;width:14px;height:14px;box-shadow:0 2px 6px rgba(255,107,0,.4)}
         .label-element img,.label-element svg{width:100%;height:100%;object-fit:contain;pointer-events:none}
@@ -125,6 +127,7 @@
             #mini-toolbar .mini-toolbar-col3 select{width:100%;min-width:7em;padding:4px 8px;font-size:12px;border:1px solid #ccc;border-radius:4px;background:#fff;box-sizing:border-box}
             #mini-toolbar .mini-toolbar-col3 button{padding:6px 10px;font-size:13px;white-space:nowrap;align-self:stretch}
             .widget-mode #canvas-container .label-element{pointer-events:none;cursor:default}
+            .widget-mode #canvas-container #selection-overlay{display:none!important}
             .widget-mode #canvas-container{cursor:default}
         .column-mention-dropdown{position:fixed;z-index:10000;background:#fff;border:1px solid #ccc;border-radius:4px;box-shadow:0 4px 12px rgba(0,0,0,.15);max-height:200px;overflow-y:auto;min-width:160px;display:none}
         .column-mention-dropdown.column-mention-dropdown-visible{display:block}
@@ -937,7 +940,7 @@ document.addEventListener('DOMContentLoaded', ()=>{
                         #label-canvas{position:static!important;width:${profile.width}cm!important;height:${profile.height}cm!important;transform:${printTr}!important;transform-origin:0 0!important;box-shadow:none!important;display:block!important;overflow:visible!important;background:#fff!important}
                             .label-element{page-break-inside:avoid!important;-webkit-print-color-adjust:exact!important;print-color-adjust:exact!important}
                         .label-element.selected{border:1px solid transparent!important;box-shadow:none!important}
-                        .resize-handle{display:none!important}
+                        #selection-overlay,.resize-handle{display:none!important}
                             .label-element[style*="border"]{-webkit-print-color-adjust:exact!important;print-color-adjust:exact!important}
                         img.qr-code-img{image-rendering:pixelated!important;-webkit-image-rendering:pixelated!important}
                     }
@@ -1746,6 +1749,77 @@ document.addEventListener('DOMContentLoaded', ()=>{
         })));
     }
 
+    function appendSelectionResizeHandle(container, el){
+        const group = getGroupForElement(el.id);
+        if(group){
+            const allGroupSelected = group.elementIds.every(id => selectedIds.includes(id));
+            if(allGroupSelected){
+                let maxDistance = -1;
+                let bottomRightElement = null;
+                group.elementIds.forEach(eid => {
+                    const elem = S.find(e => e.id === eid);
+                    if(elem){
+                        const distance = (elem.x + elem.width) + (elem.y + elem.height);
+                        if(distance > maxDistance){
+                            maxDistance = distance;
+                            bottomRightElement = elem;
+                        }
+                    }
+                });
+                if(bottomRightElement && bottomRightElement.id === el.id){
+                    const h = document.createElement('div');
+                    h.classList.add('resize-handle', 'group-resize');
+                    h.title = 'Resize group (maintains proportions)';
+                    const inner = document.createElement('div');
+                    inner.classList.add('resize-handle-inner');
+                    h.appendChild(inner);
+                    container.appendChild(h);
+                }
+            } else if(selectedIds.length === 1 && selectedIds[0] === el.id){
+                const h = document.createElement('div');
+                h.classList.add('resize-handle', 'group-resize');
+                h.title = 'Resize group (maintains proportions)';
+                const inner = document.createElement('div');
+                inner.classList.add('resize-handle-inner');
+                h.appendChild(inner);
+                container.appendChild(h);
+            }
+            return;
+        }
+        const h = document.createElement('div');
+        h.classList.add('resize-handle');
+        const inner = document.createElement('div');
+        inner.classList.add('resize-handle-inner');
+        h.appendChild(inner);
+        container.appendChild(h);
+    }
+
+    function renderSelectionOverlay(canvasData, baseOffsetY){
+        if(!selectedIds.length) return;
+        const overlay = document.createElement('div');
+        overlay.id = 'selection-overlay';
+        selectedIds.forEach(id => {
+            const el = canvasData.find(e => e.id === id);
+            if(!el) return;
+            const shim = document.createElement('div');
+            shim.className = 'selection-shim';
+            shim.dataset.id = id;
+            shim.style.left = `${el.x}cm`;
+            shim.style.top = `${el.y + baseOffsetY}cm`;
+            shim.style.width = `${el.width}cm`;
+            shim.style.height = `${el.height}cm`;
+            if(el.masterThreadId) shim.classList.add('synchronized-selected');
+            const group = getGroupForElement(el.id);
+            if(group){
+                const isResizingGroup = resizeMode && ctx && ctx.isGroup && ctx.group && ctx.group.id === group.id;
+                if(!isResizingGroup) shim.classList.add('group-selected');
+            }
+            appendSelectionResizeHandle(shim, el);
+            overlay.appendChild(shim);
+        });
+        lc.appendChild(overlay);
+    }
+
     // ---------- Rendering ----------
     function render(){
         lc.innerHTML = '';
@@ -1770,9 +1844,6 @@ document.addEventListener('DOMContentLoaded', ()=>{
         // Helper function to render elements for a specific canvas and sequence index
         function renderElementsForCanvas(canvasData, sequenceIndex, baseOffsetY, waveContext = null){
             const sorted = canvasData.map(normalizeElement).slice().sort((a,b)=> (a.zIndex||0) - (b.zIndex||0));
-            const maxZ = sorted.reduce((mz, e) => Math.max(mz, e.zIndex || 0), 0);
-            const selectedSet = new Set(selectedIds);
-            const elevateSelected = selectedSet.size > 0;
             sorted.forEach(el=>{
             const d = document.createElement('div');
             d.classList.add('label-element');
@@ -1782,11 +1853,7 @@ document.addEventListener('DOMContentLoaded', ()=>{
             d.style.width = `${el.width}cm`;
             d.style.height = `${el.height}cm`;
             const baseZIndex = el.zIndex || 0;
-            if(elevateSelected && selectedSet.has(el.id)){
-                d.style.zIndex = String(maxZ + 1 + baseZIndex);
-            } else {
-                d.style.zIndex = baseZIndex >= 0 ? baseZIndex : 0;
-            }
+            d.style.zIndex = baseZIndex >= 0 ? String(baseZIndex) : '0';
             d.style.fontSize = `${el.props.fontSize || 16}px`;
                 const fontWeight = el.props.fontWeight;
                 if(typeof fontWeight === 'number'){
@@ -2159,70 +2226,9 @@ document.addEventListener('DOMContentLoaded', ()=>{
                 d.style.backgroundColor = (bg && bg !== 'transparent') ? bg : 'transparent';
             }
 
-            // selection visuals
             if(selectedIds.includes(el.id)){
                 d.classList.add('selected');
-                    // Check if element is synchronized
-                    if(el.masterThreadId){
-                        d.classList.add('synchronized-selected');
-                    }
-                    const group = getGroupForElement(el.id);
-                    
-                    // Show resize handle for groups when all group elements are selected
-                    if(group){
-                        const allGroupSelected = group.elementIds.every(id => selectedIds.includes(id));
-                        if(allGroupSelected){
-                            // Show resize handle on the element that's at the bottom-right of the group
-                            const groupBounds = getGroupBounds(group.elementIds);
-                            // Find element closest to bottom-right corner
-                            let maxDistance = -1;
-                            let bottomRightElement = null;
-                            group.elementIds.forEach(eid => {
-                                const elem = S.find(e => e.id === eid);
-                                if(elem){
-                                    const distance = (elem.x + elem.width) + (elem.y + elem.height);
-                                    if(distance > maxDistance){
-                                        maxDistance = distance;
-                                        bottomRightElement = elem;
-                                    }
-                                }
-                            });
-                            // Show resize handle on the bottom-right element
-                            if(bottomRightElement && bottomRightElement.id === el.id){
-                                const h = document.createElement('div');
-                                h.classList.add('resize-handle', 'group-resize');
-                                h.title = 'Resize group (maintains proportions)';
-                                d.appendChild(h);
-                            }
-                        } else if(selectedIds.length === 1 && selectedIds[0] === el.id){
-                            // Show resize handle if only this element is selected (will resize whole group)
-                            const h = document.createElement('div');
-                            h.classList.add('resize-handle', 'group-resize');
-                            h.title = 'Resize group (maintains proportions)';
-                            const inner = document.createElement('div');
-                            inner.classList.add('resize-handle-inner');
-                            h.appendChild(inner);
-                            d.appendChild(h);
-                        }
-                        // Add elegant group indicator with subtle styling (hide during resize)
-                        const isResizingGroup = resizeMode && ctx.isGroup && ctx.group && ctx.group.id === group.id;
-                        if(!isResizingGroup){
-                            d.style.borderColor = '#ff6b00';
-                            d.style.borderStyle = 'dashed';
-                            d.style.borderWidth = '2px';
-                            d.style.borderRadius = '3px';
-                            d.style.boxShadow = '0 0 0 1px rgba(255,107,0,0.15), inset 0 0 0 1px rgba(255,107,0,0.05)';
-                            d.style.opacity = '0.9';
-                        }
-                    } else {
-                        // Regular resize handle for non-grouped elements
-                const h = document.createElement('div');
-                h.classList.add('resize-handle');
-                const inner = document.createElement('div');
-                inner.classList.add('resize-handle-inner');
-                h.appendChild(inner);
-                d.appendChild(h);
-                    }
+                if(el.masterThreadId) d.classList.add('synchronized-selected');
             }
 
             lc.appendChild(d);
@@ -2233,6 +2239,7 @@ document.addEventListener('DOMContentLoaded', ()=>{
         // Sequence mode is used only for printing, not for canvas preview
         // Show only the canvas that the user is currently working on
         renderElementsForCanvas(S, 1, 0);
+        renderSelectionOverlay(S, 0);
         // Reset container height to single label height
         lc.style.height = `${H}cm`;
         if(bwModeEnabled) scheduleBwPreviewUpdate();
@@ -2269,6 +2276,8 @@ document.addEventListener('DOMContentLoaded', ()=>{
                         if(!clonedNode || !clonedNode.querySelector) return;
                         const cloneLc = clonedNode.id === 'label-canvas' ? clonedNode : clonedDoc.getElementById('label-canvas');
                         if(!cloneLc) return;
+                        const cloneSel = cloneLc.querySelector('#selection-overlay');
+                        if(cloneSel) cloneSel.remove();
                         cloneLc.style.overflow = 'visible';
                         const cloneElements = cloneLc.querySelectorAll('.label-element');
                         cloneElements.forEach(function(cloneEl){
@@ -8512,8 +8521,8 @@ document.addEventListener('DOMContentLoaded', ()=>{
             return;
         }
 
-        // clicked element
-        const te = t.closest('.label-element');
+        // clicked element or selection overlay shim (drag/resize when behind other layers)
+        const te = t.closest('.label-element') || t.closest('.selection-shim');
         if(!te) return;
         const id = te.dataset.id;
         const clickedElement = S.find(x=>x.id===id);
