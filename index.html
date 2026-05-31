@@ -3311,8 +3311,8 @@ document.addEventListener('DOMContentLoaded', ()=>{
         return nonOverlapping;
     }
 
-    /** Costruisce HTML inline per un segmento; segFloor limita line-height sulle sole porzioni matchate. */
-    function buildRegexMatchSpanHtml(segmentText, nonOverlapping, segFloor){
+    /** Costruisce HTML inline per un segmento (match in &lt;span&gt; stilizzati). */
+    function buildRegexMatchSpanHtml(segmentText, nonOverlapping){
         const htmlParts = [];
         let currentIndex = 0;
 
@@ -3349,10 +3349,10 @@ document.addEventListener('DOMContentLoaded', ()=>{
                 }
             });
             const rLh = ruleLineHeightNumeric(rule);
-            if(rule.lineHeight && rule.lineHeight !== '' && rule.lineHeight !== 'inherit'){
-                if(rLh == null || rLh > segFloor + 1e-9){
-                    styles.push(`line-height: ${rule.lineHeight}`);
-                }
+            if(rLh != null){
+                styles.push(`line-height: ${rLh}`);
+                styles.push('display: inline-block');
+                styles.push('vertical-align: baseline');
             }
 
             const styleStr = styles.length > 0 ? ` style="${styles.join('; ')}"` : '';
@@ -3386,14 +3386,7 @@ document.addEventListener('DOMContentLoaded', ()=>{
                 return lineText === '' ? '\u00a0' : escapeHtml(lineText);
             }
 
-            const lhFromMatchedRules = nonOverlapping
-                .map(m => ruleLineHeightNumeric(m.rule))
-                .filter(x => x != null);
-            const segFloor = lhFromMatchedRules.length > 0
-                ? Math.min(baseLh, ...lhFromMatchedRules)
-                : baseLh;
-
-            return buildRegexMatchSpanHtml(lineText, nonOverlapping, segFloor);
+            return buildRegexMatchSpanHtml(lineText, nonOverlapping);
         }).join('<br>');
     }
 
