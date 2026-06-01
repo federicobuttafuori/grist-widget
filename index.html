@@ -9601,6 +9601,9 @@ document.addEventListener('DOMContentLoaded', ()=>{
                 if(prop === 'props.textOutlineEnabled' && parsedValue === false && el.props.textOutline2Enabled){
                     el.props.textOutline2Enabled = false;
                 }
+                if(prop === 'props.textOutlineEnabled' && parsedValue === true && (Number(el.props.textOutlineWidth) || 0) <= 0){
+                    el.props.textOutlineWidth = 1;
+                }
             });
             if((prop === 'width' || prop === 'height') && !isDeferredTextInput){
                 const seenThread = new Set();
@@ -9656,8 +9659,13 @@ document.addEventListener('DOMContentLoaded', ()=>{
                         syncPropertyToThread(el.masterThreadId, 'props.textOutline2Enabled', false);
                     }
                 }
+                if(prop === 'props.textOutlineEnabled' && parsedValue === true && (Number(el.props.textOutlineWidth) || 0) <= 0){
+                    el.props.textOutlineWidth = 1;
+                }
             }
         }
+        
+        const needsOutlinePanelRefresh = prop === 'props.textOutlineEnabled' || prop === 'props.textOutline2Enabled';
         
         // Testo: solo salvataggio; render su blur (vedi listener blur)
         if(isDeferredTextInput){
@@ -9665,6 +9673,9 @@ document.addEventListener('DOMContentLoaded', ()=>{
         } else {
             render(); 
             saveCurrentDesign();
+            if(needsOutlinePanelRefresh){
+                updateProps();
+            }
         }
     });
 
