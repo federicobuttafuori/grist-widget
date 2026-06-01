@@ -60,6 +60,19 @@
         .profile-section{background:#f5f5f5;padding:10px;border-radius:6px;border:1px solid #e0e0e0}
         .profile-section select{margin-bottom:8px}
         .sidebar-section .add-buttons{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+        .ie-section .ie-actions{display:flex;gap:8px}
+        .ie-dropdown{position:relative;flex:1;min-width:0}
+        .ie-dropdown-trigger{width:100%;font-size:13px;padding:8px 10px;background:#fff;border:1px solid #d0d7de;border-radius:6px;font-weight:500;display:flex;align-items:center;justify-content:center;gap:6px;color:#222}
+        .ie-dropdown-trigger:hover{background:#f6f8fa;border-color:#afb8c1}
+        .ie-dropdown-trigger[aria-expanded="true"]{background:#eef6ff;border-color:#007aff;box-shadow:0 0 0 2px rgba(0,122,255,.15)}
+        .ie-btn-icon{width:17px;height:17px;flex-shrink:0;display:block}
+        .ie-dropdown-chevron{font-size:9px;opacity:.5;line-height:1;margin-left:auto}
+        .ie-dropdown-menu{position:absolute;top:calc(100% + 4px);left:0;right:0;z-index:500;background:#fff;border:1px solid #d0d7de;border-radius:8px;box-shadow:0 6px 20px rgba(0,0,0,.12);padding:4px;display:flex;flex-direction:column;gap:2px}
+        .ie-dropdown-menu[hidden]{display:none!important}
+        .ie-dropdown-menu button{width:100%;text-align:left;padding:8px 10px;border:none;border-radius:6px;background:transparent;font-size:12px;line-height:1.35;cursor:pointer;color:#222}
+        .ie-dropdown-menu button:hover{background:#f0f4f8}
+        .ie-dropdown-menu button.ie-menu-danger{color:#b00020}
+        .ie-dropdown-menu button.ie-menu-danger:hover{background:#fff5f5}
         .prop-panel-align-row{display:flex;gap:8px;align-items:center;margin-bottom:10px;flex-wrap:wrap}
         .prop-panel-align-row button{flex:1;min-width:0;padding:6px 10px;font-size:14px;border:1px solid #ccc;border-radius:4px;background:#f8f8f8;cursor:pointer;box-sizing:border-box}
         .prop-panel-align-row button:disabled{opacity:0.45;cursor:not-allowed}
@@ -94,6 +107,8 @@
         .prop-stack .prop-stack-row{display:flex;gap:8px;align-items:flex-start;min-width:0}
         .prop-stack .prop-stack-row .column-mention-input,.prop-stack .prop-stack-row input[type="text"],.prop-stack .prop-stack-row .regex-pattern-input{flex:1;min-width:0}
         .add-regex-rule-btn{width:100%;padding:6px;margin-top:8px;background:#007aff;color:#fff;border:none;border-radius:4px;cursor:pointer;font-size:12px}
+        textarea.auto-grow-textarea{resize:none;overflow-y:hidden;box-sizing:border-box;width:100%;line-height:1.45;font-size:12px;padding:4px}
+        textarea.regex-pattern-input,textarea.global-regex-pattern-input{font-family:monospace}
         #btn-delete{background:#fbebeb;border-color:#d9a0a0;color:#c00;margin-top:12px}
         #btn-delete:hover{background:#f7dada}
         .button-group{display:flex;gap:4px}
@@ -265,17 +280,32 @@
                 <small class="sidebar-hint">Sync content (boundColumn, prefix, suffix, text) across elements. Style and layout remain independent.</small>
             </div>
             <hr>
-            <div class="sidebar-section">
-                <h3>Import/Export</h3>
-                <div class="sidebar-actions">
-                    <button type="button" id="btn-export">⬇️ Export</button>
-                    <button type="button" id="btn-import">⬆️ Import</button>
+            <div class="sidebar-section ie-section">
+                <h3>Importa / Esporta</h3>
+                <div class="ie-actions">
+                    <div class="ie-dropdown">
+                        <button type="button" class="ie-dropdown-trigger" id="btn-export-menu" aria-haspopup="menu" aria-expanded="false">
+                            <svg class="ie-btn-icon" viewBox="0 0 20 20" fill="none" aria-hidden="true"><path d="M10 3v8m0 0l-3-3m3 3l3-3" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/><path d="M4 14.5h12" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></svg>
+                            Esporta
+                            <span class="ie-dropdown-chevron" aria-hidden="true">▾</span>
+                        </button>
+                        <div class="ie-dropdown-menu" id="export-dropdown-menu" role="menu" hidden>
+                            <button type="button" role="menuitem" data-ie-action="export-layout">Layout design</button>
+                            <button type="button" role="menuitem" data-ie-action="export-snapshot">Snapshot completo</button>
+                        </div>
+                    </div>
+                    <div class="ie-dropdown">
+                        <button type="button" class="ie-dropdown-trigger" id="btn-import-menu" aria-haspopup="menu" aria-expanded="false">
+                            <svg class="ie-btn-icon" viewBox="0 0 20 20" fill="none" aria-hidden="true"><path d="M10 17V9m0 0l-3 3m3-3l3 3" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/><path d="M4 5.5h12" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></svg>
+                            Importa
+                            <span class="ie-dropdown-chevron" aria-hidden="true">▾</span>
+                        </button>
+                        <div class="ie-dropdown-menu" id="import-dropdown-menu" role="menu" hidden>
+                            <button type="button" role="menuitem" data-ie-action="import-layout">Layout nel canvas</button>
+                            <button type="button" role="menuitem" data-ie-action="import-snapshot" class="ie-menu-danger">Snapshot completo</button>
+                        </div>
+                    </div>
                 </div>
-                <div class="sidebar-actions">
-                    <button type="button" id="btn-export-snapshot">⬇️ Export Snapshot</button>
-                    <button type="button" id="btn-import-snapshot">⬆️ Import Snapshot</button>
-                </div>
-                <small class="sidebar-hint">Tip: Ctrl/Cmd+E exports layout. Ctrl/Cmd+Z = undo, Ctrl/Cmd+Shift+Z = redo</small>
             </div>
             <hr>
             <div class="sidebar-section">
@@ -552,10 +582,6 @@ document.addEventListener('DOMContentLoaded', ()=>{
     const bs = document.getElementById('btn-send-back');
     const fileInput = document.getElementById('file-import');
     const fileInputSnapshot = document.getElementById('file-import-snapshot');
-    const btnExport = document.getElementById('btn-export');
-    const btnImport = document.getElementById('btn-import');
-    const btnExportSnapshot = document.getElementById('btn-export-snapshot');
-    const btnImportSnapshot = document.getElementById('btn-import-snapshot');
     const marquee = document.getElementById('marquee');
         const profileSelector = document.getElementById('profile-selector');
         const designSelector = document.getElementById('design-selector');
@@ -1594,6 +1620,7 @@ document.addEventListener('DOMContentLoaded', ()=>{
                 thickness:2, format:'CODE128', displayValue:true,
                     fillEnabled:false, fillColor:'#ffffff', decimals:2, asPercent:false,
                     lineHeight: 1.2, letterSpacing: 0, textOverflow: 'clip',
+                regexRules: [], regexRulesEnabled: false,
                 qrErrorCorrectLevel: 'M', qrColorDark: '#000000', qrColorLight: '#ffffff',
                 imageOpacity: 100
             }
@@ -1692,6 +1719,13 @@ document.addEventListener('DOMContentLoaded', ()=>{
             if(!/^#[0-9A-Fa-f]{6}$/i.test(fc) || fc.toLowerCase() === 'transparent'){
                 base.props.fillColor = '#ffffff';
             }
+        }
+        if(base.type === 'text' || base.type === 'data'){
+            if(!Array.isArray(base.props.regexRules)) base.props.regexRules = [];
+            if(base.props.regexRulesEnabled === undefined){
+                base.props.regexRulesEnabled = base.props.regexRules.length > 0;
+            }
+            base.props.regexRulesEnabled = !!base.props.regexRulesEnabled;
         }
         const io = base.props.imageOpacity;
         if(io === undefined || io === null || io === '') base.props.imageOpacity = 100;
@@ -3979,6 +4013,33 @@ document.addEventListener('DOMContentLoaded', ()=>{
         return `<div class="prop-feature">${propFeatureHead(label, opts)}<div class="prop-feature-body"${hidden ? ' hidden' : ''}>${bodyHtml}</div></div>`;
     }
 
+    function resizeAutoGrowTextarea(el){
+        if(!el || el.nodeName !== 'TEXTAREA') return;
+        el.style.height = 'auto';
+        const minPx = parseFloat(el.dataset.autoGrowMinPx || '0');
+        const next = el.scrollHeight;
+        el.style.height = Math.max(next, Number.isFinite(minPx) ? minPx : 0) + 'px';
+    }
+    function bindAutoGrowTextarea(el){
+        if(!el || el.nodeName !== 'TEXTAREA' || el.dataset.autoGrowBound === '1') return;
+        el.dataset.autoGrowBound = '1';
+        if(!el.dataset.autoGrowMinPx){
+            const cs = window.getComputedStyle(el);
+            const lineH = parseFloat(cs.lineHeight) || 18;
+            const padT = parseFloat(cs.paddingTop) || 0;
+            const padB = parseFloat(cs.paddingBottom) || 0;
+            el.dataset.autoGrowMinPx = String(Math.ceil(lineH * 2 + padT + padB));
+        }
+        const run = function(){ resizeAutoGrowTextarea(el); };
+        el.addEventListener('input', run);
+        el.addEventListener('change', run);
+        run();
+    }
+    function bindAutoGrowTextareas(root){
+        const scope = root && root.querySelectorAll ? root : document;
+        scope.querySelectorAll('textarea.auto-grow-textarea').forEach(bindAutoGrowTextarea);
+    }
+
     function singlePropsPanel(el){
         const thread = el.masterThreadId ? getMasterThread(el.masterThreadId) : null;
         function valueFor(pk){
@@ -4160,7 +4221,7 @@ document.addEventListener('DOMContentLoaded', ()=>{
                     const regexPanelCount = Math.max(el.props.regexRules.length, getThreadRegexRuleCount(threadForRegexPanel));
                     if(regexPanelCount > 0) ensureRegexRulesLength(el, regexPanelCount);
                 }
-                const regexPanelEnabled = (el.props.regexRules && el.props.regexRules.length > 0);
+                const regexPanelEnabled = !!valueFor('props.regexRulesEnabled');
                 let regexBlockBody = `<div id="regex-rules-container-${el.id}" style="display:flex;flex-direction:column;gap:8px">`;
                 el.props.regexRules.forEach((rule, index) => {
                     const pkPattern = `props.regexRules.${index}.pattern`;
@@ -4190,7 +4251,7 @@ document.addEventListener('DOMContentLoaded', ()=>{
                     regexBlockBody += `<label style="font-size:12px;font-weight:600">Rule ${index + 1}</label>`;
                     regexBlockBody += `<button type="button" class="remove-regex-rule-btn" data-rule-index="${index}" style="padding:2px 6px;font-size:11px;background:#ff4444;color:#fff;border:none;border-radius:3px;cursor:pointer">Remove</button>`;
                     regexBlockBody += `</div>`;
-                    regexBlockBody += `<div class="prop-stack"><label class="${labelClass(pkPattern)}">Pattern</label><div class="prop-stack-row"><textarea class="regex-pattern-input" data-rule-index="${index}" placeholder="e.g., \\d+|[A-Z]+" style="font-size:12px;padding:4px;font-family:monospace;min-height:150px;resize:vertical">${escapeHtml(String(patternVal != null ? patternVal : ''))}</textarea>${syncBtn(pkPattern)}</div></div>`;
+                    regexBlockBody += `<div class="prop-stack"><label class="${labelClass(pkPattern)}">Pattern</label><div class="prop-stack-row"><textarea class="regex-pattern-input auto-grow-textarea" data-rule-index="${index}" rows="2" placeholder="e.g., \\d+|[A-Z]+">${escapeHtml(String(patternVal != null ? patternVal : ''))}</textarea>${syncBtn(pkPattern)}</div></div>`;
                     regexBlockBody += `<div class="${grid1Cls}"><label class="${labelClass(pkFontWeight)}">Font Weight</label><select class="regex-weight-select" data-rule-index="${index}" style="font-size:12px;padding:4px">`;
                     regexBlockBody += `<option value="inherit" ${weightVal === 'inherit' || !weightVal ? 'selected' : ''}>Inherit</option>`;
                     regexBlockBody += `<option value="normal" ${weightVal === 'normal' ? 'selected' : ''}>Normal</option>`;
@@ -4219,7 +4280,7 @@ document.addEventListener('DOMContentLoaded', ()=>{
                 });
                 regexBlockBody += `</div>`;
                 regexBlockBody += `<button type="button" class="add-regex-rule-btn">+ Add Regex Rule</button>`;
-                regexSectionHtml = propFeatureBlock('Regole regex', { checked: regexPanelEnabled, checkboxClass: 'regex-rules-panel-cb' }, regexBlockBody);
+                regexSectionHtml = propFeatureBlock('Regole regex', { checked: regexPanelEnabled, dataProp: 'props.regexRulesEnabled', syncHtml: syncBtn('props.regexRulesEnabled') }, regexBlockBody);
             }
 
             // border
@@ -4270,6 +4331,7 @@ document.addEventListener('DOMContentLoaded', ()=>{
         if(regexSectionHtml) h += regexSectionHtml;
         h += `<hr><button id="btn-delete">Delete Element</button>`;
         pp.innerHTML = h;
+            bindAutoGrowTextareas(pp);
             
             const aspectLinkBtn = pp.querySelector('#prop-aspect-link-toggle');
             if(aspectLinkBtn){
@@ -4401,12 +4463,14 @@ document.addEventListener('DOMContentLoaded', ()=>{
                             const newCount = currentCount + 1;
                             forEachElementOnThread(threadId, target => {
                                 ensureRegexRulesLength(target, newCount);
+                                target.props.regexRulesEnabled = true;
                             });
                             setThreadRegexRuleCount(thread, newCount);
                         } else {
                             if(!el.props.regexRules) el.props.regexRules = [];
                             el.props.regexRules.push(defaultRegexRule(el.props.regexRules.length));
                             normalizeRegexRulesOrders(el.props.regexRules);
+                            el.props.regexRulesEnabled = true;
                         }
                         updateProps();
                         render();
@@ -4426,6 +4490,7 @@ document.addEventListener('DOMContentLoaded', ()=>{
                 // Regex rule inputs
                 pp.querySelectorAll('.regex-pattern-input').forEach(input => {
                     input.addEventListener('input', function(){
+                        resizeAutoGrowTextarea(this);
                         const index = parseInt(this.dataset.ruleIndex);
                         if(!el.props.regexRules) el.props.regexRules = [];
                         if(!el.props.regexRules[index]) return;
@@ -4594,15 +4659,6 @@ document.addEventListener('DOMContentLoaded', ()=>{
                             if(body) body.hidden = true;
                         }
                         render(); saveCurrentDesign(); updateProps();
-                    });
-                }
-            }
-            if(el.type === 'text' || el.type === 'data'){
-                const regexPanelCb = pp.querySelector('.regex-rules-panel-cb');
-                if(regexPanelCb){
-                    regexPanelCb.addEventListener('change', function(){
-                        const body = this.closest('.prop-feature') && this.closest('.prop-feature').querySelector(':scope > .prop-feature-body');
-                        if(body) body.hidden = !this.checked;
                     });
                 }
             }
@@ -5876,7 +5932,8 @@ document.addEventListener('DOMContentLoaded', ()=>{
         }
 
         function getEffectiveRegexRulesForElement(el){
-            if(!el || !el.props || !Array.isArray(el.props.regexRules)) return [];
+            if(!el || !el.props || el.props.regexRulesEnabled === false) return [];
+            if(!Array.isArray(el.props.regexRules)) return [];
             const rules = deepCopy(el.props.regexRules);
             normalizeRegexRulesOrders(rules);
             if(!el.masterThreadId) return rules;
@@ -9375,7 +9432,7 @@ document.addEventListener('DOMContentLoaded', ()=>{
             const [o,k] = p.split('.');
             if(!el[o]) el[o] = {};
                 if(['fontSize','lineHeight','letterSpacing','decimals','thickness','borderWidth','rotation','paddingTop','paddingRight','paddingBottom','paddingLeft','marginTop','marginRight','marginBottom','marginLeft','textOutlineWidth','textOutline2Width','imageOpacity','x','y','width','height','borderRadiusTopLeft','borderRadiusTopRight','borderRadiusBottomRight','borderRadiusBottomLeft'].includes(k)) el[o][k] = Number(v);
-                else if(['showBorder','fillEnabled','displayValue','asPercent','borderTop','borderRight','borderBottom','borderLeft','textOutlineEnabled','textOutline2Enabled'].includes(k)) el[o][k] = !!v;
+                else if(['showBorder','fillEnabled','regexRulesEnabled','displayValue','asPercent','borderTop','borderRight','borderBottom','borderLeft','textOutlineEnabled','textOutline2Enabled'].includes(k)) el[o][k] = !!v;
                 else if(k === 'fontWeight'){
                     // Handle fontWeight: can be number (100-900) or string ('normal', 'bold')
                     const numVal = Number(v);
@@ -9571,7 +9628,7 @@ document.addEventListener('DOMContentLoaded', ()=>{
                     const [o,k] = keyPath.split('.');
                     if(!el[o]) el[o] = {};
                         if(['fontSize','lineHeight','letterSpacing','decimals','thickness','borderWidth','rotation','paddingTop','paddingRight','paddingBottom','paddingLeft','marginTop','marginRight','marginBottom','marginLeft','textOutlineWidth','textOutline2Width','x','y','width','height'].includes(k)) el[o][k] = Number(value);
-                        else if(['showBorder','fillEnabled','displayValue','asPercent','borderTop','borderRight','borderBottom','borderLeft','textOutlineEnabled','textOutline2Enabled'].includes(k)) el[o][k] = !!value;
+                        else if(['showBorder','fillEnabled','regexRulesEnabled','displayValue','asPercent','borderTop','borderRight','borderBottom','borderLeft','textOutlineEnabled','textOutline2Enabled'].includes(k)) el[o][k] = !!value;
                         else if(k === 'fontWeight'){
                             // Handle fontWeight: can be number (100-900) or string ('normal', 'bold')
                             const numVal = Number(value);
@@ -9727,7 +9784,7 @@ document.addEventListener('DOMContentLoaded', ()=>{
             }
         }
         
-        const needsOutlinePanelRefresh = prop === 'props.textOutlineEnabled' || prop === 'props.textOutline2Enabled' || prop === 'props.showBorder' || prop === 'props.fillEnabled';
+        const needsOutlinePanelRefresh = prop === 'props.textOutlineEnabled' || prop === 'props.textOutline2Enabled' || prop === 'props.showBorder' || prop === 'props.fillEnabled' || prop === 'props.regexRulesEnabled';
         
         // Testo: solo salvataggio; render su blur (vedi listener blur)
         if(isDeferredTextInput){
@@ -10183,11 +10240,50 @@ document.addEventListener('DOMContentLoaded', ()=>{
 
     document.querySelectorAll('.add-element').forEach(b=> b.addEventListener('click', e => add(e.currentTarget.dataset.type)));
 
-    btnExport.addEventListener('click', ()=>{ exportToFile(); msg('Layout exported to file.'); });
-    btnImport.addEventListener('click', ()=>{ fileInput.value=''; fileInput.click(); });
-
-    btnExportSnapshot.addEventListener('click', ()=>{ exportSnapshotToFile(); msg('Snapshot exported to file.'); });
-    btnImportSnapshot.addEventListener('click', ()=>{ fileInputSnapshot.value=''; fileInputSnapshot.click(); });
+    function closeAllIEDropdowns(){
+        document.querySelectorAll('.ie-dropdown-menu').forEach(menu => { menu.hidden = true; });
+        document.querySelectorAll('.ie-dropdown-trigger').forEach(tr => tr.setAttribute('aria-expanded', 'false'));
+    }
+    function setupIEDropdowns(){
+        document.querySelectorAll('.ie-dropdown-trigger').forEach(trigger => {
+            trigger.addEventListener('click', (e) => {
+                e.stopPropagation();
+                const menu = trigger.parentElement && trigger.parentElement.querySelector('.ie-dropdown-menu');
+                if(!menu) return;
+                const willOpen = menu.hidden;
+                closeAllIEDropdowns();
+                if(willOpen){
+                    menu.hidden = false;
+                    trigger.setAttribute('aria-expanded', 'true');
+                }
+            });
+        });
+        document.querySelectorAll('[data-ie-action]').forEach(btn => {
+            btn.addEventListener('click', (e) => {
+                e.stopPropagation();
+                closeAllIEDropdowns();
+                const action = btn.dataset.ieAction;
+                if(action === 'export-layout'){
+                    exportToFile();
+                    msg('Layout esportato.');
+                } else if(action === 'export-snapshot'){
+                    exportSnapshotToFile();
+                    msg('Snapshot esportato.');
+                } else if(action === 'import-layout'){
+                    fileInput.value = '';
+                    fileInput.click();
+                } else if(action === 'import-snapshot'){
+                    fileInputSnapshot.value = '';
+                    fileInputSnapshot.click();
+                }
+            });
+        });
+        document.addEventListener('click', closeAllIEDropdowns);
+        document.addEventListener('keydown', (e) => {
+            if(e.key === 'Escape') closeAllIEDropdowns();
+        });
+    }
+    setupIEDropdowns();
 
     fileInput.addEventListener('change', (ev)=>{
         const f = ev.target.files && ev.target.files[0];
@@ -10883,7 +10979,7 @@ document.addEventListener('DOMContentLoaded', ()=>{
                     <button type="button" class="remove-global-regex-rule-btn" data-rule-index="${index}" style="padding:2px 6px;font-size:11px;background:#ff4444;color:#fff;border:none;border-radius:3px;cursor:pointer">Remove</button>
                 </div>
                 <label style="font-size:12px;display:block;margin-bottom:4px">Pattern:</label>
-                <textarea class="global-regex-pattern-input" data-rule-index="${index}" placeholder="e.g., \\d+|[A-Z]+" style="font-size:12px;padding:4px;margin-bottom:6px;font-family:monospace;width:100%;min-height:150px;resize:vertical">${escapeHtml(rule.pattern || '')}</textarea>
+                <textarea class="global-regex-pattern-input auto-grow-textarea" data-rule-index="${index}" rows="2" placeholder="e.g., \\d+|[A-Z]+" style="margin-bottom:6px">${escapeHtml(rule.pattern || '')}</textarea>
                 <div class="prop-grid" style="grid-template-columns:1fr 1fr;gap:6px;margin-bottom:4px">
                     <label style="font-size:12px">Font Weight:</label>
                     <select class="global-regex-weight-select" data-rule-index="${index}" style="font-size:12px;padding:4px">
@@ -10932,6 +11028,7 @@ document.addEventListener('DOMContentLoaded', ()=>{
 
             container.appendChild(ruleDiv);
         });
+        bindAutoGrowTextareas(container);
     }
 
     // Add event listeners for global regex rules
@@ -10970,6 +11067,7 @@ document.addEventListener('DOMContentLoaded', ()=>{
 
     document.addEventListener('input', function(e){
         if(e.target.classList.contains('global-regex-pattern-input')){
+            resizeAutoGrowTextarea(e.target);
             const index = parseInt(e.target.dataset.ruleIndex);
             if(!globalRegexRules) globalRegexRules = [];
             if(!globalRegexRules[index]) return;
