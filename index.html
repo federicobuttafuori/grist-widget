@@ -7770,8 +7770,9 @@ document.addEventListener('DOMContentLoaded', ()=>{
                     }
                     // Background only for text/data/image (box set in case 'box'; line/qr/barcode have no background)
                     if(el.type === 'text' || el.type === 'data' || el.type === 'image'){
-                        d.style.backgroundColor = elementBackgroundCss(el.props);
-                        if(bg && bg !== 'transparent'){
+                        const bgCss = elementBackgroundCss(el.props);
+                        d.style.backgroundColor = bgCss;
+                        if(bgCss !== 'transparent'){
                             d.style.printColorAdjust = 'exact';
                             d.style.webkitPrintColorAdjust = 'exact';
                         }
@@ -8377,8 +8378,9 @@ document.addEventListener('DOMContentLoaded', ()=>{
                     }
                     // Background only for text/data/image (box set in case 'box'; line/qr/barcode have no background)
                     if(el.type === 'text' || el.type === 'data' || el.type === 'image'){
-                        d.style.backgroundColor = elementBackgroundCss(el.props);
-                        if(bg && bg !== 'transparent'){
+                        const bgCss = elementBackgroundCss(el.props);
+                        d.style.backgroundColor = bgCss;
+                        if(bgCss !== 'transparent'){
                             d.style.printColorAdjust = 'exact';
                             d.style.webkitPrintColorAdjust = 'exact';
                         }
@@ -8898,8 +8900,9 @@ document.addEventListener('DOMContentLoaded', ()=>{
                 }
                 // Background only for text/data/image (box set in case 'box'; line/qr/barcode have no background)
                 if(el.type === 'text' || el.type === 'data' || el.type === 'image'){
-                    d.style.backgroundColor = elementBackgroundCss(el.props);
-                    if(bg && bg !== 'transparent'){
+                    const bgCss = elementBackgroundCss(el.props);
+                    d.style.backgroundColor = bgCss;
+                    if(bgCss !== 'transparent'){
                         d.style.printColorAdjust = 'exact';
                         d.style.webkitPrintColorAdjust = 'exact';
                     }
