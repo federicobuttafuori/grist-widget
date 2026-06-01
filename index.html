@@ -1744,6 +1744,19 @@ document.addEventListener('DOMContentLoaded', ()=>{
                 else if(!savedPropHas('fillColor')) base.props.fillColor = '#ffffff';
             }
         }
+        if(base.type === 'text' || base.type === 'data' || base.type === 'image'){
+            const hadBg = !!(base.props.backgroundColor && base.props.backgroundColor !== 'transparent');
+            if(!savedPropHas('backgroundEnabled')){
+                base.props.backgroundEnabled = hadBg;
+            } else {
+                base.props.backgroundEnabled = !!base.props.backgroundEnabled;
+            }
+            const bc = String(base.props.backgroundColor || '').trim();
+            if(!/^#[0-9A-Fa-f]{6}$/i.test(bc) || bc.toLowerCase() === 'transparent'){
+                if(base.props.backgroundEnabled) base.props.backgroundColor = '#ffffff';
+                else if(!savedPropHas('backgroundColor')) base.props.backgroundColor = 'transparent';
+            }
+        }
         if(base.type === 'text' || base.type === 'data'){
             if(!Array.isArray(base.props.regexRules)) base.props.regexRules = [];
             const shouldEnableRegex = inferRegexRulesEnabled(base.props.regexRules);
@@ -2470,8 +2483,7 @@ document.addEventListener('DOMContentLoaded', ()=>{
             if(el.type === 'box'){
                 d.style.backgroundColor = boxFillBackgroundCss(el.props);
             } else if(el.type === 'text' || el.type === 'data' || el.type === 'image'){
-                const bg = el.props.backgroundColor;
-                d.style.backgroundColor = (bg && bg !== 'transparent') ? bg : 'transparent';
+                d.style.backgroundColor = elementBackgroundCss(el.props);
             }
 
             if(layerPickMode && focusSliceIds.has(el.id)){
@@ -3287,6 +3299,17 @@ document.addEventListener('DOMContentLoaded', ()=>{
     }
     function boxFillBackgroundCss(props){
         return (props && props.fillEnabled) ? boxFillColorStored(props) : 'transparent';
+    }
+    function elementBackgroundColorStored(props){
+        return normalizeOutlineColorHex(props && props.backgroundColor, '#ffffff');
+    }
+    function elementBackgroundCss(props){
+        if(!props) return 'transparent';
+        if(Object.prototype.hasOwnProperty.call(props, 'backgroundEnabled')){
+            return props.backgroundEnabled ? elementBackgroundColorStored(props) : 'transparent';
+        }
+        const bg = props.backgroundColor;
+        return (bg && bg !== 'transparent') ? bg : 'transparent';
     }
     function ensureOutlineSvgFilter(el){
         const defs = document.getElementById('outline-filters-defs');
@@ -4474,10 +4497,10 @@ document.addEventListener('DOMContentLoaded', ()=>{
         h += propFeatureBlock('Bordo', { checked: !!showBorderVal, dataProp: 'props.showBorder', syncHtml: syncBtn('props.showBorder') }, borderBody);
         if(el.type!=='box' && el.type!=='text' && el.type!=='data') h += `<hr><div class="${grid1Cls}"><label class="${labelClass('props.color')}">Colore</label><input type="color" data-prop="props.color" value="${valueFor('props.color')||'#000000'}">${syncBtn('props.color')}</div>`;
             if(el.type==='text' || el.type==='data' || el.type==='image'){
-                const hasBg = el.props.backgroundColor && el.props.backgroundColor!=='transparent';
-                const bgHex = (hasBg && /^#[0-9A-Fa-f]{6}$/.test(String(el.props.backgroundColor||''))) ? String(el.props.backgroundColor) : '#ffffff';
-                h += propFeatureBlock('Sfondo', { checked: hasBg, checkboxClass: 'enable-background-cb' },
-                    `<div class="prop-feature-row-color"><label>Colore</label><input type="color" class="background-color-input" data-prop="props.backgroundColor" value="${bgHex}"></div>`);
+                const bgEnabledVal = !!valueFor('props.backgroundEnabled');
+                const bgHex = elementBackgroundColorStored({ backgroundColor: valueFor('props.backgroundColor') });
+                h += propFeatureBlock('Sfondo', { checked: bgEnabledVal, dataProp: 'props.backgroundEnabled', syncHtml: syncBtn('props.backgroundEnabled') },
+                    `<div class="prop-feature-row-color"><label>Colore</label><input type="color" data-prop="props.backgroundColor" value="${bgHex}">${syncBtn('props.backgroundColor')}</div>`);
             }
             if(el.type==='text' || el.type==='data' || el.type==='image'){
                 const outlineW = Math.max(0, Number(valueFor('props.textOutlineWidth'))||0);
@@ -4826,24 +4849,6 @@ document.addEventListener('DOMContentLoaded', ()=>{
                         });
                     });
                 });
-            }
-            if(el.type === 'text' || el.type === 'data' || el.type === 'image'){
-                const enableBgCb = pp.querySelector('.enable-background-cb');
-                const bgInput = pp.querySelector('.background-color-input');
-                if(enableBgCb){
-                    enableBgCb.addEventListener('change', function(){
-                        const body = this.closest('.prop-feature') && this.closest('.prop-feature').querySelector(':scope > .prop-feature-body');
-                        pushBeforeChange();
-                        if(this.checked){
-                            el.props.backgroundColor = (bgInput && bgInput.value) ? bgInput.value : '#ffffff';
-                            if(body) body.hidden = false;
-                        } else {
-                            el.props.backgroundColor = 'transparent';
-                            if(body) body.hidden = true;
-                        }
-                        render(); saveCurrentDesign(); updateProps();
-                    });
-                }
             }
             // Formato Data/Ora: select + custom input (senza data-prop per gestione custom)
             if(el.type === 'text' || el.type === 'data'){
@@ -7765,8 +7770,7 @@ document.addEventListener('DOMContentLoaded', ()=>{
                     }
                     // Background only for text/data/image (box set in case 'box'; line/qr/barcode have no background)
                     if(el.type === 'text' || el.type === 'data' || el.type === 'image'){
-                        const bg = el.props.backgroundColor;
-                        d.style.backgroundColor = (bg && bg !== 'transparent') ? bg : 'transparent';
+                        d.style.backgroundColor = elementBackgroundCss(el.props);
                         if(bg && bg !== 'transparent'){
                             d.style.printColorAdjust = 'exact';
                             d.style.webkitPrintColorAdjust = 'exact';
@@ -8373,8 +8377,7 @@ document.addEventListener('DOMContentLoaded', ()=>{
                     }
                     // Background only for text/data/image (box set in case 'box'; line/qr/barcode have no background)
                     if(el.type === 'text' || el.type === 'data' || el.type === 'image'){
-                        const bg = el.props.backgroundColor;
-                        d.style.backgroundColor = (bg && bg !== 'transparent') ? bg : 'transparent';
+                        d.style.backgroundColor = elementBackgroundCss(el.props);
                         if(bg && bg !== 'transparent'){
                             d.style.printColorAdjust = 'exact';
                             d.style.webkitPrintColorAdjust = 'exact';
@@ -8895,8 +8898,7 @@ document.addEventListener('DOMContentLoaded', ()=>{
                 }
                 // Background only for text/data/image (box set in case 'box'; line/qr/barcode have no background)
                 if(el.type === 'text' || el.type === 'data' || el.type === 'image'){
-                    const bg = el.props.backgroundColor;
-                    d.style.backgroundColor = (bg && bg !== 'transparent') ? bg : 'transparent';
+                    d.style.backgroundColor = elementBackgroundCss(el.props);
                     if(bg && bg !== 'transparent'){
                         d.style.printColorAdjust = 'exact';
                         d.style.webkitPrintColorAdjust = 'exact';
@@ -9685,7 +9687,7 @@ document.addEventListener('DOMContentLoaded', ()=>{
             const [o,k] = p.split('.');
             if(!el[o]) el[o] = {};
                 if(['fontSize','lineHeight','letterSpacing','decimals','thickness','borderWidth','rotation','paddingTop','paddingRight','paddingBottom','paddingLeft','marginTop','marginRight','marginBottom','marginLeft','textOutlineWidth','textOutline2Width','imageOpacity','x','y','width','height','borderRadiusTopLeft','borderRadiusTopRight','borderRadiusBottomRight','borderRadiusBottomLeft'].includes(k)) el[o][k] = Number(v);
-                else if(['showBorder','fillEnabled','regexRulesEnabled','displayValue','asPercent','borderTop','borderRight','borderBottom','borderLeft','textOutlineEnabled','textOutline2Enabled','textOverflowFormattedMeasure'].includes(k)) el[o][k] = !!v;
+                else if(['showBorder','fillEnabled','backgroundEnabled','regexRulesEnabled','displayValue','asPercent','borderTop','borderRight','borderBottom','borderLeft','textOutlineEnabled','textOutline2Enabled','textOverflowFormattedMeasure'].includes(k)) el[o][k] = !!v;
                 else if(k === 'fontWeight'){
                     // Handle fontWeight: can be number (100-900) or string ('normal', 'bold')
                     const numVal = Number(v);
@@ -9881,7 +9883,7 @@ document.addEventListener('DOMContentLoaded', ()=>{
                     const [o,k] = keyPath.split('.');
                     if(!el[o]) el[o] = {};
                         if(['fontSize','lineHeight','letterSpacing','decimals','thickness','borderWidth','rotation','paddingTop','paddingRight','paddingBottom','paddingLeft','marginTop','marginRight','marginBottom','marginLeft','textOutlineWidth','textOutline2Width','x','y','width','height'].includes(k)) el[o][k] = Number(value);
-                        else if(['showBorder','fillEnabled','regexRulesEnabled','displayValue','asPercent','borderTop','borderRight','borderBottom','borderLeft','textOutlineEnabled','textOutline2Enabled','textOverflowFormattedMeasure'].includes(k)) el[o][k] = !!value;
+                        else if(['showBorder','fillEnabled','backgroundEnabled','regexRulesEnabled','displayValue','asPercent','borderTop','borderRight','borderBottom','borderLeft','textOutlineEnabled','textOutline2Enabled','textOverflowFormattedMeasure'].includes(k)) el[o][k] = !!value;
                         else if(k === 'fontWeight'){
                             // Handle fontWeight: can be number (100-900) or string ('normal', 'bold')
                             const numVal = Number(value);
@@ -9976,6 +9978,12 @@ document.addEventListener('DOMContentLoaded', ()=>{
                 if(prop === 'props.textOutlineEnabled' && parsedValue === true && (Number(el.props.textOutlineWidth) || 0) <= 0){
                     el.props.textOutlineWidth = 1;
                 }
+                if(prop === 'props.backgroundEnabled' && parsedValue === true){
+                    const bc = String(el.props.backgroundColor || '').trim();
+                    if(!bc || bc === 'transparent' || !/^#[0-9A-Fa-f]{6}$/i.test(bc)){
+                        el.props.backgroundColor = '#ffffff';
+                    }
+                }
             });
             if((prop === 'width' || prop === 'height') && !isDeferredTextInput){
                 const seenThread = new Set();
@@ -10034,10 +10042,16 @@ document.addEventListener('DOMContentLoaded', ()=>{
                 if(prop === 'props.textOutlineEnabled' && parsedValue === true && (Number(el.props.textOutlineWidth) || 0) <= 0){
                     el.props.textOutlineWidth = 1;
                 }
+                if(prop === 'props.backgroundEnabled' && parsedValue === true){
+                    const bc = String(el.props.backgroundColor || '').trim();
+                    if(!bc || bc === 'transparent' || !/^#[0-9A-Fa-f]{6}$/i.test(bc)){
+                        el.props.backgroundColor = '#ffffff';
+                    }
+                }
             }
         }
         
-        const needsOutlinePanelRefresh = prop === 'props.textOutlineEnabled' || prop === 'props.textOutline2Enabled' || prop === 'props.showBorder' || prop === 'props.fillEnabled' || prop === 'props.regexRulesEnabled';
+        const needsOutlinePanelRefresh = prop === 'props.textOutlineEnabled' || prop === 'props.textOutline2Enabled' || prop === 'props.showBorder' || prop === 'props.fillEnabled' || prop === 'props.backgroundEnabled' || prop === 'props.regexRulesEnabled';
         const needsOverflowPanelRefresh = prop === 'props.textOverflow' || prop === 'props.textOverflowFormattedMeasure';
         
         // Testo: solo salvataggio; render su blur (vedi listener blur)
