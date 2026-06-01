@@ -388,12 +388,13 @@
             position: absolute;
             cursor: pointer;
             border: 1px dashed transparent;
-            padding: 2px;
+            padding: 4px;
             user-select: none;
             box-sizing: border-box;
             display: flex;
             align-items: center;
             justify-content: center;
+            transition: border-radius 0.15s, border-width 0.15s, border-color 0.15s;
         }
 
         .sim-label-element:hover {
@@ -401,7 +402,8 @@
         }
 
         .sim-label-element.selected {
-            border: 2px dashed var(--accent-color);
+            outline: 1px dashed var(--accent-color);
+            outline-offset: 1px;
             box-shadow: 0 0 0 1px rgba(var(--accent-rgb), 0.1);
         }
 
@@ -417,14 +419,17 @@
             bottom: -5px;
             right: -5px;
             cursor: nwse-resize;
+            z-index: 5;
         }
 
         /* Elementi specifici */
         .sim-el-text {
             color: #000;
             font-weight: 700;
-            font-size: 14px;
+            font-size: 13px;
             font-family: sans-serif;
+            border: 0px solid #000; /* border dynamic */
+            border-radius: 4px;
         }
 
         .sim-el-barcode {
@@ -540,7 +545,7 @@
         .form-grid {
             display: grid;
             grid-template-columns: 80px 1fr;
-            gap: 10px 6px;
+            gap: 8px 6px;
             align-items: center;
         }
 
@@ -554,7 +559,7 @@
 
         .form-grid select, .form-grid input[type="text"], .form-grid input[type="number"] {
             width: 100%;
-            padding: 6px;
+            padding: 5px;
             font-size: 12px;
             background: rgba(0, 0, 0, 0.2);
             border: 1px solid var(--border-color);
@@ -600,7 +605,7 @@
 
         .seg-btn {
             flex: 1;
-            padding: 4px;
+            padding: 5px;
             font-size: 11px;
             border: none;
             background: transparent;
@@ -615,30 +620,6 @@
             color: var(--text-main);
         }
 
-        /* Accordion in sidebar */
-        .collapsible-header {
-            width: 100%;
-            padding: 10px 14px;
-            background: rgba(0,0,0,0.1);
-            border: none;
-            border-bottom: 1px solid var(--border-color);
-            color: var(--text-main);
-            font-weight: 600;
-            font-size: 12.5px;
-            text-align: left;
-            cursor: pointer;
-            display: flex;
-            align-items: center;
-            justify-content: space-between;
-        }
-
-        .collapsible-body {
-            padding: 12px;
-            display: flex;
-            flex-direction: column;
-            gap: 10px;
-        }
-
         /* Keyboard badge */
         kbd {
             background: rgba(255, 255, 255, 0.08);
@@ -648,6 +629,43 @@
             font-size: 9px;
             font-family: monospace;
             color: var(--text-muted);
+        }
+
+        /* Tabs a destra */
+        .tab-buttons {
+            display: flex;
+            gap: 4px;
+            background: rgba(0, 0, 0, 0.2);
+            border: 1px solid var(--border-color);
+            border-radius: var(--radius-btn);
+            padding: 2px;
+        }
+
+        .tab-btn {
+            flex: 1;
+            padding: 6px;
+            font-size: 11px;
+            font-weight: 600;
+            border: none;
+            background: transparent;
+            color: var(--text-muted);
+            border-radius: calc(var(--radius-btn) - 2px);
+            cursor: pointer;
+            text-align: center;
+            transition: all 0.2s;
+        }
+
+        .tab-btn.active {
+            background: var(--bg-panel);
+            color: var(--text-main);
+        }
+
+        .tab-pane {
+            display: none;
+        }
+
+        .tab-pane.active {
+            display: block;
         }
 
         /* ==========================================================================
@@ -748,12 +766,30 @@
         .btn-apply-direct:hover {
             background: #059669;
         }
+
+        .showcase-card {
+            background: rgba(0,0,0,0.15);
+            border: 1px solid var(--border-color);
+            border-radius: 8px;
+            padding: 12px;
+        }
+
+        .hint-badge {
+            background: var(--accent-color);
+            color: #fff;
+            font-size: 9px;
+            padding: 1px 4px;
+            border-radius: 3px;
+            font-weight: 700;
+            margin-right: 6px;
+            vertical-align: middle;
+        }
     </style>
 </head>
 <body class="theme-dark-figma">
 
     <header>
-        <h1><i data-lucide="layout-grid" style="color: var(--accent-color)"></i> Prototipi di Layout e Componenti <span>V3</span></h1>
+        <h1><i data-lucide="layout-grid" style="color: var(--accent-color)"></i> Prototipi di Layout e Componenti <span>V4</span></h1>
         <div style="display: flex; gap: 12px; align-items: center;">
             <button class="sim-tb-btn" onclick="toggleTheme()" style="font-size: 11px;"><i data-lucide="sun-moon"></i> Cambia Tema Colore</button>
             <span style="font-size: 12px; color: var(--text-muted);"><i data-lucide="help-circle" size="14"></i> Seleziona i prototipi per testarli interattivamente</span>
@@ -830,14 +866,13 @@
                 </div>
             </div>
             
-            <hr style="border:none; border-top:1px solid var(--border-color); margin:8px 0;">
+            <hr style="border:none; border-top:1px solid var(--border-color); margin:4px 0;">
 
             <!-- SEZIONE 2: PROTOTIPI SPECIFICI DI IMPORT/EXPORT -->
             <div>
                 <h3 class="showcase-section-title"><i data-lucide="folder-sync"></i> 2. Prototipi Import/Export</h3>
                 <p class="showcase-desc">Scegli come visualizzare l'area di salvataggio. Cambierà il blocco "Importa/Esporta" nella sidebar simulata.</p>
 
-                <!-- IE Opzione 1: Grid con Scorciatoie -->
                 <div class="layout-option-card ie-option-card active" data-ie="grid" onclick="setIEPrototype('grid')">
                     <div class="layout-radio"></div>
                     <div class="layout-info">
@@ -846,7 +881,6 @@
                     </div>
                 </div>
 
-                <!-- IE Opzione 2: Tabbed File Hub con Dropzone -->
                 <div class="layout-option-card ie-option-card" data-ie="dropzone" onclick="setIEPrototype('dropzone')">
                     <div class="layout-radio"></div>
                     <div class="layout-info">
@@ -855,7 +889,6 @@
                     </div>
                 </div>
 
-                <!-- IE Opzione 3: Split Button (Figma Style) -->
                 <div class="layout-option-card ie-option-card" data-ie="split" onclick="setIEPrototype('split')">
                     <div class="layout-radio"></div>
                     <div class="layout-info">
@@ -864,12 +897,37 @@
                     </div>
                 </div>
 
-                <!-- IE Opzione 4: Card Contestuale con Info -->
                 <div class="layout-option-card ie-option-card" data-ie="card" onclick="setIEPrototype('card')">
                     <div class="layout-radio"></div>
                     <div class="layout-info">
                         <h4>4. Card Informativa Integrata</h4>
                         <p>Contenuto racchiuso in una card in risalto con brevi descrizioni dei formati di salvataggio.</p>
+                    </div>
+                </div>
+            </div>
+
+            <hr style="border:none; border-top:1px solid var(--border-color); margin:4px 0;">
+
+            <!-- SEZIONE 3: STILI PADDING E BORDO -->
+            <div>
+                <h3 class="showcase-section-title"><i data-lucide="sliders-horizontal"></i> 3. Stile Padding & Bordo</h3>
+                <p class="showcase-desc">Scegli come visualizzare le impostazioni del bordo e del padding negli elementi per confrontare l'ergonomia.</p>
+
+                <!-- Style Opzione 1: Figma Style -->
+                <div class="layout-option-card style-option-card active" data-style="figma" onclick="setStyleMode('figma')">
+                    <div class="layout-radio"></div>
+                    <div class="layout-info">
+                        <h4>1. Figma Style (Compatto)</h4>
+                        <p>Controlli unificati con toggle d'espansione. Il colore e lo spessore del bordo stanno sulla stessa riga.</p>
+                    </div>
+                </div>
+
+                <!-- Style Opzione 2: Classico -->
+                <div class="layout-option-card style-option-card" data-style="classic" onclick="setStyleMode('classic')">
+                    <div class="layout-radio"></div>
+                    <div class="layout-info">
+                        <h4>2. Classico (Verticale)</h4>
+                        <p>Pulsanti e input elencati verticalmente uno sotto l'altro. Tante righe di opzioni e molto scrolling.</p>
                     </div>
                 </div>
             </div>
@@ -881,7 +939,7 @@
             <!-- Indicatore Posizionamento Attivo -->
             <div id="positioning-infobar">
                 <i data-lucide="info" size="14" style="color: var(--accent-color)"></i>
-                <span>Layout: <strong><span id="active-layout-name">Sidebar a Sinistra</span></strong> | Import/Export: <strong><span id="active-ie-name">Griglia con Scorciatoie</span></strong></span>
+                <span>Layout: <strong><span id="active-layout-name">Sidebar a Sinistra</span></strong> | I/E: <strong><span id="active-ie-name">Griglia</span></strong> | Stile: <strong><span id="active-style-name">Figma Style</span></strong></span>
             </div>
 
             <!-- Il Programma Simulato -->
@@ -982,7 +1040,7 @@
                         <div id="sim-label-sheet">
                             
                             <!-- Elemento 1: Testo -->
-                            <div class="sim-label-element sim-el-text selected" id="sim-el1" style="top: 25px; left: 20px;" onclick="selectSimElement('sim-el1'); event.stopPropagation();">
+                            <div class="sim-label-element sim-el-text selected" id="sim-el1" style="top: 25px; left: 20px; border-style: solid; border-width: 1px; border-color: #000000; border-radius: 4px; padding: 4px;" onclick="selectSimElement('sim-el1'); event.stopPropagation();">
                                 Bistecca di Fassona Premium
                             </div>
 
@@ -1058,8 +1116,9 @@
         <div id="detail-panel">
             
             <div class="tab-buttons" style="margin-bottom: 12px;">
-                <button class="tab-btn active" data-tab="ux-rational">Razionale UX & Layout</button>
+                <button class="tab-btn active" data-tab="ux-rational">Razionale Layout</button>
                 <button class="tab-btn" data-tab="ie-rational">Razionale Import/Export</button>
+                <button class="tab-btn" data-tab="padding-border-rational">Razionale Padding & Bordo</button>
             </div>
 
             <!-- TAB 1: Razionale generale dei Layout -->
@@ -1146,7 +1205,7 @@
                         <span class="hint-badge">OPZIONE 1</span> Griglia con Scorciatoie
                     </h4>
                     <p style="font-size: 11.5px; color: var(--text-muted); line-height: 1.4;">
-                        Conserva la logica originaria a 4 bottoni ma li organizza in un blocco simmetrico 2x2. Visualizza la scorciatoia <kbd>Ctrl+E</kbd> per educare l'utente a esportare senza fare click. **Voto Usabilità: 8/10**.
+                        Conserva la logica originaria a 4 bottoni ma li organizza in un blocco simmetrico 2x2. Visualizza la scorciatoia <kbd>Ctrl+E</kbd> per educare l'utente. **Voto Usabilità: 8/10**.
                     </p>
                 </div>
 
@@ -1155,7 +1214,7 @@
                         <span class="hint-badge">OPZIONE 2</span> Tabbed File Hub + Dropzone
                     </h4>
                     <p style="font-size: 11.5px; color: var(--text-muted); line-height: 1.4;">
-                        Divide le azioni in due modalità (Salva o Carica). Il caricamento offre un'area interattiva dashed drag-and-drop. Riduce lo stress visivo e rende l'importazione estremamente moderna. **Voto Usabilità: 9/10**.
+                        Divide le azioni in tab. Il tab "Carica" offre un'area interattiva dashed drag-and-drop per importare i file. Riduce lo stress visivo. **Voto Usabilità: 9/10**.
                     </p>
                 </div>
 
@@ -1164,7 +1223,7 @@
                         <span class="hint-badge">OPZIONE 3</span> Split Button (Figma Style)
                     </h4>
                     <p style="font-size: 11.5px; color: var(--text-muted); line-height: 1.4;">
-                        Raggruppa le varie forme di esportazione (solo Layout, Snapshot completo, o persino PNG) in un unico menu a discesa compatto. Riduce l'altezza del pannello del 60%. **Voto Usabilità: 8.5/10**.
+                        Raggruppa le varie esportazioni (solo Layout, Snapshot completo, o PNG) in un unico menu a discesa compatto. **Voto Usabilità: 8.5/10**.
                     </p>
                 </div>
 
@@ -1173,15 +1232,53 @@
                         <span class="hint-badge">OPZIONE 4</span> Card Informativa Integrata
                     </h4>
                     <p style="font-size: 11.5px; color: var(--text-muted); line-height: 1.4;">
-                        Inserisce i controlli all'interno di una card evidenziata con brevi note esplicative. Evita errori di distrazione all'utente guidandolo nella scelta tra esportazione classica e Snapshot. **Voto Usabilità: 7.5/10**.
+                        Racchiude i pulsanti dentro un pannello azzurrato con brevi spiegazioni. Guida gli utenti meno esperti. **Voto Usabilità: 7.5/10**.
+                    </p>
+                </div>
+            </div>
+
+            <!-- TAB 3: Razionale Padding & Bordo -->
+            <div class="tab-pane" id="tab-padding-border-rational">
+                <h3 class="showcase-section-title"><i data-lucide="sliders-horizontal"></i> Ergonomia di Padding & Bordo</h3>
+                <p class="showcase-desc">Confronto sull'usabilità per la configurazione di margini interni e contorni:</p>
+
+                <div class="showcase-card" style="margin-bottom: 12px; border-color: rgba(var(--accent-rgb), 0.25);">
+                    <h4 style="font-size: 13.5px; font-weight: 600; margin-bottom: 4px; color: var(--text-main);">
+                        <span class="hint-badge">FIGMA STYLE</span> Controlli Unificati e Collassabili
+                    </h4>
+                    <p style="font-size: 11.5px; color: var(--text-muted); line-height: 1.4;">
+                        <strong>Padding:</strong> Un singolo campo numerico per il padding globale. Cliccando sull'icona di espansione, si aprono 4 mini-input per i lati singoli in orizzontale. Riduce il disordine.<br><br>
+                        <strong>Bordo:</strong> Colore e spessore condividono la stessa riga. I lati sono selezionabili tramite una barra segmentata compatta. Angoli configurabili con un input globale ed espansione a 4 angoli.
                     </p>
                 </div>
 
-                <button class="btn-apply-direct" onclick="alert('Seleziona il prototipo che ti piace nel pannello di sinistra, fammi sapere quale preferisci e provvederò ad applicarlo alla codebase reale.')">
-                    <i data-lucide="check-circle-2"></i> Conferma Componente Import/Export
-                </button>
+                <div class="showcase-card" style="margin-bottom: 12px;">
+                    <h4 style="font-size: 13.5px; font-weight: 600; margin-bottom: 4px; color: var(--text-main);">
+                        <span class="hint-badge">CLASSICO</span> Elencazione Verticale
+                    </h4>
+                    <p style="font-size: 11.5px; color: var(--text-muted); line-height: 1.4;">
+                        Mostra tutti i campi (Padding Top, Right, Bottom, Left) come righe singole fin dall'inizio. Costringe l'utente a scrollare continuamente la sidebar anche se vuole solo impostare un bordo semplice.
+                    </p>
+                </div>
+
+                <h3 class="showcase-section-title" style="margin-top: 16px;"><i data-lucide="code-2"></i> Integrazione CSS & HTML</h3>
+                <p class="showcase-desc">Come ristrutturare la sezione del bordo in `index.html` per allineare colore e spessore:</p>
+                
+                <pre class="code-snippet" style="font-size: 10px;">
+<span class="code-comment">&lt;!-- Row Colore e Spessore affiancati --&gt;</span>
+&lt;div class="border-row-inline" style="display: grid; grid-template-columns: 1fr 80px; gap: 8px;"&gt;
+    &lt;div class="color-picker-wrapper"&gt;
+        &lt;input type="color" data-prop="props.borderColor"&gt;
+    &lt;/div&gt;
+    &lt;div class="thickness-wrapper"&gt;
+        &lt;input type="number" data-prop="props.borderWidth"&gt;
+    &lt;/div&gt;
+&lt;/div&gt;</pre>
             </div>
             
+            <button class="btn-apply-direct" onclick="alert('Seleziona il prototipo che ti piace nel pannello di sinistra, fammi sapere quale preferisci e provvederò ad applicarlo alla codebase reale.')">
+                <i data-lucide="check-circle-2"></i> Conferma Scelta Stile
+            </button>
         </div>
 
     </div>
@@ -1386,6 +1483,7 @@
         let currentLayout = 'classic';
         let currentSelectedElement = 'sim-el1'; // Testo selezionato di default
         let currentIEPrototype = 'grid'; // Grid di default
+        let currentStyleMode = 'figma'; // Figma Style di default per Padding & Bordo
 
         // Selettore Layout
         function setLayout(layoutName) {
@@ -1393,7 +1491,7 @@
             
             // Aggiorna classi del selettore a sinistra
             document.querySelectorAll('#control-panel .layout-option-card').forEach(card => {
-                if(!card.classList.contains('ie-option-card')) {
+                if(!card.classList.contains('ie-option-card') && !card.classList.contains('style-option-card')) {
                     card.classList.remove('active');
                 }
             });
@@ -1412,7 +1510,7 @@
             };
             document.getElementById('active-layout-name').textContent = labelMap[layoutName];
 
-            // Ri-renderizza le proprietà nel corretto placeholder
+            // Ri-renderizza le proprietà e l'import-export nel corretto placeholder
             renderActiveProperties();
             renderActiveIEPrototype();
         }
@@ -1442,6 +1540,191 @@
             renderActiveProperties();
         }
 
+        // Selettore Stile Padding e Bordo
+        function setStyleMode(mode) {
+            currentStyleMode = mode;
+            
+            // Aggiorna classi del selettore a sinistra
+            document.querySelectorAll('.style-option-card').forEach(card => {
+                card.classList.remove('active');
+            });
+            document.querySelector(`.style-option-card[data-style="${mode}"]`).classList.add('active');
+
+            const labelMap = {
+                'figma': 'Figma Style (Compatto)',
+                'classic': 'Classico (Verticale)'
+            };
+            document.getElementById('active-style-name').textContent = labelMap[mode];
+
+            renderActiveProperties();
+        }
+
+        // Genera HTML per la sezione Padding in base allo stile scelto
+        function getPaddingHtml(mode) {
+            if (mode === 'classic') {
+                return `
+                <div style="border-top: 1px solid var(--border-color); margin-top: 12px; padding-top: 10px;">
+                    <h4 style="font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 8px; color: var(--text-main);">Padding Elemento</h4>
+                    <div class="form-grid">
+                        <label>Top (mm):</label>
+                        <input type="number" class="classic-pad-t" value="1.0" step="0.5" oninput="updateClassicPadding()">
+                        <label>Right (mm):</label>
+                        <input type="number" class="classic-pad-r" value="1.0" step="0.5" oninput="updateClassicPadding()">
+                        <label>Bottom (mm):</label>
+                        <input type="number" class="classic-pad-b" value="1.0" step="0.5" oninput="updateClassicPadding()">
+                        <label>Left (mm):</label>
+                        <input type="number" class="classic-pad-l" value="1.0" step="0.5" oninput="updateClassicPadding()">
+                    </div>
+                </div>`;
+            } else {
+                // Figma style
+                return `
+                <div style="border-top: 1px solid var(--border-color); margin-top: 12px; padding-top: 10px;">
+                    <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:8px;">
+                        <span style="font-size:12px; font-weight:600; color:var(--text-main);">Padding (mm)</span>
+                        <button class="sim-tb-btn" style="padding:2px 4px; font-size:10px; height:20px; min-width:20px; display:flex; align-items:center; justify-content:center;" onclick="toggleSimPaddingMode(this)">
+                            <i data-lucide="sliders-horizontal" size="12"></i>
+                        </button>
+                    </div>
+                    
+                    <!-- Unified Mode -->
+                    <div class="padding-unified-row" style="display:flex; align-items:center; gap:8px;">
+                        <i data-lucide="maximize" size="12" style="color:var(--text-muted); flex-shrink:0;"></i>
+                        <input type="number" value="1.0" step="0.5" style="padding:4px 6px; font-size:11px;" oninput="updateSimPaddingAll(this.value)">
+                    </div>
+                    
+                    <!-- Individual Mode (Hidden by default) -->
+                    <div class="padding-individual-row" style="display:none; grid-template-columns:repeat(4, 1fr); gap:6px;">
+                        <div style="display:flex; flex-direction:column; align-items:center; gap:2px;">
+                            <input type="number" class="pad-t" value="1.0" step="0.5" style="padding:4px; font-size:11px; text-align:center; width:100%;" oninput="updateLabelPadding()">
+                            <span style="font-size:8px; color:var(--text-muted);">Top</span>
+                        </div>
+                        <div style="display:flex; flex-direction:column; align-items:center; gap:2px;">
+                            <input type="number" class="pad-r" value="1.0" step="0.5" style="padding:4px; font-size:11px; text-align:center; width:100%;" oninput="updateLabelPadding()">
+                            <span style="font-size:8px; color:var(--text-muted);">Right</span>
+                        </div>
+                        <div style="display:flex; flex-direction:column; align-items:center; gap:2px;">
+                            <input type="number" class="pad-b" value="1.0" step="0.5" style="padding:4px; font-size:11px; text-align:center; width:100%;" oninput="updateLabelPadding()">
+                            <span style="font-size:8px; color:var(--text-muted);">Bottom</span>
+                        </div>
+                        <div style="display:flex; flex-direction:column; align-items:center; gap:2px;">
+                            <input type="number" class="pad-l" value="1.0" step="0.5" style="padding:4px; font-size:11px; text-align:center; width:100%;" oninput="updateLabelPadding()">
+                            <span style="font-size:8px; color:var(--text-muted);">Left</span>
+                        </div>
+                    </div>
+                </div>`;
+            }
+        }
+
+        // Genera HTML per la sezione Bordo in base allo stile scelto
+        function getBorderHtml(mode) {
+            if (mode === 'classic') {
+                return `
+                <div style="border-top: 1px solid var(--border-color); margin-top: 12px; padding-top: 10px;">
+                    <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:8px;">
+                        <span style="font-size:12px; font-weight:600; color:var(--text-main);">Bordo Elemento</span>
+                        <label style="display:flex; align-items:center; gap:4px; font-size:11px; cursor:pointer;">
+                            <input type="checkbox" id="cb-border-enable" checked onchange="toggleClassicBorderEnabled(this)" style="width:auto;"> Abilita
+                        </label>
+                    </div>
+                    
+                    <div id="classic-border-body" class="form-grid">
+                        <label>Colore:</label>
+                        <input type="color" value="#000000" style="padding:2px; height:28px;" oninput="updateSimBorderColor(this.value)">
+                        
+                        <label>Spessore (px):</label>
+                        <input type="number" value="1.0" step="0.5" oninput="updateSimBorderWidth(this.value)">
+                        
+                        <label style="grid-column: span 2; text-align:left; font-weight:600; margin-top:4px; font-size:10.5px; color:var(--text-muted);">Lati del bordo:</label>
+                        <div style="grid-column: span 2; display:grid; grid-template-columns:1fr 1fr; gap:6px; padding-left:8px;">
+                            <label style="text-align:left; display:flex; align-items:center; gap:4px; font-size:11px;"><input type="checkbox" class="cb-side-top" checked style="width:auto;" onchange="toggleClassicBorderSide('top', this.checked)"> Top</label>
+                            <label style="text-align:left; display:flex; align-items:center; gap:4px; font-size:11px;"><input type="checkbox" class="cb-side-right" checked style="width:auto;" onchange="toggleClassicBorderSide('right', this.checked)"> Right</label>
+                            <label style="text-align:left; display:flex; align-items:center; gap:4px; font-size:11px;"><input type="checkbox" class="cb-side-bottom" checked style="width:auto;" onchange="toggleClassicBorderSide('bottom', this.checked)"> Bottom</label>
+                            <label style="text-align:left; display:flex; align-items:center; gap:4px; font-size:11px;"><input type="checkbox" class="cb-side-left" checked style="width:auto;" onchange="toggleClassicBorderSide('left', this.checked)"> Left</label>
+                        </div>
+
+                        <label style="grid-column: span 2; text-align:left; font-weight:600; margin-top:4px; font-size:10.5px; color:var(--text-muted);">Angoli (Radius px):</label>
+                        <div style="grid-column: span 2; display:grid; grid-template-columns:1fr 1fr; gap:8px; padding-left:4px;">
+                            <div style="display:flex; flex-direction:column;"><span style="font-size:8px; color:var(--text-muted);">Top Left</span><input type="number" class="c-rad-tl" value="4.0" style="padding:2px;" oninput="updateClassicRadius()"></div>
+                            <div style="display:flex; flex-direction:column;"><span style="font-size:8px; color:var(--text-muted);">Top Right</span><input type="number" class="c-rad-tr" value="4.0" style="padding:2px;" oninput="updateClassicRadius()"></div>
+                            <div style="display:flex; flex-direction:column;"><span style="font-size:8px; color:var(--text-muted);">Bottom Right</span><input type="number" class="c-rad-br" value="4.0" style="padding:2px;" oninput="updateClassicRadius()"></div>
+                            <div style="display:flex; flex-direction:column;"><span style="font-size:8px; color:var(--text-muted);">Bottom Left</span><input type="number" class="c-rad-bl" value="4.0" style="padding:2px;" oninput="updateClassicRadius()"></div>
+                        </div>
+                    </div>
+                </div>`;
+            } else {
+                // Figma style
+                return `
+                <div style="border-top: 1px solid var(--border-color); margin-top: 12px; padding-top: 10px;">
+                    <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:8px;">
+                        <span style="font-size:12px; font-weight:600; color:var(--text-main);">Bordo</span>
+                        <label style="display:flex; align-items:center; gap:4px; font-size:11px; cursor:pointer;">
+                            <input type="checkbox" id="cb-figma-border-enable" checked onchange="toggleSimBorderEnabled(this)" style="width:auto;"> Abilita
+                        </label>
+                    </div>
+                    
+                    <div class="border-controls-body" style="display:flex; flex-direction:column; gap:8px;">
+                        <!-- Color + Thickness in single row -->
+                        <div style="display:grid; grid-template-columns:1fr 70px; gap:8px; align-items:center;">
+                            <div style="display:flex; align-items:center; gap:6px; background:rgba(0,0,0,0.25); border:1px solid var(--border-color); border-radius:var(--radius-btn); padding:4px 8px; height:28px;">
+                                <input type="color" value="#000000" style="width:18px; height:18px; border:none; padding:0; background:transparent; cursor:pointer;" oninput="updateSimBorderColor(this.value)">
+                                <span class="color-hex-val" style="font-size:10.5px; font-family:monospace; color:var(--text-muted);">#000000</span>
+                            </div>
+                            <div style="display:flex; align-items:center; gap:4px; background:rgba(0,0,0,0.25); border:1px solid var(--border-color); border-radius:var(--radius-btn); padding:2px 4px; height:28px;">
+                                <input type="number" class="border-w-input" value="1.0" step="0.5" min="0" style="width:100%; border:none; background:transparent; font-size:11px; color:var(--text-main); text-align:center; padding:0;" oninput="updateSimBorderWidth(this.value)">
+                                <span style="font-size:10px; color:var(--text-muted);">px</span>
+                            </div>
+                        </div>
+
+                        <!-- Border Sides (Segmented bar) -->
+                        <div class="border-sides-section" style="display:flex; flex-direction:column; gap:4px;">
+                            <span style="font-size:10px; color:var(--text-muted);">Lati attivi</span>
+                            <div class="seg-control" style="width:100%;">
+                                <button class="seg-btn active" onclick="toggleSimBorderSide(this, 'top')" title="Top Border">T</button>
+                                <button class="seg-btn active" onclick="toggleSimBorderSide(this, 'right')" title="Right Border">R</button>
+                                <button class="seg-btn active" onclick="toggleSimBorderSide(this, 'bottom')" title="Bottom Border">B</button>
+                                <button class="seg-btn active" onclick="toggleSimBorderSide(this, 'left')" title="Left Border">L</button>
+                            </div>
+                        </div>
+
+                        <!-- Corner Radius (Figma style) -->
+                        <div style="display:flex; flex-direction:column; gap:4px; margin-top:4px;">
+                            <div style="display:flex; justify-content:space-between; align-items:center;">
+                                <span style="font-size:10px; color:var(--text-muted);">Angoli (Radius px)</span>
+                                <button class="sim-tb-btn" style="padding:2px 4px; font-size:10px; height:18px; min-width:18px; display:flex; align-items:center; justify-content:center;" onclick="toggleSimRadiusMode(this)">
+                                    <i data-lucide="square" size="10"></i>
+                                </button>
+                            </div>
+                            <!-- Unified Radius -->
+                            <div class="radius-unified-row" style="display:flex; align-items:center; gap:8px;">
+                                <i data-lucide="corner-down-right" size="12" style="color:var(--text-muted); flex-shrink:0;"></i>
+                                <input type="number" value="4.0" step="1" style="padding:4px 6px; font-size:11px;" oninput="updateSimRadiusAll(this.value)">
+                            </div>
+                            <!-- Individual Radius -->
+                            <div class="radius-individual-row" style="display:none; grid-template-columns:repeat(4, 1fr); gap:6px;">
+                                <div style="display:flex; flex-direction:column; align-items:center; gap:2px;">
+                                    <input type="number" class="rad-tl" value="4.0" style="padding:4px; font-size:11px; text-align:center; width:100%;" oninput="updateLabelRadius()">
+                                    <span style="font-size:8px; color:var(--text-muted);">TL</span>
+                                </div>
+                                <div style="display:flex; flex-direction:column; align-items:center; gap:2px;">
+                                    <input type="number" class="rad-tr" value="4.0" style="padding:4px; font-size:11px; text-align:center; width:100%;" oninput="updateLabelRadius()">
+                                    <span style="font-size:8px; color:var(--text-muted);">TR</span>
+                                </div>
+                                <div style="display:flex; flex-direction:column; align-items:center; gap:2px;">
+                                    <input type="number" class="rad-br" value="4.0" style="padding:4px; font-size:11px; text-align:center; width:100%;" oninput="updateLabelRadius()">
+                                    <span style="font-size:8px; color:var(--text-muted);">BR</span>
+                                </div>
+                                <div style="display:flex; flex-direction:column; align-items:center; gap:2px;">
+                                    <input type="number" class="rad-bl" value="4.0" style="padding:4px; font-size:11px; text-align:center; width:100%;" oninput="updateLabelRadius()">
+                                    <span style="font-size:8px; color:var(--text-muted);">BL</span>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>`;
+            }
+        }
+
         // Renderizza il form delle proprietà nel pannello corretto
         function renderActiveProperties() {
             let templateId = '';
@@ -1449,7 +1732,13 @@
             else if (currentSelectedElement === 'sim-el2') templateId = 'template-barcode';
             else if (currentSelectedElement === 'sim-el3') templateId = 'template-qr';
 
-            const templateContent = document.getElementById(templateId).innerHTML;
+            let templateContent = document.getElementById(templateId).innerHTML;
+            
+            // Appendi il padding e bordo all'elemento sim-el1 (Testo) per dimostrazione
+            if (currentSelectedElement === 'sim-el1') {
+                templateContent += getPaddingHtml(currentStyleMode);
+                templateContent += getBorderHtml(currentStyleMode);
+            }
 
             const leftPlaceholder = document.getElementById('sidebar-left-props-placeholder');
             const rightPlaceholder = document.getElementById('sidebar-right-props-placeholder');
@@ -1461,6 +1750,9 @@
                 leftPlaceholder.innerHTML = '';
                 rightPlaceholder.innerHTML = templateContent;
             }
+
+            // Inizializza le icone
+            lucide.createIcons();
         }
 
         // Selettore Prototipi Import/Export
@@ -1474,15 +1766,12 @@
             document.querySelector(`.ie-option-card[data-ie="${protoName}"]`).classList.add('active');
 
             const labelMap = {
-                'grid': 'Griglia con Scorciatoie',
-                'dropzone': 'Tabbed File Hub + Dropzone',
-                'split': 'Split Button Dropdown',
-                'card': 'Card Informativa Integrata'
+                'grid': 'Griglia',
+                'dropzone': 'Tabbed File Hub',
+                'split': 'Split Button',
+                'card': 'Card Info'
             };
             document.getElementById('active-ie-name').textContent = labelMap[protoName];
-
-            // Aggiorna spiegazione nel razionale a destra
-            updateIERationalText(protoName);
 
             // Renderizza nella sidebar simulata
             renderActiveIEPrototype();
@@ -1507,6 +1796,223 @@
             // Ricrea icone per renderizzare le nuove icone inserite
             lucide.createIcons();
         }
+
+        // ==========================================================================
+        // FUNZIONI DI INTERATTIVITÀ DEI COMPONENTI PADDING & BORDO (LIVE REFLECTION)
+        // ==========================================================================
+
+        // Figma Padding Toggle (Unified vs Individual)
+        function toggleSimPaddingMode(btn) {
+            const parent = btn.closest('.sim-sidebar-section');
+            const unified = parent.querySelector('.padding-unified-row');
+            const individual = parent.querySelector('.padding-individual-row');
+            if (unified.style.display === 'none') {
+                unified.style.display = 'flex';
+                individual.style.display = 'none';
+                btn.classList.remove('active');
+                btn.style.background = 'transparent';
+            } else {
+                unified.style.display = 'none';
+                individual.style.display = 'grid';
+                btn.classList.add('active');
+                btn.style.background = 'rgba(var(--accent-rgb), 0.15)';
+            }
+        }
+
+        // Aggiorna padding uniforme per Figma style
+        function updateSimPaddingAll(val) {
+            const el = document.getElementById(currentSelectedElement);
+            if (!el) return;
+            const paddingPx = Math.max(0, parseFloat(val) * 4); // rough mm to px translation for screen
+            el.style.padding = paddingPx + 'px';
+            
+            // Sincronizza i valori degli input individuali
+            const parent = document.querySelector('.padding-individual-row');
+            if (parent) {
+                parent.querySelector('.pad-t').value = val;
+                parent.querySelector('.pad-r').value = val;
+                parent.querySelector('.pad-b').value = val;
+                parent.querySelector('.pad-l').value = val;
+            }
+        }
+
+        // Aggiorna padding asimmetrico per Figma style
+        function updateLabelPadding() {
+            const el = document.getElementById(currentSelectedElement);
+            if (!el) return;
+            const parent = document.querySelector('.padding-individual-row');
+            if (!parent) return;
+            
+            const t = Math.max(0, parseFloat(parent.querySelector('.pad-t').value || 0)) * 4;
+            const r = Math.max(0, parseFloat(parent.querySelector('.pad-r').value || 0)) * 4;
+            const b = Math.max(0, parseFloat(parent.querySelector('.pad-b').value || 0)) * 4;
+            const l = Math.max(0, parseFloat(parent.querySelector('.pad-l').value || 0)) * 4;
+            
+            el.style.padding = `${t}px ${r}px ${b}px ${l}px`;
+        }
+
+        // Aggiorna padding asimmetrico per Classic style
+        function updateClassicPadding() {
+            const el = document.getElementById(currentSelectedElement);
+            if (!el) return;
+            const parent = document.querySelector('.sim-sidebar-section');
+            if (!parent) return;
+            
+            const t = Math.max(0, parseFloat(parent.querySelector('.classic-pad-t').value || 0)) * 4;
+            const r = Math.max(0, parseFloat(parent.querySelector('.classic-pad-r').value || 0)) * 4;
+            const b = Math.max(0, parseFloat(parent.querySelector('.classic-pad-b').value || 0)) * 4;
+            const l = Math.max(0, parseFloat(parent.querySelector('.classic-pad-l').value || 0)) * 4;
+            
+            el.style.padding = `${t}px ${r}px ${b}px ${l}px`;
+        }
+
+        // Figma Border Toggle (Unified Corners vs Individual Corners)
+        function toggleSimRadiusMode(btn) {
+            const parent = btn.closest('.sim-sidebar-section');
+            const unified = parent.querySelector('.radius-unified-row');
+            const individual = parent.querySelector('.radius-individual-row');
+            if (unified.style.display === 'none') {
+                unified.style.display = 'flex';
+                individual.style.display = 'none';
+                btn.classList.remove('active');
+                btn.style.background = 'transparent';
+            } else {
+                unified.style.display = 'none';
+                individual.style.display = 'grid';
+                btn.classList.add('active');
+                btn.style.background = 'rgba(var(--accent-rgb), 0.15)';
+            }
+        }
+
+        // Aggiorna Border Radius uniforme per Figma style
+        function updateSimRadiusAll(val) {
+            const el = document.getElementById(currentSelectedElement);
+            if (!el) return;
+            el.style.borderRadius = val + 'px';
+            
+            // Sincronizza i valori degli input individuali
+            const parent = document.querySelector('.radius-individual-row');
+            if (parent) {
+                parent.querySelector('.rad-tl').value = val;
+                parent.querySelector('.rad-tr').value = val;
+                parent.querySelector('.rad-br').value = val;
+                parent.querySelector('.rad-bl').value = val;
+            }
+        }
+
+        // Aggiorna Border Radius asimmetrico per Figma style
+        function updateLabelRadius() {
+            const el = document.getElementById(currentSelectedElement);
+            if (!el) return;
+            const parent = document.querySelector('.radius-individual-row');
+            if (!parent) return;
+            
+            const tl = Math.max(0, parseFloat(parent.querySelector('.rad-tl').value || 0));
+            const tr = Math.max(0, parseFloat(parent.querySelector('.rad-tr').value || 0));
+            const br = Math.max(0, parseFloat(parent.querySelector('.rad-br').value || 0));
+            const bl = Math.max(0, parseFloat(parent.querySelector('.rad-bl').value || 0));
+            
+            el.style.borderRadius = `${tl}px ${tr}px ${br}px ${bl}px`;
+        }
+
+        // Aggiorna Border Radius asimmetrico per Classic style
+        function updateClassicRadius() {
+            const el = document.getElementById(currentSelectedElement);
+            if (!el) return;
+            const parent = document.querySelector('.sim-sidebar-section');
+            if (!parent) return;
+            
+            const tl = Math.max(0, parseFloat(parent.querySelector('.c-rad-tl').value || 0));
+            const tr = Math.max(0, parseFloat(parent.querySelector('.c-rad-tr').value || 0));
+            const br = Math.max(0, parseFloat(parent.querySelector('.c-rad-br').value || 0));
+            const bl = Math.max(0, parseFloat(parent.querySelector('.c-rad-bl').value || 0));
+            
+            el.style.borderRadius = `${tl}px ${tr}px ${br}px ${bl}px`;
+        }
+
+        // Figma Border Enable/Disable
+        function toggleSimBorderEnabled(checkbox) {
+            const parent = checkbox.closest('.sim-sidebar-section');
+            const body = parent.querySelector('.border-controls-body');
+            const el = document.getElementById(currentSelectedElement);
+            if (checkbox.checked) {
+                body.style.display = 'flex';
+                if (el) {
+                    el.style.borderStyle = 'solid';
+                    el.style.borderWidth = '1px';
+                    el.style.borderColor = '#000000';
+                }
+            } else {
+                body.style.display = 'none';
+                if (el) {
+                    el.style.borderStyle = 'none';
+                }
+            }
+        }
+
+        // Classic Border Enable/Disable
+        function toggleClassicBorderEnabled(checkbox) {
+            const body = document.getElementById('classic-border-body');
+            const el = document.getElementById(currentSelectedElement);
+            if (checkbox.checked) {
+                body.style.display = 'grid';
+                if (el) {
+                    el.style.borderStyle = 'solid';
+                    el.style.borderWidth = '1px';
+                    el.style.borderColor = '#000000';
+                }
+            } else {
+                body.style.display = 'none';
+                if (el) {
+                    el.style.borderStyle = 'none';
+                }
+            }
+        }
+
+        // Aggiorna Colore Bordo
+        function updateSimBorderColor(colorVal) {
+            const el = document.getElementById(currentSelectedElement);
+            if (el) el.style.borderColor = colorVal;
+            const hexText = document.querySelector('.color-hex-val');
+            if (hexText) hexText.textContent = colorVal.toUpperCase();
+        }
+
+        // Aggiorna Spessore Bordo
+        function updateSimBorderWidth(wVal) {
+            const el = document.getElementById(currentSelectedElement);
+            if (el) el.style.borderWidth = wVal + 'px';
+        }
+
+        // Figma Border Sides (Top, Right, Bottom, Left Segmented Buttons)
+        function toggleSimBorderSide(btn, side) {
+            btn.classList.toggle('active');
+            const el = document.getElementById(currentSelectedElement);
+            if (!el) return;
+            
+            const sideProperty = 'border' + side.charAt(0).toUpperCase() + side.slice(1);
+            if (btn.classList.contains('active')) {
+                el.style[sideProperty + 'Style'] = 'solid';
+            } else {
+                el.style[sideProperty + 'Style'] = 'none';
+            }
+        }
+
+        // Classic Border Sides Checkbox Change
+        function toggleClassicBorderSide(side, isChecked) {
+            const el = document.getElementById(currentSelectedElement);
+            if (!el) return;
+            
+            const sideProperty = 'border' + side.charAt(0).toUpperCase() + side.slice(1);
+            if (isChecked) {
+                el.style[sideProperty + 'Style'] = 'solid';
+            } else {
+                el.style[sideProperty + 'Style'] = 'none';
+            }
+        }
+
+        // ==========================================================================
+        // GESTIONE DEI TAB E MENU GENERALI DELLO SHOWCASE
+        // ==========================================================================
 
         // Gestione Tab per il prototipo 2 (File Hub)
         function setExportImportTab(tabType, btn) {
@@ -1546,19 +2052,6 @@
         document.addEventListener('click', () => {
             document.querySelectorAll('.sim-dropdown-menu').forEach(menu => menu.style.display = 'none');
         });
-
-        // Aggiorna spiegazione razionale a destra in tempo reale
-        function updateIERationalText(protoName) {
-            const explanations = {
-                'grid': '<strong>1. Griglia con Scorciatoie:</strong> Consolida l\'attuale schema a 4 bottoni allineandoli su una griglia ordinata. Consente un accesso diretto con un solo click e indica esplicitamente la scorciatoia da tastiera per educare l\'utente nel lungo termine.',
-                'dropzone': '<strong>2. Tabbed File Hub:</strong> Questa opzione pulisce l\'interfaccia nascondendo le opzioni di Importazione finché l\'utente non fa click sul tab Carica. L\'aggiunta dell\'area trascinamento dashed (Dropzone) rende l\'azione ergonomica e naturale.',
-                'split': '<strong>3. Split Button Figma-style:</strong> Il prototipo più compatto. Raggruppa i tre metodi di esportazione sotto una singola tendina. Ideale per layout stretti perché recupera molto spazio verticale per altri elementi di design.',
-                'card': '<strong>4. Card Informativa:</strong> Racchiude i pulsanti dentro un pannello azzurrato di evidenza visiva. Aggiunge un testo descrittivo che guida gli utenti meno esperti a distinguere tra un semplice layout e uno snapshot comprensivo di dati.'
-            };
-            
-            const element = document.getElementById('ie-rational-explanation');
-            if(element) element.innerHTML = explanations[protoName];
-        }
 
         // Funzioni di modifica in tempo reale del canvas simulato da form
         function updateSimText(val) {
@@ -1626,6 +2119,7 @@
         window.onload = function() {
             setLayout('classic');
             setIEPrototype('grid');
+            setStyleMode('figma');
             selectSimElement('sim-el1');
         };
     </script>

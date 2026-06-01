@@ -62,11 +62,11 @@
         .sidebar-section .add-buttons{display:grid;grid-template-columns:1fr 1fr;gap:8px}
         .ie-section .ie-actions{display:flex;gap:8px}
         .ie-dropdown{position:relative;flex:1;min-width:0}
-        .ie-dropdown-trigger{width:100%;font-size:13px;padding:8px 10px;background:#fff;border:1px solid #d0d7de;border-radius:6px;font-weight:500;display:flex;align-items:center;justify-content:center;gap:6px;color:#222}
-        .ie-dropdown-trigger:hover{background:#f6f8fa;border-color:#afb8c1}
-        .ie-dropdown-trigger[aria-expanded="true"]{background:#eef6ff;border-color:#007aff;box-shadow:0 0 0 2px rgba(0,122,255,.15)}
+        .ie-dropdown-trigger{width:100%;font-size:13px;padding:8px 10px;border:1px solid transparent;border-radius:6px;font-weight:600;display:flex;align-items:center;justify-content:center;gap:6px;text-align:center}
         .ie-btn-icon{width:17px;height:17px;flex-shrink:0;display:block}
-        .ie-dropdown-chevron{font-size:9px;opacity:.5;line-height:1;margin-left:auto}
+        .ie-dropdown-trigger.ie-trigger-export,.ie-dropdown-trigger.ie-trigger-import{background:#007aff;color:#fff;border-color:#0066d6}
+        .ie-dropdown-trigger.ie-trigger-export:hover,.ie-dropdown-trigger.ie-trigger-import:hover{background:#0066eb;border-color:#0059cc}
+        .ie-dropdown-trigger.ie-trigger-export[aria-expanded="true"],.ie-dropdown-trigger.ie-trigger-import[aria-expanded="true"]{box-shadow:0 0 0 2px rgba(0,122,255,.35)}
         .ie-dropdown-menu{position:absolute;top:calc(100% + 4px);left:0;right:0;z-index:500;background:#fff;border:1px solid #d0d7de;border-radius:8px;box-shadow:0 6px 20px rgba(0,0,0,.12);padding:4px;display:flex;flex-direction:column;gap:2px}
         .ie-dropdown-menu[hidden]{display:none!important}
         .ie-dropdown-menu button{width:100%;text-align:left;padding:8px 10px;border:none;border-radius:6px;background:transparent;font-size:12px;line-height:1.35;cursor:pointer;color:#222}
@@ -284,10 +284,9 @@
                 <h3>Importa / Esporta</h3>
                 <div class="ie-actions">
                     <div class="ie-dropdown">
-                        <button type="button" class="ie-dropdown-trigger" id="btn-export-menu" aria-haspopup="menu" aria-expanded="false">
+                        <button type="button" class="ie-dropdown-trigger ie-trigger-export" id="btn-export-menu" aria-haspopup="menu" aria-expanded="false">
                             <svg class="ie-btn-icon" viewBox="0 0 20 20" fill="none" aria-hidden="true"><path d="M10 3v8m0 0l-3-3m3 3l3-3" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/><path d="M4 14.5h12" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></svg>
-                            Esporta
-                            <span class="ie-dropdown-chevron" aria-hidden="true">▾</span>
+                            <span>Esporta</span>
                         </button>
                         <div class="ie-dropdown-menu" id="export-dropdown-menu" role="menu" hidden>
                             <button type="button" role="menuitem" data-ie-action="export-layout">Layout design</button>
@@ -295,10 +294,9 @@
                         </div>
                     </div>
                     <div class="ie-dropdown">
-                        <button type="button" class="ie-dropdown-trigger" id="btn-import-menu" aria-haspopup="menu" aria-expanded="false">
+                        <button type="button" class="ie-dropdown-trigger ie-trigger-import" id="btn-import-menu" aria-haspopup="menu" aria-expanded="false">
                             <svg class="ie-btn-icon" viewBox="0 0 20 20" fill="none" aria-hidden="true"><path d="M10 17V9m0 0l-3 3m3-3l3 3" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/><path d="M4 5.5h12" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></svg>
-                            Importa
-                            <span class="ie-dropdown-chevron" aria-hidden="true">▾</span>
+                            <span>Importa</span>
                         </button>
                         <div class="ie-dropdown-menu" id="import-dropdown-menu" role="menu" hidden>
                             <button type="button" role="menuitem" data-ie-action="import-layout">Layout nel canvas</button>
