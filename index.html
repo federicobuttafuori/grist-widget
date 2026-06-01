@@ -109,6 +109,10 @@
         .prop-stack .prop-stack-row{display:flex;gap:8px;align-items:flex-start;min-width:0}
         .prop-stack .prop-stack-row .column-mention-input,.prop-stack .prop-stack-row input[type="text"],.prop-stack .prop-stack-row .regex-pattern-input{flex:1;min-width:0}
         .add-regex-rule-btn{width:100%;padding:6px;margin-top:8px;background:#007aff;color:#fff;border:none;border-radius:4px;cursor:pointer;font-size:12px}
+        .regex-rule-order-btns{display:flex;gap:2px;align-items:center}
+        .move-regex-rule-btn,.move-global-regex-rule-btn{padding:2px 6px;font-size:11px;border:1px solid #ccc;border-radius:3px;background:#fff;cursor:pointer;line-height:1}
+        .move-regex-rule-btn:hover:not(:disabled),.move-global-regex-rule-btn:hover:not(:disabled){background:#f0f4f8}
+        .move-regex-rule-btn:disabled,.move-global-regex-rule-btn:disabled{opacity:.35;cursor:not-allowed}
         textarea.auto-grow-textarea{resize:none;overflow-y:hidden;box-sizing:border-box;width:100%;line-height:1.45;font-size:12px;padding:4px}
         textarea.regex-pattern-input,textarea.global-regex-pattern-input{font-family:monospace}
         #btn-delete{background:#fbebeb;border-color:#d9a0a0;color:#c00;margin-top:12px}
@@ -3345,7 +3349,7 @@ document.addEventListener('DOMContentLoaded', ()=>{
         return Number.isFinite(n) ? n : null;
     }
 
-    function collectNonOverlappingMatchesForSegment(segmentText, sortedRules){
+    function collectAllRegexMatchesForSegment(segmentText, sortedRules){
         const matches = [];
         sortedRules.forEach((rule, ruleIndex) => {
             if(!rule.pattern || rule.enabled === false) return;
@@ -3356,6 +3360,7 @@ document.addEventListener('DOMContentLoaded', ()=>{
                 while((match = regex.exec(segmentText)) !== null){
                     matches.push({
                         ruleIndex,
+                        ruleOrder: Number(rule.order) || ruleIndex,
                         start: match.index,
                         end: match.index + match[0].length,
                         text: match[0],
@@ -3366,83 +3371,100 @@ document.addEventListener('DOMContentLoaded', ()=>{
                 console.warn('Invalid regex pattern:', rule.pattern, e);
             }
         });
-
-        if(matches.length === 0) return [];
-
-        matches.sort((a, b) => {
-            if(a.start !== b.start) return a.start - b.start;
-            return b.end - a.end;
-        });
-
-        const nonOverlapping = [];
-        for(let i = 0; i < matches.length; i++){
-            const m = matches[i];
-            let overlaps = false;
-            for(let j = 0; j < nonOverlapping.length; j++){
-                const existing = nonOverlapping[j];
-                if(m.start < existing.end && m.end > existing.start){
-                    overlaps = true;
-                    break;
-                }
-            }
-            if(!overlaps) nonOverlapping.push(m);
-        }
-        return nonOverlapping;
+        return matches;
     }
 
-    /** Costruisce HTML inline per un segmento (match in &lt;span&gt; stilizzati). */
-    function buildRegexMatchSpanHtml(segmentText, nonOverlapping){
-        const htmlParts = [];
-        let currentIndex = 0;
-
-        nonOverlapping.forEach(match => {
-            if(match.start > currentIndex){
-                htmlParts.push(escapeHtml(segmentText.substring(currentIndex, match.start)));
-            }
-
-            const styles = [];
-            const rule = match.rule;
-
-            if(rule.fontWeight && rule.fontWeight !== 'inherit'){
-                styles.push(`font-weight: ${rule.fontWeight}`);
-            }
-            if(rule.italic){
-                styles.push('font-style: italic');
-            }
-            if(rule.underline){
-                styles.push('text-decoration: underline');
-            }
-            if(rule.fontSize && rule.fontSize !== '' && rule.fontSize !== 'inherit'){
-                styles.push(`font-size: ${rule.fontSize}px`);
+    /** Unisce regole nello stesso tratto: si applicano dall'alto verso il basso; in basso ha priorità sui conflitti. */
+    function mergeRegexRuleStyles(rulesInListOrder){
+        const merged = {
+            fontWeight: null,
+            italic: false,
+            underline: false,
+            fontSize: null,
+            letterSpacing: null,
+            paddingTop: null,
+            paddingBottom: null,
+            paddingLeft: null,
+            paddingRight: null,
+            lineHeight: null
+        };
+        rulesInListOrder.forEach(rule => {
+            if(!rule) return;
+            if(rule.fontWeight && rule.fontWeight !== 'inherit') merged.fontWeight = rule.fontWeight;
+            if(rule.italic) merged.italic = true;
+            if(rule.underline) merged.underline = true;
+            if(rule.fontSize !== '' && rule.fontSize !== undefined && rule.fontSize !== null && rule.fontSize !== 'inherit'){
+                merged.fontSize = rule.fontSize;
             }
             if(rule.letterSpacing !== '' && rule.letterSpacing !== undefined && rule.letterSpacing !== null && rule.letterSpacing !== 'inherit'){
-                const ls = Number(rule.letterSpacing);
-                if(Number.isFinite(ls)) styles.push(`letter-spacing: ${ls}px`);
+                merged.letterSpacing = rule.letterSpacing;
             }
             ['Top', 'Bottom', 'Left', 'Right'].forEach(side => {
                 const key = 'padding' + side;
                 const pv = rule[key];
                 if(pv !== '' && pv !== undefined && pv !== null && pv !== 'inherit'){
-                    const n = Number(pv);
-                    if(Number.isFinite(n)) styles.push(`padding-${side.toLowerCase()}: ${n}px`);
+                    merged[key] = pv;
                 }
             });
             const rLh = ruleLineHeightNumeric(rule);
-            if(rLh != null){
-                styles.push(`line-height: ${rLh}`);
-                styles.push('display: inline-block');
-                styles.push('vertical-align: baseline');
-            }
-
-            const styleStr = styles.length > 0 ? ` style="${styles.join('; ')}"` : '';
-            htmlParts.push(`<span${styleStr}>${escapeHtml(match.text)}</span>`);
-            currentIndex = match.end;
+            if(rLh != null) merged.lineHeight = rLh;
         });
+        return merged;
+    }
 
-        if(currentIndex < segmentText.length){
-            htmlParts.push(escapeHtml(segmentText.substring(currentIndex)));
+    function mergedRegexStylesToCss(merged){
+        const styles = [];
+        if(merged.fontWeight) styles.push(`font-weight: ${merged.fontWeight}`);
+        if(merged.italic) styles.push('font-style: italic');
+        if(merged.underline) styles.push('text-decoration: underline');
+        if(merged.fontSize !== null && merged.fontSize !== '') styles.push(`font-size: ${merged.fontSize}px`);
+        if(merged.letterSpacing !== null && merged.letterSpacing !== ''){
+            const ls = Number(merged.letterSpacing);
+            if(Number.isFinite(ls)) styles.push(`letter-spacing: ${ls}px`);
+        }
+        ['Top', 'Bottom', 'Left', 'Right'].forEach(side => {
+            const pv = merged['padding' + side];
+            if(pv !== null && pv !== ''){
+                const n = Number(pv);
+                if(Number.isFinite(n)) styles.push(`padding-${side.toLowerCase()}: ${n}px`);
+            }
+        });
+        if(merged.lineHeight != null){
+            styles.push(`line-height: ${merged.lineHeight}`);
+            styles.push('display: inline-block');
+            styles.push('vertical-align: baseline');
+        }
+        return styles;
+    }
+
+    function buildRegexLineHtml(lineText, sortedRules){
+        const matches = collectAllRegexMatchesForSegment(lineText, sortedRules);
+        if(matches.length === 0){
+            return lineText === '' ? '\u00a0' : escapeHtml(lineText);
         }
 
+        const points = new Set([0, lineText.length]);
+        matches.forEach(m => { points.add(m.start); points.add(m.end); });
+        const bounds = [...points].sort((a, b) => a - b);
+
+        const htmlParts = [];
+        for(let i = 0; i < bounds.length - 1; i++){
+            const start = bounds[i];
+            const end = bounds[i + 1];
+            if(start >= end) continue;
+
+            const active = matches.filter(m => m.start <= start && m.end >= end);
+            if(active.length === 0){
+                htmlParts.push(escapeHtml(lineText.substring(start, end)));
+                continue;
+            }
+
+            active.sort((a, b) => (a.ruleOrder - b.ruleOrder) || (a.ruleIndex - b.ruleIndex));
+            const merged = mergeRegexRuleStyles(active.map(m => m.rule));
+            const styles = mergedRegexStylesToCss(merged);
+            const styleStr = styles.length > 0 ? ` style="${styles.join('; ')}"` : '';
+            htmlParts.push(`<span${styleStr}>${escapeHtml(lineText.substring(start, end))}</span>`);
+        }
         return htmlParts.join('');
     }
 
@@ -3459,14 +3481,7 @@ document.addEventListener('DOMContentLoaded', ()=>{
         const sortedRules = [...rules].sort((a, b) => (a.order || 0) - (b.order || 0));
         const lines = text.split(/\r?\n/);
 
-        return lines.map(lineText => {
-            const nonOverlapping = collectNonOverlappingMatchesForSegment(lineText, sortedRules);
-            if(nonOverlapping.length === 0){
-                return lineText === '' ? '\u00a0' : escapeHtml(lineText);
-            }
-
-            return buildRegexMatchSpanHtml(lineText, nonOverlapping);
-        }).join('<br>');
+        return lines.map(lineText => buildRegexLineHtml(lineText, sortedRules)).join('<br>');
     }
 
     function getData(el, sequenceIndex = 1, waveContext = null){
@@ -4254,6 +4269,7 @@ document.addEventListener('DOMContentLoaded', ()=>{
                 }
                 const regexPanelEnabled = !!valueFor('props.regexRulesEnabled');
                 let regexBlockBody = `<div id="regex-rules-container-${el.id}" style="display:flex;flex-direction:column;gap:8px">`;
+                const regexRulesCount = el.props.regexRules.length;
                 el.props.regexRules.forEach((rule, index) => {
                     const pkPattern = `props.regexRules.${index}.pattern`;
                     const pkFontWeight = `props.regexRules.${index}.fontWeight`;
@@ -4278,10 +4294,15 @@ document.addEventListener('DOMContentLoaded', ()=>{
                     const padLeftVal = valueFor(pkPaddingLeft);
                     const padRightVal = valueFor(pkPaddingRight);
                     regexBlockBody += `<div class="regex-rule-item" data-rule-index="${index}" style="border:1px solid #ddd;border-radius:4px;padding:8px;background:#f9f9f9">`;
-                    regexBlockBody += `<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px">`;
+                    regexBlockBody += `<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px;gap:6px">`;
                     regexBlockBody += `<label style="font-size:12px;font-weight:600">Rule ${index + 1}</label>`;
+                    regexBlockBody += `<div style="display:flex;gap:4px;align-items:center">`;
+                    regexBlockBody += `<span class="regex-rule-order-btns">`;
+                    regexBlockBody += `<button type="button" class="move-regex-rule-up-btn" data-rule-index="${index}" ${index === 0 ? 'disabled' : ''} title="Meno priorità">↑</button>`;
+                    regexBlockBody += `<button type="button" class="move-regex-rule-down-btn" data-rule-index="${index}" ${index >= regexRulesCount - 1 ? 'disabled' : ''} title="Più priorità">↓</button>`;
+                    regexBlockBody += `</span>`;
                     regexBlockBody += `<button type="button" class="remove-regex-rule-btn" data-rule-index="${index}" style="padding:2px 6px;font-size:11px;background:#ff4444;color:#fff;border:none;border-radius:3px;cursor:pointer">Remove</button>`;
-                    regexBlockBody += `</div>`;
+                    regexBlockBody += `</div></div>`;
                     regexBlockBody += `<div class="prop-stack"><label class="${labelClass(pkPattern)}">Pattern</label><div class="prop-stack-row"><textarea class="regex-pattern-input auto-grow-textarea" data-rule-index="${index}" rows="2" placeholder="e.g., \\d+|[A-Z]+">${escapeHtml(String(patternVal != null ? patternVal : ''))}</textarea>${syncBtn(pkPattern)}</div></div>`;
                     regexBlockBody += `<div class="${grid1Cls}"><label class="${labelClass(pkFontWeight)}">Font Weight</label><select class="regex-weight-select" data-rule-index="${index}" style="font-size:12px;padding:4px">`;
                     regexBlockBody += `<option value="inherit" ${weightVal === 'inherit' || !weightVal ? 'selected' : ''}>Inherit</option>`;
@@ -4516,6 +4537,20 @@ document.addEventListener('DOMContentLoaded', ()=>{
                         const index = parseInt(this.dataset.ruleIndex, 10);
                         if(isNaN(index)) return;
                         removeRegexRuleAtIndex(el, index);
+                    });
+                });
+                pp.querySelectorAll('.move-regex-rule-up-btn').forEach(btn => {
+                    btn.addEventListener('click', function(){
+                        const index = parseInt(this.dataset.ruleIndex, 10);
+                        if(isNaN(index)) return;
+                        moveRegexRuleAtIndex(el, index, -1);
+                    });
+                });
+                pp.querySelectorAll('.move-regex-rule-down-btn').forEach(btn => {
+                    btn.addEventListener('click', function(){
+                        const index = parseInt(this.dataset.ruleIndex, 10);
+                        if(isNaN(index)) return;
+                        moveRegexRuleAtIndex(el, index, 1);
                     });
                 });
                 
@@ -6051,6 +6086,75 @@ document.addEventListener('DOMContentLoaded', ()=>{
                     });
                 });
             });
+        }
+
+        function swapRegexOverrideKeysForMove(el, indexA, indexB){
+            if(!el || !Array.isArray(el.syncedOverrides)) return;
+            el.syncedOverrides = el.syncedOverrides.map(pk => {
+                const r = parseRegexRulePropKey(pk);
+                if(!r) return pk;
+                if(r.index === indexA) return `props.regexRules.${indexB}.${r.field}`;
+                if(r.index === indexB) return `props.regexRules.${indexA}.${r.field}`;
+                return pk;
+            });
+        }
+
+        function swapThreadRegexDataIndices(thread, indexA, indexB){
+            if(!thread || !thread.data) return;
+            REGEX_RULE_SYNC_FIELDS.forEach(field => {
+                const keyA = `props.regexRules.${indexA}.${field}`;
+                const keyB = `props.regexRules.${indexB}.${field}`;
+                const valA = thread.data[keyA];
+                const valB = thread.data[keyB];
+                if(valB !== undefined) thread.data[keyA] = valB;
+                else delete thread.data[keyA];
+                if(valA !== undefined) thread.data[keyB] = valA;
+                else delete thread.data[keyB];
+            });
+        }
+
+        function swapRegexRulesAtIndices(rules, indexA, indexB){
+            if(!rules || indexA < 0 || indexB < 0 || indexA >= rules.length || indexB >= rules.length) return;
+            const tmp = rules[indexA];
+            rules[indexA] = rules[indexB];
+            rules[indexB] = tmp;
+            normalizeRegexRulesOrders(rules);
+        }
+
+        function moveRegexRuleAtIndex(el, fromIndex, delta){
+            if(!el || fromIndex < 0 || isNaN(fromIndex) || !delta) return;
+            const toIndex = fromIndex + delta;
+            if(!el.props.regexRules || toIndex < 0 || toIndex >= el.props.regexRules.length) return;
+            pushBeforeChange();
+            const threadId = el.masterThreadId;
+            if(threadId){
+                const thread = getMasterThread(threadId);
+                forEachElementOnThread(threadId, target => {
+                    if(!target.props) target.props = {};
+                    if(!target.props.regexRules) target.props.regexRules = [];
+                    if(fromIndex < target.props.regexRules.length && toIndex < target.props.regexRules.length){
+                        swapRegexRulesAtIndices(target.props.regexRules, fromIndex, toIndex);
+                    }
+                    swapRegexOverrideKeysForMove(target, fromIndex, toIndex);
+                });
+                if(thread) swapThreadRegexDataIndices(thread, fromIndex, toIndex);
+            } else {
+                swapRegexRulesAtIndices(el.props.regexRules, fromIndex, toIndex);
+            }
+            updateProps();
+            render();
+            saveCurrentDesign();
+        }
+
+        function moveGlobalRegexRuleAtIndex(fromIndex, delta){
+            if(!globalRegexRules || fromIndex < 0 || isNaN(fromIndex) || !delta) return;
+            const toIndex = fromIndex + delta;
+            if(toIndex < 0 || toIndex >= globalRegexRules.length) return;
+            pushBeforeChange();
+            swapRegexRulesAtIndices(globalRegexRules, fromIndex, toIndex);
+            updateGlobalRegexRulesUI();
+            render();
+            saveCurrentDesign();
         }
 
         function removeRegexRuleAtIndex(el, removedIndex){
@@ -11006,10 +11110,17 @@ document.addEventListener('DOMContentLoaded', ()=>{
             ruleDiv.dataset.ruleIndex = index;
             ruleDiv.style.cssText = 'border:1px solid #ddd;border-radius:4px;padding:8px;background:#f9f9f9';
 
+            const globalRulesCount = globalRegexRules.length;
             ruleDiv.innerHTML = `
-                <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px">
+                <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px;gap:6px">
                     <label style="font-size:12px;font-weight:600">Global Rule ${index + 1}</label>
-                    <button type="button" class="remove-global-regex-rule-btn" data-rule-index="${index}" style="padding:2px 6px;font-size:11px;background:#ff4444;color:#fff;border:none;border-radius:3px;cursor:pointer">Remove</button>
+                    <div style="display:flex;gap:4px;align-items:center">
+                        <span class="regex-rule-order-btns">
+                            <button type="button" class="move-global-regex-rule-up-btn" data-rule-index="${index}" ${index === 0 ? 'disabled' : ''} title="Meno priorità">↑</button>
+                            <button type="button" class="move-global-regex-rule-down-btn" data-rule-index="${index}" ${index >= globalRulesCount - 1 ? 'disabled' : ''} title="Più priorità">↓</button>
+                        </span>
+                        <button type="button" class="remove-global-regex-rule-btn" data-rule-index="${index}" style="padding:2px 6px;font-size:11px;background:#ff4444;color:#fff;border:none;border-radius:3px;cursor:pointer">Remove</button>
+                    </div>
                 </div>
                 <label style="font-size:12px;display:block;margin-bottom:4px">Pattern:</label>
                 <textarea class="global-regex-pattern-input auto-grow-textarea" data-rule-index="${index}" rows="2" placeholder="e.g., \\d+|[A-Z]+" style="margin-bottom:6px">${escapeHtml(rule.pattern || '')}</textarea>
@@ -11095,6 +11206,15 @@ document.addEventListener('DOMContentLoaded', ()=>{
             updateGlobalRegexRulesUI();
             render();
             saveCurrentDesign();
+        }
+
+        if(e.target.classList.contains('move-global-regex-rule-up-btn')){
+            const index = parseInt(e.target.dataset.ruleIndex, 10);
+            if(!isNaN(index)) moveGlobalRegexRuleAtIndex(index, -1);
+        }
+        if(e.target.classList.contains('move-global-regex-rule-down-btn')){
+            const index = parseInt(e.target.dataset.ruleIndex, 10);
+            if(!isNaN(index)) moveGlobalRegexRuleAtIndex(index, 1);
         }
     });
 
