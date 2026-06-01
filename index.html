@@ -1620,21 +1620,30 @@ document.addEventListener('DOMContentLoaded', ()=>{
                     borderRadiusTopLeft:0, borderRadiusTopRight:0, borderRadiusBottomRight:0, borderRadiusBottomLeft:0,
                 paddingTop: 0, paddingRight: 0, paddingBottom: 0, paddingLeft: 0,
                 marginTop: 0, marginRight: 0, marginBottom: 0, marginLeft: 0,
-                textOutlineWidth: 0, textOutlineColor: '#000000', textOutlineEnabled: false, textOutline2Width: 0, textOutline2Color: '#ffffff', textOutline2Enabled: false,
+                textOutlineWidth: 0, textOutlineColor: '#000000', textOutline2Width: 0, textOutline2Color: '#ffffff',
                 thickness:2, format:'CODE128', displayValue:true,
-                    fillEnabled:false, fillColor:'#ffffff', decimals:2, asPercent:false,
+                    fillColor:'#ffffff', decimals:2, asPercent:false,
                     lineHeight: 1.2, letterSpacing: 0, textOverflow: 'clip',
-                regexRules: [], regexRulesEnabled: false,
+                regexRules: [],
                 qrErrorCorrectLevel: 'M', qrColorDark: '#000000', qrColorLight: '#ffffff',
                 imageOpacity: 100
             }
         };
 
-        // Merge top-level / props
+        // Merge top-level / props (savedProps: chiavi presenti nel file — i flag *Enabled* non vanno forzati dai default)
+        const savedProps = (el && el.props && typeof el.props === 'object') ? el.props : {};
         const base = Object.assign({}, defaults, el);
-        base.props = Object.assign({}, defaults.props, el && el.props ? el.props : {});
+        base.props = Object.assign({}, defaults.props, savedProps);
 
         if(!Array.isArray(base.syncedOverrides)) base.syncedOverrides = [];
+
+        function savedPropHas(key){
+            return Object.prototype.hasOwnProperty.call(savedProps, key);
+        }
+        function inferRegexRulesEnabled(rules){
+            if(!Array.isArray(rules) || !rules.length) return false;
+            return rules.some(r => r && r.enabled !== false && String(r.pattern || '').trim() !== '');
+        }
 
         // If old single padding exists (legacy data), convert to sides
         if(base.props.padding !== undefined && !isNaN(Number(base.props.padding))){
@@ -1655,10 +1664,22 @@ document.addEventListener('DOMContentLoaded', ()=>{
         base.props.marginLeft = Number(base.props.marginLeft) || 0;
         base.props.textOutlineWidth = Math.max(0, Number(base.props.textOutlineWidth) || 0);
         base.props.textOutlineColor = base.props.textOutlineColor || '#000000';
-        if(base.props.textOutlineEnabled === undefined) base.props.textOutlineEnabled = (Number(base.props.textOutlineWidth) || 0) > 0;
+        if(!savedPropHas('textOutlineEnabled')){
+            base.props.textOutlineEnabled = (Number(base.props.textOutlineWidth) || 0) > 0;
+        } else if(!base.props.textOutlineEnabled && (Number(base.props.textOutlineWidth) || 0) > 0){
+            base.props.textOutlineEnabled = true;
+        } else {
+            base.props.textOutlineEnabled = !!base.props.textOutlineEnabled;
+        }
         base.props.textOutline2Width = Math.max(0, Number(base.props.textOutline2Width) || 0);
         base.props.textOutline2Color = base.props.textOutline2Color || '#ffffff';
-        if(base.props.textOutline2Enabled === undefined) base.props.textOutline2Enabled = (Number(base.props.textOutline2Width) || 0) > 0;
+        if(!savedPropHas('textOutline2Enabled')){
+            base.props.textOutline2Enabled = (Number(base.props.textOutline2Width) || 0) > 0;
+        } else if(!base.props.textOutline2Enabled && (Number(base.props.textOutline2Width) || 0) > 0){
+            base.props.textOutline2Enabled = true;
+        } else {
+            base.props.textOutline2Enabled = !!base.props.textOutline2Enabled;
+        }
 
         base.x = Number(base.x) || 0;
         base.y = Number(base.y) || 0;
@@ -1715,21 +1736,30 @@ document.addEventListener('DOMContentLoaded', ()=>{
                 base.props.borderLeft = false;
             }
         if(base.type === 'box'){
-            if(base.props.fillEnabled === undefined){
-                base.props.fillEnabled = !!(base.props.fillColor && base.props.fillColor !== 'transparent');
+            const hadFill = !!(base.props.fillColor && base.props.fillColor !== 'transparent');
+            if(!savedPropHas('fillEnabled')){
+                base.props.fillEnabled = hadFill;
+            } else if(!base.props.fillEnabled && hadFill){
+                base.props.fillEnabled = true;
+            } else {
+                base.props.fillEnabled = !!base.props.fillEnabled;
             }
-            base.props.fillEnabled = !!base.props.fillEnabled;
             const fc = String(base.props.fillColor || '').trim();
             if(!/^#[0-9A-Fa-f]{6}$/i.test(fc) || fc.toLowerCase() === 'transparent'){
-                base.props.fillColor = '#ffffff';
+                if(base.props.fillEnabled) base.props.fillColor = '#ffffff';
+                else if(!savedPropHas('fillColor')) base.props.fillColor = '#ffffff';
             }
         }
         if(base.type === 'text' || base.type === 'data'){
             if(!Array.isArray(base.props.regexRules)) base.props.regexRules = [];
-            if(base.props.regexRulesEnabled === undefined){
-                base.props.regexRulesEnabled = base.props.regexRules.length > 0;
+            const shouldEnableRegex = inferRegexRulesEnabled(base.props.regexRules);
+            if(!savedPropHas('regexRulesEnabled')){
+                base.props.regexRulesEnabled = shouldEnableRegex;
+            } else if(!base.props.regexRulesEnabled && shouldEnableRegex){
+                base.props.regexRulesEnabled = true;
+            } else {
+                base.props.regexRulesEnabled = !!base.props.regexRulesEnabled;
             }
-            base.props.regexRulesEnabled = !!base.props.regexRulesEnabled;
         }
         const io = base.props.imageOpacity;
         if(io === undefined || io === null || io === '') base.props.imageOpacity = 100;
