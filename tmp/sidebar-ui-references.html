@@ -1,0 +1,661 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+    <meta charset="utf-8"/>
+    <meta name="viewport" content="width=device-width,initial-scale=1"/>
+    <title>Reference UI — Figma, Webflow, Canva, Penpot, BarTender</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --page-bg: #eceff4;
+            --text: #1a1a1a;
+            --muted: #6b7280;
+            --link: #2563eb;
+            --radius: 12px;
+        }
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        body { font-family: Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; background: var(--page-bg); color: var(--text); line-height: 1.5; }
+        a { color: var(--link); }
+        .top { position: sticky; top: 0; z-index: 50; background: rgba(255,255,255,.94); backdrop-filter: blur(8px); border-bottom: 1px solid #dde2ea; padding: 16px 24px; }
+        .top h1 { font-size: 20px; font-weight: 600; }
+        .top p { font-size: 13px; color: var(--muted); margin-top: 4px; max-width: 880px; }
+        .nav { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 12px; }
+        .nav button {
+            border: 1px solid #cfd6e0; background: #fff; padding: 7px 12px;
+            border-radius: 999px; font-size: 12px; cursor: pointer; font-family: inherit;
+        }
+        .nav button.active { background: #1a1a1a; color: #fff; border-color: #1a1a1a; }
+        .wrap { max-width: 1280px; margin: 0 auto; padding: 24px; }
+        .panel { display: none; animation: in .2s ease; }
+        .panel.active { display: block; }
+        @keyframes in { from { opacity: 0; transform: translateY(4px); } to { opacity: 1; transform: none; } }
+        .meta { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; margin-bottom: 18px; }
+        @media (max-width: 800px) { .meta { grid-template-columns: 1fr; } }
+        .card { background: #fff; border: 1px solid #dde2ea; border-radius: var(--radius); padding: 14px 16px; }
+        .card h2 { font-size: 15px; margin-bottom: 8px; }
+        .card ul { padding-left: 18px; font-size: 13px; color: var(--muted); }
+        .card li + li { margin-top: 4px; }
+        .src { display: inline-block; margin-top: 10px; font-size: 12px; }
+        .frame { display: flex; height: 640px; border: 1px solid #cfd6e0; border-radius: 14px; overflow: hidden; background: #fff; box-shadow: 0 4px 20px rgba(0,0,0,.06); }
+        .canvas-mock {
+            flex: 1; background: #e5e7eb;
+            display: flex; align-items: center; justify-content: center;
+            background-image: radial-gradient(circle, #d1d5db 1px, transparent 1px);
+            background-size: 16px 16px;
+        }
+        .label-sheet { width: 200px; height: 125px; background: #fff; box-shadow: 0 6px 20px rgba(0,0,0,.12); display: flex; align-items: center; justify-content: center; font-size: 12px; color: #94a3b8; }
+
+        /* ═══ FIGMA (Design panel) ═══
+           Ref: help.figma.com — right sidebar, Layout / Fill / Stroke sections */
+        .figma {
+            width: 240px; flex-shrink: 0; background: #fff; border-right: 1px solid #e6e6e6;
+            overflow-y: auto; font-size: 11px; color: rgba(0,0,0,.85);
+        }
+        .figma .tabs { display: flex; border-bottom: 1px solid #e6e6e6; }
+        .figma .tabs span { flex: 1; text-align: center; padding: 10px 0; font-weight: 600; font-size: 11px; border-bottom: 2px solid #18a0fb; }
+        .figma .tabs span.off { border-bottom-color: transparent; color: rgba(0,0,0,.5); font-weight: 500; }
+        .figma .layer-name { padding: 8px 12px; border-bottom: 1px solid #e6e6e6; display: flex; gap: 6px; align-items: center; }
+        .figma .layer-name input { border: none; flex: 1; font: 600 11px Inter, sans-serif; background: transparent; }
+        .figma .sec { border-bottom: 1px solid #e6e6e6; }
+        .figma .sec-h { padding: 8px 12px; font-weight: 600; display: flex; justify-content: space-between; cursor: default; }
+        .figma .sec-b { padding: 0 12px 10px; }
+        .figma .layout-grid {
+            display: grid; grid-template-columns: 68px 1fr 1fr; gap: 8px; align-items: start;
+        }
+        .figma .align-box {
+            display: grid; grid-template-columns: repeat(3, 18px); gap: 2px;
+        }
+        .figma .align-box button {
+            width: 18px; height: 18px; border: none; border-radius: 2px;
+            background: #f0f0f0; cursor: pointer; padding: 0; font-size: 7px; color: #666;
+        }
+        .figma .align-box button.on { background: #daebf7; box-shadow: inset 0 0 0 1px #18a0fb; }
+        .figma .pair { display: flex; flex-direction: column; gap: 4px; }
+        .figma .field {
+            display: flex; align-items: center; height: 24px;
+            background: #f5f5f5; border-radius: 2px; overflow: hidden;
+        }
+        .figma .field:focus-within { background: #fff; box-shadow: inset 0 0 0 1px #18a0fb; }
+        .figma .field .k { width: 18px; text-align: center; color: rgba(0,0,0,.45); font-size: 10px; flex-shrink: 0; }
+        .figma .field input { border: none; background: transparent; flex: 1; min-width: 0; font: 11px Inter, sans-serif; padding: 0 4px; }
+        .figma .stroke-line { display: grid; grid-template-columns: 22px 1fr 44px; gap: 6px; align-items: center; margin-top: 6px; }
+        .figma .sw { width: 22px; height: 22px; border-radius: 2px; border: 1px solid rgba(0,0,0,.12); }
+        .figma .type-row { display: flex; gap: 4px; margin-top: 8px; }
+        .figma .type-row button {
+            flex: 1; padding: 5px 0; border: 1px solid #e6e6e6; background: #fff;
+            border-radius: 2px; font-size: 10px; cursor: pointer;
+        }
+        .figma .type-row button.on { border-color: #18a0fb; background: #eef8ff; }
+
+        /* ═══ WEBFLOW (Style panel) ═══
+           Ref: help.webflow.com — Spacing box model, collapsible sections */
+        .webflow {
+            width: 280px; flex-shrink: 0; background: #fff; border-right: 1px solid #e6e6e8;
+            overflow-y: auto; font-size: 12px;
+        }
+        .webflow .wf-top { padding: 10px 12px; border-bottom: 1px solid #e6e6e8; }
+        .webflow .selector {
+            display: flex; align-items: center; gap: 6px;
+            background: #f7f7f9; border: 1px solid #e6e6e8; border-radius: 4px; padding: 6px 8px;
+        }
+        .webflow .selector .tag { background: #4353ff; color: #fff; font-size: 10px; padding: 2px 6px; border-radius: 3px; font-weight: 600; }
+        .webflow .sec { border-bottom: 1px solid #e6e6e8; }
+        .webflow .sec-h {
+            padding: 10px 12px; font-weight: 600; font-size: 11px; text-transform: uppercase;
+            letter-spacing: .04em; color: #636369;
+            display: flex; align-items: center; justify-content: space-between; cursor: pointer;
+        }
+        .webflow .sec-h .dot { width: 6px; height: 6px; border-radius: 50%; background: #4353ff; }
+        .webflow .sec-b { padding: 8px 12px 14px; }
+        .webflow .spacing-widget {
+            display: grid; grid-template-columns: 36px 1fr 36px;
+            grid-template-rows: 28px 1fr 28px; gap: 4px; max-width: 220px; margin: 0 auto 10px;
+        }
+        .webflow .sp-input {
+            width: 100%; border: 1px solid #e0e0e6; border-radius: 3px;
+            text-align: center; font-size: 11px; padding: 4px 2px;
+        }
+        .webflow .sp-margin {
+            grid-column: 1 / 4; grid-row: 1 / 4;
+            background: #f7f7f9; border: 1px dashed #c8c8d0; border-radius: 4px;
+            padding: 28px 36px; position: relative;
+        }
+        .webflow .sp-padding {
+            background: #fff; border: 1px solid #e0e0e6; border-radius: 3px;
+            height: 100%; display: flex; align-items: center; justify-content: center;
+            position: relative;
+        }
+        .webflow .sp-content {
+            background: rgba(67,83,255,.08); border: 1px solid rgba(67,83,255,.35);
+            border-radius: 2px; padding: 12px 20px; font-size: 10px; color: #4353ff; font-weight: 600;
+        }
+        .webflow .sp-margin > .sp-l { position: absolute; left: 4px; top: 50%; transform: translateY(-50%); width: 28px; }
+        .webflow .sp-margin > .sp-r { position: absolute; right: 4px; top: 50%; transform: translateY(-50%); width: 28px; }
+        .webflow .sp-margin > .sp-t { position: absolute; top: 2px; left: 50%; transform: translateX(-50%); width: 36px; }
+        .webflow .sp-margin > .sp-b { position: absolute; bottom: 2px; left: 50%; transform: translateX(-50%); width: 36px; }
+        .webflow .typo-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+        .webflow .typo-grid label { display: block; font-size: 10px; color: #636369; margin-bottom: 3px; }
+        .webflow .typo-grid input, .webflow .typo-grid select {
+            width: 100%; border: 1px solid #e0e0e6; border-radius: 3px; padding: 5px 6px; font-size: 11px;
+        }
+        .webflow .border-row { display: grid; grid-template-columns: 22px 1fr 52px; gap: 6px; align-items: center; }
+
+        /* ═══ CANVA (context toolbar + edit panel) ═══
+           Ref: canva.com/help — quick actions toolbar, edit panel */
+        .canva-wrap { width: 280px; flex-shrink: 0; padding: 16px 12px; background: #f1f3f4; border-right: 1px solid #dadce0; overflow-y: auto; }
+        .canva-toolbar {
+            display: flex; align-items: center; gap: 2px; flex-wrap: wrap;
+            background: #fff; border-radius: 8px; padding: 4px 6px;
+            box-shadow: 0 1px 4px rgba(0,0,0,.12), 0 2px 12px rgba(0,0,0,.08);
+            margin-bottom: 14px;
+        }
+        .canva-toolbar button {
+            border: none; background: transparent; padding: 8px 10px; border-radius: 6px;
+            font-size: 12px; cursor: pointer; color: #202124; white-space: nowrap;
+        }
+        .canva-toolbar button:hover { background: #f1f3f4; }
+        .canva-toolbar .sep { width: 1px; height: 20px; background: #dadce0; margin: 0 2px; }
+        .canva-toolbar .more { margin-left: auto; font-weight: 600; color: #8b3dff; }
+        .canva-panel {
+            background: #fff; border-radius: 12px; overflow: hidden;
+            box-shadow: 0 1px 3px rgba(0,0,0,.08);
+        }
+        .canva-panel-h {
+            padding: 12px 14px; font-weight: 600; font-size: 14px;
+            border-bottom: 1px solid #e8eaed; display: flex; justify-content: space-between; align-items: center;
+        }
+        .canva-panel-h button { border: none; background: none; font-size: 18px; cursor: pointer; color: #5f6368; }
+        .canva-row {
+            display: flex; align-items: center; justify-content: space-between;
+            padding: 12px 14px; border-bottom: 1px solid #f1f3f4; font-size: 13px;
+        }
+        .canva-row:last-child { border-bottom: none; }
+        .canva-row input[type="range"] { width: 100px; }
+        .canva-row input[type="color"] { width: 36px; height: 28px; border: none; padding: 0; }
+
+        /* ═══ PENPOT (Design properties — Figma-family) ═══
+           Ref: help.penpot.app — Design properties sidebar */
+        .penpot {
+            width: 252px; flex-shrink: 0; background: #1e1e1e; color: #f0f0f0;
+            overflow-y: auto; font-size: 11px; border-right: 1px solid #333;
+        }
+        .penpot .ph { padding: 10px 12px; border-bottom: 1px solid #333; font-weight: 600; font-size: 12px; }
+        .penpot .sec { border-bottom: 1px solid #2a2a2a; }
+        .penpot .sec-h { padding: 8px 12px; color: #aaa; font-weight: 600; text-transform: uppercase; font-size: 10px; letter-spacing: .05em; }
+        .penpot .sec-b { padding: 0 12px 12px; }
+        .penpot .row2 { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; }
+        .penpot .pf {
+            display: flex; align-items: center; height: 26px;
+            background: #2b2b2b; border-radius: 4px; border: 1px solid #3a3a3a;
+        }
+        .penpot .pf .k { width: 22px; text-align: center; color: #888; font-size: 10px; }
+        .penpot .pf input { flex: 1; background: transparent; border: none; color: #fff; font-size: 11px; padding: 0 6px; min-width: 0; }
+        .penpot .stroke { display: flex; gap: 6px; align-items: center; margin-top: 8px; }
+        .penpot .stroke .sw { width: 26px; height: 26px; border-radius: 4px; border: 1px solid #555; }
+
+        /* ═══ BARTENDER / label software ═══
+           Ref: Seagull BarTender — tabbed Properties (Attributes / Style / Layout) */
+        .bartender {
+            width: 300px; flex-shrink: 0; background: #f0f0f0; border-right: 1px solid #b0b0b0;
+            overflow-y: auto; font-size: 12px; font-family: "Segoe UI", Tahoma, sans-serif;
+        }
+        .bt-title { padding: 8px 10px; background: linear-gradient(#fdfdfd, #e8e8e8); border-bottom: 1px solid #b0b0b0; font-weight: 600; }
+        .bt-tabs { display: flex; background: #e0e0e0; border-bottom: 1px solid #b0b0b0; }
+        .bt-tabs button {
+            flex: 1; padding: 6px 4px; border: none; background: #e0e0e0;
+            border-right: 1px solid #b0b0b0; font-size: 11px; cursor: pointer;
+        }
+        .bt-tabs button.active { background: #f0f0f0; font-weight: 600; border-bottom: 2px solid #0078d4; margin-bottom: -1px; }
+        .bt-form { padding: 10px; }
+        .bt-form .row {
+            display: grid; grid-template-columns: 110px 1fr; gap: 8px; align-items: center;
+            margin-bottom: 8px; min-height: 24px;
+        }
+        .bt-form .row label { text-align: right; color: #333; font-size: 11px; }
+        .bt-form input, .bt-form select {
+            border: 1px solid #ababab; padding: 3px 6px; font-size: 11px; background: #fff;
+        }
+        .bt-form input[type="checkbox"] { width: auto; justify-self: start; }
+        .bt-group {
+            border: 1px solid #c0c0c0; margin: 10px 0; background: #fff;
+        }
+        .bt-group-h {
+            padding: 4px 8px; background: linear-gradient(#f5f5f5, #e0e0e0);
+            border-bottom: 1px solid #c0c0c0; font-weight: 600; font-size: 11px;
+        }
+        .bt-group-b { padding: 8px; }
+
+        /* Compare row */
+        .compare { display: grid; grid-template-columns: repeat(3, 1fr); gap: 0; height: 520px; border: 1px solid #cfd6e0; border-radius: 12px; overflow: hidden; }
+        @media (max-width: 1000px) { .compare { grid-template-columns: 1fr; height: auto; } }
+        .compare > div { border-right: 1px solid #dde2ea; overflow: hidden; display: flex; flex-direction: column; }
+        .compare > div:last-child { border-right: none; }
+        .compare-h { padding: 8px 10px; font-size: 11px; font-weight: 700; text-align: center; background: #f7f8fa; border-bottom: 1px solid #dde2ea; }
+        .compare-b { flex: 1; overflow: auto; transform: scale(0.92); transform-origin: top left; width: 108%; }
+
+        .note { margin-top: 14px; padding: 12px; background: #fff; border: 1px dashed #cfd6e0; border-radius: 8px; font-size: 12px; color: var(--muted); }
+        .back { font-size: 12px; margin-top: 8px; display: inline-block; }
+    </style>
+</head>
+<body>
+    <header class="top">
+        <h1>Reference UI da prodotti di successo</h1>
+        <p>Mockup ispirati a pannelli proprietà reali (non prototipi generici). Stessi concetti del label designer — posizione, testo, contorno, sfondo — resi con pattern collaudati.</p>
+        <a class="back" href="sidebar-ui-showcase.html">← Torna allo showcase generico</a>
+        <nav class="nav" aria-label="Reference">
+            <button type="button" class="active" data-ref="figma">Figma</button>
+            <button type="button" data-ref="webflow">Webflow</button>
+            <button type="button" data-ref="canva">Canva</button>
+            <button type="button" data-ref="penpot">Penpot</button>
+            <button type="button" data-ref="bartender">BarTender</button>
+            <button type="button" data-ref="compare">Confronto</button>
+        </nav>
+    </header>
+
+    <main class="wrap">
+
+        <!-- FIGMA -->
+        <section class="panel active" id="ref-figma">
+            <div class="meta">
+                <div class="card">
+                    <h2>Figma — Design panel (right sidebar)</h2>
+                    <ul>
+                        <li>Sezioni collassabili: <strong>Layout</strong>, <strong>Fill</strong>, <strong>Stroke</strong> — non una riga per proprietà.</li>
+                        <li>In Layout: griglia allineamento 3×3 + coppie X/Y e W/H con prefisso lettera nel campo.</li>
+                        <li>Stroke = colore + spessore sulla stessa riga; effetti opzionali sotto.</li>
+                        <li>Contesto selezione in alto (nome layer).</li>
+                    </ul>
+                    <a class="src" href="https://help.figma.com/hc/en-us/articles/360039832014" target="_blank" rel="noopener">Documentazione Figma →</a>
+                </div>
+                <div class="card">
+                    <h2>Cosa portare nel label designer</h2>
+                    <ul>
+                        <li>Raggruppare Posizione (XYWH + allinea in etichetta) in un blocco “Layout”.</li>
+                        <li>Contorno testo = sezione “Stroke” (toggle + spessore + colore inline).</li>
+                        <li>Sfondo = sezione “Fill” con swatch + opacità.</li>
+                        <li>Niente sync ↻ per ogni campo — Figma non lo fa; sync thread resta custom vostro.</li>
+                    </ul>
+                </div>
+            </div>
+            <div class="frame">
+                <aside class="figma">
+                    <div class="tabs"><span>Design</span><span class="off">Prototype</span></div>
+                    <div class="layer-name"><span style="opacity:.5">T</span><input value="Sample Text" readonly></div>
+                    <div class="sec">
+                        <div class="sec-h">Layout <span style="opacity:.4">▾</span></div>
+                        <div class="sec-b">
+                            <div class="layout-grid">
+                                <div class="align-box">
+                                    <button type="button">↖</button><button type="button">↑</button><button type="button">↗</button>
+                                    <button type="button">←</button><button type="button" class="on">+</button><button type="button">→</button>
+                                    <button type="button">↙</button><button type="button">↓</button><button type="button">↘</button>
+                                </div>
+                                <div class="pair">
+                                    <div class="field"><span class="k">X</span><input value="12" readonly></div>
+                                    <div class="field"><span class="k">Y</span><input value="5" readonly></div>
+                                </div>
+                                <div class="pair">
+                                    <div class="field"><span class="k">W</span><input value="120" readonly></div>
+                                    <div class="field"><span class="k">H</span><input value="18" readonly></div>
+                                </div>
+                            </div>
+                            <p style="margin-top:8px;font-size:10px;color:rgba(0,0,0,.45)">Allinea selezione nell’etichetta ↔ stessa griglia 3×3</p>
+                        </div>
+                    </div>
+                    <div class="sec">
+                        <div class="sec-h">Fill <span style="opacity:.4">▾</span></div>
+                        <div class="sec-b">
+                            <div class="stroke-line">
+                                <div class="sw" style="background:transparent;border-style:dashed"></div>
+                                <span style="color:rgba(0,0,0,.5)">Sfondo</span>
+                                <button type="button" style="font-size:10px;padding:3px 6px;border:1px solid #e6e6e6;background:#fff;border-radius:2px;cursor:pointer">+</button>
+                            </div>
+                            <div class="stroke-line">
+                                <div class="sw" style="background:#ffffff"></div>
+                                <span>#FFFFFF</span>
+                                <span style="text-align:right">100%</span>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="sec">
+                        <div class="sec-h">Stroke <span style="opacity:.4">▾</span></div>
+                        <div class="sec-b">
+                            <div class="type-row">
+                                <button type="button" class="on">Center</button>
+                                <button type="button">Inside</button>
+                                <button type="button">Outside</button>
+                            </div>
+                            <div class="stroke-line">
+                                <div class="sw" style="background:#000"></div>
+                                <div class="field" style="flex:1"><span class="k">—</span><input value="1" readonly></div>
+                                <span>px</span>
+                            </div>
+                            <p style="margin-top:8px;font-size:10px;color:rgba(0,0,0,.45)">Contorno secondario ≈ second Stroke o Effect drop shadow</p>
+                        </div>
+                    </div>
+                    <div class="sec">
+                        <div class="sec-h">Typography <span style="opacity:.4">▾</span></div>
+                        <div class="sec-b">
+                            <div class="field" style="margin-bottom:4px"><input value="Arial" readonly style="padding:0 8px"></div>
+                            <div class="pair" style="flex-direction:row;gap:4px">
+                                <div class="field" style="flex:1"><span class="k">A</span><input value="16" readonly></div>
+                                <div class="field" style="flex:1"><span class="k">↕</span><input value="120%" readonly></div>
+                            </div>
+                        </div>
+                    </div>
+                </aside>
+                <div class="canvas-mock"><div class="label-sheet">Testo selezionato</div></div>
+            </div>
+        </section>
+
+        <!-- WEBFLOW -->
+        <section class="panel" id="ref-webflow">
+            <div class="meta">
+                <div class="card">
+                    <h2>Webflow — Style panel</h2>
+                    <ul>
+                        <li>Sezioni CSS vere: Layout, Spacing, Size, Typography, Backgrounds, Borders, Effects.</li>
+                        <li><strong>Spacing widget</strong>: diagramma margin/padding — standard de facto per editor visivi.</li>
+                        <li>Pallino blu sulla sezione se almeno un valore è impostato.</li>
+                        <li>Tipografia: font + size + line height in griglia 2 colonne.</li>
+                    </ul>
+                    <a class="src" href="https://help.webflow.com/hc/en-us/articles/33961362040723" target="_blank" rel="noopener">Documentazione Webflow →</a>
+                </div>
+                <div class="card">
+                    <h2>Cosa portare nel label designer</h2>
+                    <ul>
+                        <li>Padding elementi (T/R/B/L) con widget spacing invece di 4 righe prop-grid.</li>
+                        <li>Border / contorno sotto sezione “Borders” con width + color + radius.</li>
+                        <li>Typography dedicata — separata da posizione e da contorno.</li>
+                    </ul>
+                </div>
+            </div>
+            <div class="frame">
+                <aside class="webflow">
+                    <div class="wf-top">
+                        <div class="selector"><span class="tag">Text</span><span style="font-size:11px;color:#636369">sample-text</span></div>
+                    </div>
+                    <div class="sec">
+                        <div class="sec-h"><span>Spacing</span><span class="dot"></span></div>
+                        <div class="sec-b">
+                            <div class="spacing-widget">
+                                <div class="sp-margin">
+                                    <input class="sp-input sp-t" value="0" readonly>
+                                    <input class="sp-input sp-r" value="0" readonly>
+                                    <input class="sp-input sp-b" value="0" readonly>
+                                    <input class="sp-input sp-l" value="0" readonly>
+                                    <div class="sp-padding">
+                                        <input class="sp-input sp-t" value="2" readonly style="position:absolute;top:2px;left:50%;transform:translateX(-50%);width:36px">
+                                        <div class="sp-content">Content</div>
+                                    </div>
+                                </div>
+                            </div>
+                            <p style="font-size:10px;color:#636369;text-align:center">Margin esterno · padding interno</p>
+                        </div>
+                    </div>
+                    <div class="sec">
+                        <div class="sec-h"><span>Typography</span><span class="dot"></span></div>
+                        <div class="sec-b typo-grid">
+                            <div><label>Size</label><input value="16" readonly></div>
+                            <div><label>Height</label><input value="1.2" readonly></div>
+                            <div><label>Weight</label><select><option>Normal</option></select></div>
+                            <div><label>Spacing</label><input value="0" readonly></div>
+                        </div>
+                    </div>
+                    <div class="sec">
+                        <div class="sec-h"><span>Borders</span><span class="dot"></span></div>
+                        <div class="sec-b">
+                            <div class="border-row">
+                                <div style="width:22px;height:22px;background:#000;border-radius:2px;border:1px solid #ccc"></div>
+                                <input value="1px" readonly style="border:1px solid #e0e0e6;border-radius:3px;padding:5px;font-size:11px">
+                                <select style="border:1px solid #e0e0e6;border-radius:3px;padding:4px;font-size:11px"><option>Solid</option></select>
+                            </div>
+                            <p style="font-size:10px;color:#636369;margin-top:8px">Contorno testo = border o text-stroke qui</p>
+                        </div>
+                    </div>
+                    <div class="sec">
+                        <div class="sec-h"><span>Backgrounds</span></div>
+                        <div class="sec-b">
+                            <div class="border-row">
+                                <div style="width:22px;height:22px;background:#fff;border:1px solid #ccc;border-radius:2px"></div>
+                                <input value="#FFFFFF" readonly style="border:1px solid #e0e0e6;border-radius:3px;padding:5px;font-size:11px;flex:1">
+                            </div>
+                        </div>
+                    </div>
+                </aside>
+                <div class="canvas-mock"><div class="label-sheet">Testo selezionato</div></div>
+            </div>
+        </section>
+
+        <!-- CANVA -->
+        <section class="panel" id="ref-canva">
+            <div class="meta">
+                <div class="card">
+                    <h2>Canva — Quick actions + Edit panel</h2>
+                    <ul>
+                        <li>Canva <em>non</em> usa un pannello proprietà fisso a destra: toolbar contestuale sopra l’elemento.</li>
+                        <li>Selezioni testo → font, size, colore, allineamento in barra orizzontale.</li>
+                        <li>Pulsante <strong>&gt;&gt;</strong> apre pannello edit completo (effetti, spaziatura avanzata).</li>
+                        <li>Side panel sinistro = contenuti (template, elementi), non proprietà.</li>
+                    </ul>
+                    <a class="src" href="https://www.canva.com/help/glow-up-variantb/" target="_blank" rel="noopener">Canva Help — editor glow up →</a>
+                </div>
+                <div class="card">
+                    <h2>Cosa portare nel label designer</h2>
+                    <ul>
+                        <li>Barra floating sopra elemento selezionato: font size, colore, allinea H/V.</li>
+                        <li>Sidebar resta per profilo etichetta + add element + sync; props “leggere” on-canvas.</li>
+                        <li>Utile su tablet / schermi stretti.</li>
+                    </ul>
+                </div>
+            </div>
+            <div class="frame">
+                <div class="canva-wrap" style="flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;background:#e8eaed;border-right:none">
+                    <div class="canva-toolbar">
+                        <button type="button">Arial ▾</button>
+                        <button type="button"><strong>16</strong></button>
+                        <span class="sep"></span>
+                        <button type="button" style="font-weight:700">B</button>
+                        <button type="button"><em>I</em></button>
+                        <button type="button"><u>U</u></button>
+                        <span class="sep"></span>
+                        <button type="button">≡</button>
+                        <button type="button" style="width:20px;height:20px;background:#000;border-radius:50%;padding:0"></button>
+                        <button type="button" class="more">&gt;&gt;</button>
+                    </div>
+                    <div class="label-sheet" style="margin-bottom:12px">Sample Text</div>
+                    <div class="canva-panel" style="width:100%;max-width:260px">
+                        <div class="canva-panel-h">Testo <button type="button">×</button></div>
+                        <div class="canva-row"><span>Spaziatura lettere</span><input type="range" min="0" max="100" value="0"></div>
+                        <div class="canva-row"><span>Altezza riga</span><input type="range" min="80" max="200" value="120"></div>
+                        <div class="canva-row"><span>Contorno</span><input type="color" value="#000000"></div>
+                        <div class="canva-row"><span>Sfondo testo</span><input type="color" value="#ffffff"></div>
+                        <div class="canva-row"><span>Trasparenza</span><input type="range" min="0" max="100" value="100"></div>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- PENPOT -->
+        <section class="panel" id="ref-penpot">
+            <div class="meta">
+                <div class="card">
+                    <h2>Penpot — Design properties (open source)</h2>
+                    <ul>
+                        <li>Stessa famiglia di Figma: sidebar destra “Design properties” dinamica per tipo layer.</li>
+                        <li>Proprietà sempre presenti: size, position; opzionali: stroke, shadow, blur.</li>
+                        <li>Tipografie salvabili come stili (Assets) — utile per brand kit etichette.</li>
+                        <li>Inspect mode separato per dev (come Figma Dev Mode).</li>
+                    </ul>
+                    <a class="src" href="https://help.penpot.app/user-guide/first-steps/the-interface/" target="_blank" rel="noopener">Documentazione Penpot →</a>
+                </div>
+                <div class="card">
+                    <h2>Perché citarlo</h2>
+                    <ul>
+                        <li>UI open source ispezionabile se vuoi copiare spacing/colori esatti.</li>
+                        <li>Pattern identici a Figma — se ti piace Figma, Penpot conferma quella direzione.</li>
+                    </ul>
+                </div>
+            </div>
+            <div class="frame">
+                <aside class="penpot">
+                    <div class="ph">Design properties</div>
+                    <div class="sec">
+                        <div class="sec-h">Layout</div>
+                        <div class="sec-b row2">
+                            <div class="pf"><span class="k">X</span><input value="12" readonly></div>
+                            <div class="pf"><span class="k">Y</span><input value="5" readonly></div>
+                            <div class="pf"><span class="k">W</span><input value="120" readonly></div>
+                            <div class="pf"><span class="k">H</span><input value="18" readonly></div>
+                        </div>
+                    </div>
+                    <div class="sec">
+                        <div class="sec-h">Typography</div>
+                        <div class="sec-b">
+                            <div class="pf" style="margin-bottom:6px"><input value="Arial" readonly style="padding:0 8px"></div>
+                            <div class="row2">
+                                <div class="pf"><span class="k">Size</span><input value="16" readonly></div>
+                                <div class="pf"><span class="k">LH</span><input value="1.2" readonly></div>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="sec">
+                        <div class="sec-h">Stroke</div>
+                        <div class="sec-b">
+                            <div class="stroke">
+                                <div class="sw" style="background:#000"></div>
+                                <div class="pf" style="flex:1"><input value="1" readonly style="padding:0 8px"></div>
+                                <span style="color:#888">px</span>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="sec">
+                        <div class="sec-h">Fill</div>
+                        <div class="sec-b">
+                            <div class="stroke">
+                                <div class="sw" style="background:transparent;border-style:dashed"></div>
+                                <span style="color:#888">No fill</span>
+                            </div>
+                        </div>
+                    </div>
+                </aside>
+                <div class="canvas-mock"><div class="label-sheet">Testo selezionato</div></div>
+            </div>
+        </section>
+
+        <!-- BARTENDER -->
+        <section class="panel" id="ref-bartender">
+            <div class="meta">
+                <div class="card">
+                    <h2>BarTender — Properties (software etichette)</h2>
+                    <ul>
+                        <li>Pannello destro <strong>context-sensitive</strong>: cambia con oggetto selezionato.</li>
+                        <li>Form intelligenti: tab Attributes · Options · Layout · Style.</li>
+                        <li>Label a destra del campo (Windows classic) — familiare per utenti industriali.</li>
+                        <li>Gruppi fieldset per sotto-sezioni (Data Source, Font, Border).</li>
+                    </ul>
+                    <a class="src" href="https://help.seagullscientific.com/bartendercloud/help/en/Content/Forms_CreatingIntelligentForms.htm" target="_blank" rel="noopener">BarTender — Properties tabs →</a>
+                </div>
+                <div class="card">
+                    <h2>Cosa portare nel label designer</h2>
+                    <ul>
+                        <li>Tab nel pannello props: <strong>Contenuto</strong> | <strong>Stile</strong> | <strong>Layout</strong>.</li>
+                        <li>Contorno/sfondo/font sotto “Stile”; posizione/dimensioni sotto “Layout”.</li>
+                        <li>Più vicino al dominio “etichette” che Figma, meno trendy ma chiaro.</li>
+                    </ul>
+                </div>
+            </div>
+            <div class="frame">
+                <aside class="bartender">
+                    <div class="bt-title">Proprietà — Campo testo</div>
+                    <div class="bt-tabs">
+                        <button type="button" class="active">Contenuto</button>
+                        <button type="button">Stile</button>
+                        <button type="button">Layout</button>
+                    </div>
+                    <div class="bt-form">
+                        <div class="bt-group">
+                            <div class="bt-group-h">Testo</div>
+                            <div class="bt-group-b">
+                                <div class="row"><label>Testo:</label><input value="Sample Text"></div>
+                                <div class="row"><label>Colonna:</label><select><option>—</option></select></div>
+                            </div>
+                        </div>
+                        <div class="bt-group">
+                            <div class="bt-group-h">Aspetto</div>
+                            <div class="bt-group-b">
+                                <div class="row"><label>Font:</label><select><option>Arial</option></select></div>
+                                <div class="row"><label>Dimensione:</label><input type="number" value="16"></div>
+                                <div class="row"><label>Colore:</label><input type="color" value="#000000"></div>
+                                <div class="row"><label>Sfondo:</label><input type="checkbox"></div>
+                                <div class="row"><label>Contorno:</label><input type="checkbox" checked></div>
+                                <div class="row"><label>Spessore:</label><input type="number" value="1" style="width:60px"> px</div>
+                            </div>
+                        </div>
+                        <div class="bt-group">
+                            <div class="bt-group-h">Posizione</div>
+                            <div class="bt-group-b">
+                                <div class="row"><label>Top:</label><input value="0.5 cm"></div>
+                                <div class="row"><label>Left:</label><input value="1.2 cm"></div>
+                                <div class="row"><label>Width:</label><input value="3.0 cm"></div>
+                            </div>
+                        </div>
+                    </div>
+                </aside>
+                <div class="canvas-mock"><div class="label-sheet">Testo selezionato</div></div>
+            </div>
+        </section>
+
+        <!-- COMPARE -->
+        <section class="panel" id="ref-compare">
+            <div class="meta">
+                <div class="card">
+                    <h2>Confronto — stesso dominio, pattern diversi</h2>
+                    <ul>
+                        <li><strong>Figma/Penpot</strong>: sezioni Design (Layout / Fill / Stroke / Type).</li>
+                        <li><strong>Webflow</strong>: spacing visuale + sezioni CSS.</li>
+                        <li><strong>BarTender</strong>: tab + form label-destra (verticali industriali).</li>
+                    </ul>
+                </div>
+                <div class="card">
+                    <h2>Sintesi per Custom Label</h2>
+                    <ul>
+                        <li>Utenti creativi / web → direzione <strong>Figma</strong>.</li>
+                        <li>Padding/margin complessi → widget <strong>Webflow</strong>.</li>
+                        <li>Tablet / editing rapido → toolbar <strong>Canva</strong> + sidebar leggera.</li>
+                        <li>Stampa industriale, poche sorprese → tab <strong>BarTender</strong>.</li>
+                    </ul>
+                </div>
+            </div>
+            <div class="compare">
+                <div>
+                    <div class="compare-h">Figma-style</div>
+                    <div class="compare-b"><aside class="figma" style="width:240px;border:none"><div class="sec"><div class="sec-h">Stroke</div><div class="sec-b"><div class="stroke-line"><div class="sw" style="background:#000"></div><div class="field" style="flex:1"><input value="1" readonly></div><span>px</span></div></div></div></aside></div>
+                </div>
+                <div>
+                    <div class="compare-h">Webflow-style</div>
+                    <div class="compare-b"><aside class="webflow" style="width:260px;border:none"><div class="sec"><div class="sec-h"><span>Borders</span><span class="dot"></span></div><div class="sec-b"><div class="border-row"><div style="width:22px;height:22px;background:#000;border-radius:2px"></div><input value="1px" readonly style="border:1px solid #e0e0e6;border-radius:3px;padding:5px;font-size:11px"></div></div></div></aside></div>
+                </div>
+                <div>
+                    <div class="compare-h">BarTender-style</div>
+                    <div class="compare-b"><aside class="bartender" style="width:280px;border:none"><div class="bt-form" style="padding:6px"><div class="row"><label>Contorno:</label><input type="checkbox" checked></div><div class="row"><label>Spessore:</label><input value="1 px"></div></div></aside></div>
+                </div>
+            </div>
+            <p class="note">Questi mockup sono interpretazioni visive per decisione UX, non clone pixel-perfect. Per implementazione, prendere struttura e gerarchia — non colori esatti — salvo Penpot (open source).</p>
+        </section>
+
+    </main>
+
+    <script>
+        document.querySelectorAll('.nav button').forEach(btn => {
+            btn.addEventListener('click', () => {
+                document.querySelectorAll('.nav button').forEach(b => b.classList.remove('active'));
+                document.querySelectorAll('.panel').forEach(p => p.classList.remove('active'));
+                btn.classList.add('active');
+                document.getElementById('ref-' + btn.dataset.ref).classList.add('active');
+            });
+        });
+    </script>
+</body>
+</html>

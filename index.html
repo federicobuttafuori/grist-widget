@@ -151,6 +151,29 @@
         .bw-controls .bw-value{grid-column:3;text-align:right;font-size:13px;min-width:40px}
         .bw-controls .bw-control-full{grid-column:2/4}
         .bw-controls .bw-toggle-row{grid-column:1/-1;display:flex;align-items:center;gap:8px}
+        .prop-feature{margin-top:10px;padding-top:10px;border-top:1px solid #e8e8e8}
+        .prop-feature-head{display:flex;align-items:center;gap:6px;margin-bottom:0}
+        .prop-feature-label{font-size:13px;font-weight:600;flex:1;min-width:0}
+        .prop-feature-head .prop-sync-btn{flex-shrink:0;margin-left:0}
+        .prop-feature-switch{position:relative;display:inline-flex;align-items:center;cursor:pointer;flex-shrink:0}
+        .prop-feature-switch input{position:absolute;opacity:0;width:0;height:0;margin:0}
+        .prop-feature-switch-ui{display:block;width:36px;height:20px;background:#c4c4c4;border-radius:10px;transition:background .2s;position:relative}
+        .prop-feature-switch-ui::after{content:'';position:absolute;width:16px;height:16px;left:2px;top:2px;background:#fff;border-radius:50%;transition:transform .2s;box-shadow:0 1px 2px rgba(0,0,0,.2)}
+        .prop-feature-switch input:checked + .prop-feature-switch-ui{background:#007aff}
+        .prop-feature-switch input:checked + .prop-feature-switch-ui::after{transform:translateX(16px)}
+        .prop-feature-switch input:disabled + .prop-feature-switch-ui{opacity:.45;cursor:not-allowed}
+        .prop-feature-body{margin-top:8px;display:flex;flex-direction:column;gap:8px}
+        .prop-feature-body[hidden]{display:none!important}
+        .prop-feature-nested{margin-top:8px;padding:8px 8px 8px 10px;border-left:3px solid #d0d7de;background:#f7f8fa;border-radius:0 6px 6px 0}
+        .prop-feature-row-color{display:flex;align-items:center;gap:8px}
+        .prop-feature-row-color label{font-size:13px;font-weight:500;min-width:56px}
+        .prop-feature-row-color input[type="color"]{width:100%;max-width:120px;height:32px;padding:2px}
+        .prop-feature-row-num{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+        .prop-feature-row-num label{font-size:13px;font-weight:500;min-width:56px}
+        .prop-feature-row-num input[type="number"]{width:72px}
+        #bw-preview-section .prop-feature{border-top:none;padding-top:0;margin-top:0}
+        #bw-preview-section .bw-controls-body{margin-top:8px}
+        #bw-preview-section .bw-controls-body[hidden]{display:none!important}
     </style>
 </head>
 <body>
@@ -263,12 +286,14 @@
                 </div>
             <hr>
             <div class="sidebar-section" id="bw-preview-section">
-                <h3>Anteprima termica (B&amp;N)</h3>
-                <div class="bw-controls">
-                    <div class="bw-toggle-row">
+                <div class="prop-feature-head bw-feature-head">
+                    <span class="prop-feature-label">Anteprima termica (B&amp;N)</span>
+                    <label class="prop-feature-switch" title="Attiva anteprima B&amp;N">
                         <input type="checkbox" id="bw-mode-toggle">
-                        <span>Attiva anteprima B&amp;N</span>
-                    </div>
+                        <span class="prop-feature-switch-ui"></span>
+                    </label>
+                </div>
+                <div class="bw-controls bw-controls-body" id="bw-controls-body" hidden>
                     <span class="bw-label">Gamma</span>
                     <input type="range" id="bw-gamma" class="bw-control" min="0.5" max="2.5" step="0.1" value="1">
                     <span id="bw-gamma-val" class="bw-value">1</span>
@@ -1567,7 +1592,7 @@ document.addEventListener('DOMContentLoaded', ()=>{
                 marginTop: 0, marginRight: 0, marginBottom: 0, marginLeft: 0,
                 textOutlineWidth: 0, textOutlineColor: '#000000', textOutlineEnabled: false, textOutline2Width: 0, textOutline2Color: '#ffffff', textOutline2Enabled: false,
                 thickness:2, format:'CODE128', displayValue:true,
-                    fillColor:'transparent', decimals:2, asPercent:false,
+                    fillEnabled:false, fillColor:'#ffffff', decimals:2, asPercent:false,
                     lineHeight: 1.2, letterSpacing: 0, textOverflow: 'clip',
                 qrErrorCorrectLevel: 'M', qrColorDark: '#000000', qrColorLight: '#ffffff',
                 imageOpacity: 100
@@ -1658,6 +1683,16 @@ document.addEventListener('DOMContentLoaded', ()=>{
                 base.props.borderBottom = false;
                 base.props.borderLeft = false;
             }
+        if(base.type === 'box'){
+            if(base.props.fillEnabled === undefined){
+                base.props.fillEnabled = !!(base.props.fillColor && base.props.fillColor !== 'transparent');
+            }
+            base.props.fillEnabled = !!base.props.fillEnabled;
+            const fc = String(base.props.fillColor || '').trim();
+            if(!/^#[0-9A-Fa-f]{6}$/i.test(fc) || fc.toLowerCase() === 'transparent'){
+                base.props.fillColor = '#ffffff';
+            }
+        }
         const io = base.props.imageOpacity;
         if(io === undefined || io === null || io === '') base.props.imageOpacity = 100;
         else base.props.imageOpacity = Math.max(0, Math.min(100, Number(io)));
@@ -2373,7 +2408,7 @@ document.addEventListener('DOMContentLoaded', ()=>{
 
             // Background: box (fillColor); text/data/image (backgroundColor); line/qr/barcode have no background option
             if(el.type === 'box'){
-                d.style.backgroundColor = el.props.fillColor || 'transparent';
+                d.style.backgroundColor = boxFillBackgroundCss(el.props);
             } else if(el.type === 'text' || el.type === 'data' || el.type === 'image'){
                 const bg = el.props.backgroundColor;
                 d.style.backgroundColor = (bg && bg !== 'transparent') ? bg : 'transparent';
@@ -3116,6 +3151,12 @@ document.addEventListener('DOMContentLoaded', ()=>{
         if(/^#[0-9A-Fa-f]{6}$/.test(s)) return s.toLowerCase();
         if(/^#[0-9A-Fa-f]{3}$/.test(s)) return ('#' + s[1]+s[1]+s[2]+s[2]+s[3]+s[3]).toLowerCase();
         return fallback;
+    }
+    function boxFillColorStored(props){
+        return normalizeOutlineColorHex(props && props.fillColor, '#ffffff');
+    }
+    function boxFillBackgroundCss(props){
+        return (props && props.fillEnabled) ? boxFillColorStored(props) : 'transparent';
     }
     function ensureOutlineSvgFilter(el){
         const defs = document.getElementById('outline-filters-defs');
@@ -3918,6 +3959,26 @@ document.addEventListener('DOMContentLoaded', ()=>{
     }
 
     // ---------- Properties Panels ----------
+    function propFeatureHead(label, opts){
+        const o = opts || {};
+        const parts = [];
+        if(o.checkboxClass) parts.push(`class="${o.checkboxClass}"`);
+        if(o.dataProp) parts.push(`data-prop="${o.dataProp}"`);
+        if(o.id) parts.push(`id="${o.id}"`);
+        if(o.checked) parts.push('checked');
+        if(o.disabled) parts.push('disabled');
+        const cb = parts.length ? parts.join(' ') : '';
+        return `<div class="prop-feature-head">
+            <span class="prop-feature-label">${label}</span>
+            ${o.syncHtml || ''}
+            <label class="prop-feature-switch"><input type="checkbox" ${cb}><span class="prop-feature-switch-ui"></span></label>
+        </div>`;
+    }
+    function propFeatureBlock(label, opts, bodyHtml){
+        const hidden = !(opts && opts.checked);
+        return `<div class="prop-feature">${propFeatureHead(label, opts)}<div class="prop-feature-body"${hidden ? ' hidden' : ''}>${bodyHtml}</div></div>`;
+    }
+
     function singlePropsPanel(el){
         const thread = el.masterThreadId ? getMasterThread(el.masterThreadId) : null;
         function valueFor(pk){
@@ -4042,8 +4103,10 @@ document.addEventListener('DOMContentLoaded', ()=>{
         }
 
         if(el.type==='box'){
-                const hasFill = el.props.fillColor && el.props.fillColor!=='transparent';
-                h += `<hr><div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap"><label style="font-weight:normal;display:flex;align-items:center;gap:4px"><input type="checkbox" class="no-fill-cb" ${!hasFill?'checked':''}> No fill</label><label style="font-weight:500">Fill Color</label><input type="color" class="fill-color-input" data-prop="props.fillColor" value="${hasFill?el.props.fillColor:'#ffffff'}" ${!hasFill?'disabled':''}></div>`;
+                const fillEnabledVal = !!valueFor('props.fillEnabled');
+                const fillHex = boxFillColorStored({ fillColor: valueFor('props.fillColor') });
+                h += propFeatureBlock('Riempimento', { checked: fillEnabledVal, dataProp: 'props.fillEnabled', syncHtml: syncBtn('props.fillEnabled') },
+                    `<div class="prop-feature-row-color"><label>Colore</label><input type="color" class="fill-color-input" data-prop="props.fillColor" value="${fillHex}">${syncBtn('props.fillColor')}</div>`);
         }
 
             if(el.type==='image'){
@@ -4055,7 +4118,8 @@ document.addEventListener('DOMContentLoaded', ()=>{
                 h += `<hr><div class="${grid1Cls}"><label class="${labelClass('props.objectFit')}">Object Fit</label><select data-prop="props.objectFit"><option value="contain" ${(objFitVal||'contain')==='contain'?'selected':''}>Contain</option><option value="cover" ${objFitVal==='cover'?'selected':''}>Cover</option><option value="fill" ${objFitVal==='fill'?'selected':''}>Fill</option><option value="none" ${objFitVal==='none'?'selected':''}>None</option><option value="scale-down" ${objFitVal==='scale-down'?'selected':''}>Scale Down</option></select>${syncBtn('props.objectFit')}</div>`;
                 h += `<div class="${grid1Cls}"><label class="${labelClass('props.imageOpacity')}">Opacità</label><div style="display:flex;align-items:center;gap:8px;min-width:0"><input type="range" data-prop="props.imageOpacity" min="0" max="100" step="1" value="${opShow}" style="flex:1;min-width:0"><span class="image-opacity-pct" style="min-width:40px;font-size:12px;text-align:right">${opShow}%</span></div>${syncBtn('props.imageOpacity')}</div>`;
                 h += `<div class="${grid1Cls}"><label class="${labelClass('props.fallbackLink')}">Fallback Link</label><input type="text" data-prop="props.fallbackLink" placeholder="https://..." value="${escapeHtml(String(fallbackVal||''))}">${syncBtn('props.fallbackLink')}</div>`;
-                h += `<div class="${grid1Cls}"><label class="${labelClass('props.normalizeForBw')}" title="Stabilize brightness and contrast for consistent black-and-white printing">Normalize for B&amp;W</label><input type="checkbox" data-prop="props.normalizeForBw" ${normalizeForBwVal?'checked':''}>${syncBtn('props.normalizeForBw')}</div>`;
+                h += propFeatureBlock('Normalizza per B&amp;N', { checked: !!normalizeForBwVal, dataProp: 'props.normalizeForBw', syncHtml: syncBtn('props.normalizeForBw') },
+                    `<p style="font-size:11px;color:#666;margin:0">Stabilizza luminosità e contrasto per stampa termica.</p>`);
                 const mT = valueFor('props.marginTop'), mR = valueFor('props.marginRight'), mB = valueFor('props.marginBottom'), mL = valueFor('props.marginLeft');
                 h += `<hr><div style="margin-top:8px"><label style="font-size:12px;display:block;margin-bottom:6px">Margini (cm)</label><div class="${grid1Cls}"><label>Su</label><input type="number" step="0.01" data-prop="props.marginTop" value="${Number(mT||0).toFixed(2)}" min="0"><label>Destra</label><input type="number" step="0.01" data-prop="props.marginRight" value="${Number(mR||0).toFixed(2)}" min="0"><label>Giu</label><input type="number" step="0.01" data-prop="props.marginBottom" value="${Number(mB||0).toFixed(2)}" min="0"><label>Sinistra</label><input type="number" step="0.01" data-prop="props.marginLeft" value="${Number(mL||0).toFixed(2)}" min="0"></div></div>`;
                 const rotImgVal = valueFor('props.rotation');
@@ -4070,6 +4134,7 @@ document.addEventListener('DOMContentLoaded', ()=>{
                 h += `<div class="${grid1Cls}"><label class="${labelClass('props.fontWeight')}">Weight</label><select data-prop="props.fontWeight" id="font-weight-select-${el.id}">${generateWeightOptions(currentFontFamily, weightVal)}</select>${syncBtn('props.fontWeight')}</div>`;
                 h += `<div class="${grid1Cls}"><label class="${labelClass('props.lineHeight')}">Line Height</label><input type="number" step="0.1" data-prop="props.lineHeight" value="${lineHVal!==undefined?lineHVal:1.2}" min="0.5" max="3">${syncBtn('props.lineHeight')}</div>`;
                 h += `<div class="${grid1Cls}"><label class="${labelClass('props.letterSpacing')}">Letter spacing (px)</label><input type="number" step="0.1" data-prop="props.letterSpacing" value="${letterSpacingVal!==undefined?letterSpacingVal:0}">${syncBtn('props.letterSpacing')}</div>`;
+                h += `<div class="${grid1Cls}"><label class="${labelClass('props.color')}">Colore</label><input type="color" data-prop="props.color" value="${valueFor('props.color')||'#000000'}">${syncBtn('props.color')}</div>`;
                 const taVal = valueFor('props.textAlign'); const vaVal = valueFor('props.valign'); const overflowVal = valueFor('props.textOverflow'); const rotVal = valueFor('props.rotation');
                 h += `<div class="${grid1Cls}"><label class="${labelClass('props.textAlign')}">H. Align</label><select data-prop="props.textAlign"><option value="left" ${taVal==='left'?'selected':''}>Left</option><option value="center" ${taVal==='center'?'selected':''}>Center</option><option value="right" ${taVal==='right'?'selected':''}>Right</option></select>${syncBtn('props.textAlign')}</div>`;
                 h += `<div class="${grid1Cls}"><label class="${labelClass('props.valign')}">V. Align</label><select data-prop="props.valign"><option value="top" ${vaVal==='top'?'selected':''}>Top</option><option value="middle" ${vaVal==='middle'?'selected':''}>Middle</option><option value="bottom" ${vaVal==='bottom'?'selected':''}>Bottom</option></select>${syncBtn('props.valign')}</div>`;
@@ -4080,8 +4145,11 @@ document.addEventListener('DOMContentLoaded', ()=>{
                 h += `<div class="${grid1Cls}"><label class="${labelClass('props.paddingRight')}">Padding Right</label><input type="number" step="0.01" data-prop="props.paddingRight" value="${Number(prVal||0).toFixed(2)}" min="0">${syncBtn('props.paddingRight')}</div>`;
                 h += `<div class="${grid1Cls}"><label class="${labelClass('props.paddingBottom')}">Padding Bottom</label><input type="number" step="0.01" data-prop="props.paddingBottom" value="${Number(pbVal||0).toFixed(2)}" min="0">${syncBtn('props.paddingBottom')}</div>`;
                 h += `<div class="${grid1Cls}"><label class="${labelClass('props.paddingLeft')}">Padding Left</label><input type="number" step="0.01" data-prop="props.paddingLeft" value="${Number(plVal||0).toFixed(2)}" min="0">${syncBtn('props.paddingLeft')}</div>`;
-                
-                // Regex formatting rules section
+            }
+
+            let regexSectionHtml = '';
+            if(el.type==='text' || el.type==='data'){
+                // Regex formatting rules (dopo bordo/sfondo/contorno)
                 if(!el.props.regexRules) el.props.regexRules = [];
                 const threadForRegexPanel = el.masterThreadId ? getMasterThread(el.masterThreadId) : null;
                 if(threadForRegexPanel){
@@ -4092,8 +4160,8 @@ document.addEventListener('DOMContentLoaded', ()=>{
                     const regexPanelCount = Math.max(el.props.regexRules.length, getThreadRegexRuleCount(threadForRegexPanel));
                     if(regexPanelCount > 0) ensureRegexRulesLength(el, regexPanelCount);
                 }
-                h += `<hr><div style="margin-top:8px"><div class="prop-grid-label-sync" style="margin-bottom:8px"><label>Regex Formatting Rules</label></div>`;
-                h += `<div id="regex-rules-container-${el.id}" style="display:flex;flex-direction:column;gap:8px">`;
+                const regexPanelEnabled = (el.props.regexRules && el.props.regexRules.length > 0);
+                let regexBlockBody = `<div id="regex-rules-container-${el.id}" style="display:flex;flex-direction:column;gap:8px">`;
                 el.props.regexRules.forEach((rule, index) => {
                     const pkPattern = `props.regexRules.${index}.pattern`;
                     const pkFontWeight = `props.regexRules.${index}.fontWeight`;
@@ -4117,69 +4185,70 @@ document.addEventListener('DOMContentLoaded', ()=>{
                     const padBottomVal = valueFor(pkPaddingBottom);
                     const padLeftVal = valueFor(pkPaddingLeft);
                     const padRightVal = valueFor(pkPaddingRight);
-                    h += `<div class="regex-rule-item" data-rule-index="${index}" style="border:1px solid #ddd;border-radius:4px;padding:8px;background:#f9f9f9">`;
-                    h += `<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px">`;
-                    h += `<label style="font-size:12px;font-weight:600">Rule ${index + 1}</label>`;
-                    h += `<button type="button" class="remove-regex-rule-btn" data-rule-index="${index}" style="padding:2px 6px;font-size:11px;background:#ff4444;color:#fff;border:none;border-radius:3px;cursor:pointer">Remove</button>`;
-                    h += `</div>`;
-                    h += `<div class="prop-stack"><label class="${labelClass(pkPattern)}">Pattern</label><div class="prop-stack-row"><textarea class="regex-pattern-input" data-rule-index="${index}" placeholder="e.g., \\d+|[A-Z]+" style="font-size:12px;padding:4px;font-family:monospace;min-height:150px;resize:vertical">${escapeHtml(String(patternVal != null ? patternVal : ''))}</textarea>${syncBtn(pkPattern)}</div></div>`;
-                    h += `<div class="${grid1Cls}"><label class="${labelClass(pkFontWeight)}">Font Weight</label><select class="regex-weight-select" data-rule-index="${index}" style="font-size:12px;padding:4px">`;
-                    h += `<option value="inherit" ${weightVal === 'inherit' || !weightVal ? 'selected' : ''}>Inherit</option>`;
-                    h += `<option value="normal" ${weightVal === 'normal' ? 'selected' : ''}>Normal</option>`;
-                    h += `<option value="bold" ${weightVal === 'bold' ? 'selected' : ''}>Bold</option>`;
-                    h += `<option value="100" ${weightVal === '100' ? 'selected' : ''}>100</option>`;
-                    h += `<option value="200" ${weightVal === '200' ? 'selected' : ''}>200</option>`;
-                    h += `<option value="300" ${weightVal === '300' ? 'selected' : ''}>300</option>`;
-                    h += `<option value="400" ${weightVal === '400' ? 'selected' : ''}>400</option>`;
-                    h += `<option value="500" ${weightVal === '500' ? 'selected' : ''}>500</option>`;
-                    h += `<option value="600" ${weightVal === '600' ? 'selected' : ''}>600</option>`;
-                    h += `<option value="700" ${weightVal === '700' ? 'selected' : ''}>700</option>`;
-                    h += `<option value="800" ${weightVal === '800' ? 'selected' : ''}>800</option>`;
-                    h += `<option value="900" ${weightVal === '900' ? 'selected' : ''}>900</option>`;
-                    h += `</select>${syncBtn(pkFontWeight)}</div>`;
-                    h += `<div class="${grid1Cls}"><label class="${labelClass(pkFontSize)}">Font Size</label><input type="number" class="regex-size-input" data-rule-index="${index}" placeholder="inherit" value="${sizeVal !== undefined && sizeVal !== '' ? sizeVal : ''}" min="6" max="200" step="1" style="font-size:12px;padding:4px">${syncBtn(pkFontSize)}</div>`;
-                    h += `<div class="${grid1Cls}"><label class="${labelClass(pkLineHeight)}">Line Height</label><input type="number" class="regex-line-height-input" data-rule-index="${index}" placeholder="inherit" value="${lhVal !== undefined && lhVal !== '' ? lhVal : ''}" min="0.5" max="3" step="0.1" style="font-size:12px;padding:4px">${syncBtn(pkLineHeight)}</div>`;
-                    h += `<div class="${grid1Cls}"><label class="${labelClass(pkLetterSpacing)}">Letter spacing (px)</label><input type="number" class="regex-letter-spacing-input" data-rule-index="${index}" placeholder="inherit" value="${lsVal !== undefined && lsVal !== '' ? lsVal : ''}" step="0.1" style="font-size:12px;padding:4px">${syncBtn(pkLetterSpacing)}</div>`;
-                    h += `<div class="${grid1Cls}"><label class="${labelClass(pkItalic)}">Italic</label><input type="checkbox" class="regex-italic-checkbox" data-rule-index="${index}" ${italicVal ? 'checked' : ''}>${syncBtn(pkItalic)}</div>`;
-                    h += `<div class="${grid1Cls}"><label class="${labelClass(pkUnderline)}">Underline</label><input type="checkbox" class="regex-underline-checkbox" data-rule-index="${index}" ${underlineVal ? 'checked' : ''}>${syncBtn(pkUnderline)}</div>`;
-                    h += `<div style="margin-top:6px"><label style="font-size:12px;font-weight:600;display:block;margin-bottom:4px">Padding (px)</label></div>`;
-                    h += `<div class="${grid1Cls}"><label class="${labelClass(pkPaddingTop)}">Top</label><input type="number" class="regex-padding-top-input" data-rule-index="${index}" placeholder="0" value="${padTopVal !== undefined && padTopVal !== '' ? padTopVal : ''}" min="0" step="1" style="font-size:12px;padding:4px">${syncBtn(pkPaddingTop)}</div>`;
-                    h += `<div class="${grid1Cls}"><label class="${labelClass(pkPaddingBottom)}">Bottom</label><input type="number" class="regex-padding-bottom-input" data-rule-index="${index}" placeholder="0" value="${padBottomVal !== undefined && padBottomVal !== '' ? padBottomVal : ''}" min="0" step="1" style="font-size:12px;padding:4px">${syncBtn(pkPaddingBottom)}</div>`;
-                    h += `<div class="${grid1Cls}"><label class="${labelClass(pkPaddingLeft)}">Left</label><input type="number" class="regex-padding-left-input" data-rule-index="${index}" placeholder="0" value="${padLeftVal !== undefined && padLeftVal !== '' ? padLeftVal : ''}" min="0" step="1" style="font-size:12px;padding:4px">${syncBtn(pkPaddingLeft)}</div>`;
-                    h += `<div class="${grid1Cls}"><label class="${labelClass(pkPaddingRight)}">Right</label><input type="number" class="regex-padding-right-input" data-rule-index="${index}" placeholder="0" value="${padRightVal !== undefined && padRightVal !== '' ? padRightVal : ''}" min="0" step="1" style="font-size:12px;padding:4px">${syncBtn(pkPaddingRight)}</div>`;
-                    h += `</div>`;
+                    regexBlockBody += `<div class="regex-rule-item" data-rule-index="${index}" style="border:1px solid #ddd;border-radius:4px;padding:8px;background:#f9f9f9">`;
+                    regexBlockBody += `<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px">`;
+                    regexBlockBody += `<label style="font-size:12px;font-weight:600">Rule ${index + 1}</label>`;
+                    regexBlockBody += `<button type="button" class="remove-regex-rule-btn" data-rule-index="${index}" style="padding:2px 6px;font-size:11px;background:#ff4444;color:#fff;border:none;border-radius:3px;cursor:pointer">Remove</button>`;
+                    regexBlockBody += `</div>`;
+                    regexBlockBody += `<div class="prop-stack"><label class="${labelClass(pkPattern)}">Pattern</label><div class="prop-stack-row"><textarea class="regex-pattern-input" data-rule-index="${index}" placeholder="e.g., \\d+|[A-Z]+" style="font-size:12px;padding:4px;font-family:monospace;min-height:150px;resize:vertical">${escapeHtml(String(patternVal != null ? patternVal : ''))}</textarea>${syncBtn(pkPattern)}</div></div>`;
+                    regexBlockBody += `<div class="${grid1Cls}"><label class="${labelClass(pkFontWeight)}">Font Weight</label><select class="regex-weight-select" data-rule-index="${index}" style="font-size:12px;padding:4px">`;
+                    regexBlockBody += `<option value="inherit" ${weightVal === 'inherit' || !weightVal ? 'selected' : ''}>Inherit</option>`;
+                    regexBlockBody += `<option value="normal" ${weightVal === 'normal' ? 'selected' : ''}>Normal</option>`;
+                    regexBlockBody += `<option value="bold" ${weightVal === 'bold' ? 'selected' : ''}>Bold</option>`;
+                    regexBlockBody += `<option value="100" ${weightVal === '100' ? 'selected' : ''}>100</option>`;
+                    regexBlockBody += `<option value="200" ${weightVal === '200' ? 'selected' : ''}>200</option>`;
+                    regexBlockBody += `<option value="300" ${weightVal === '300' ? 'selected' : ''}>300</option>`;
+                    regexBlockBody += `<option value="400" ${weightVal === '400' ? 'selected' : ''}>400</option>`;
+                    regexBlockBody += `<option value="500" ${weightVal === '500' ? 'selected' : ''}>500</option>`;
+                    regexBlockBody += `<option value="600" ${weightVal === '600' ? 'selected' : ''}>600</option>`;
+                    regexBlockBody += `<option value="700" ${weightVal === '700' ? 'selected' : ''}>700</option>`;
+                    regexBlockBody += `<option value="800" ${weightVal === '800' ? 'selected' : ''}>800</option>`;
+                    regexBlockBody += `<option value="900" ${weightVal === '900' ? 'selected' : ''}>900</option>`;
+                    regexBlockBody += `</select>${syncBtn(pkFontWeight)}</div>`;
+                    regexBlockBody += `<div class="${grid1Cls}"><label class="${labelClass(pkFontSize)}">Font Size</label><input type="number" class="regex-size-input" data-rule-index="${index}" placeholder="inherit" value="${sizeVal !== undefined && sizeVal !== '' ? sizeVal : ''}" min="6" max="200" step="1" style="font-size:12px;padding:4px">${syncBtn(pkFontSize)}</div>`;
+                    regexBlockBody += `<div class="${grid1Cls}"><label class="${labelClass(pkLineHeight)}">Line Height</label><input type="number" class="regex-line-height-input" data-rule-index="${index}" placeholder="inherit" value="${lhVal !== undefined && lhVal !== '' ? lhVal : ''}" min="0.5" max="3" step="0.1" style="font-size:12px;padding:4px">${syncBtn(pkLineHeight)}</div>`;
+                    regexBlockBody += `<div class="${grid1Cls}"><label class="${labelClass(pkLetterSpacing)}">Letter spacing (px)</label><input type="number" class="regex-letter-spacing-input" data-rule-index="${index}" placeholder="inherit" value="${lsVal !== undefined && lsVal !== '' ? lsVal : ''}" step="0.1" style="font-size:12px;padding:4px">${syncBtn(pkLetterSpacing)}</div>`;
+                    regexBlockBody += `<div class="${grid1Cls}"><label class="${labelClass(pkItalic)}">Italic</label><input type="checkbox" class="regex-italic-checkbox" data-rule-index="${index}" ${italicVal ? 'checked' : ''}>${syncBtn(pkItalic)}</div>`;
+                    regexBlockBody += `<div class="${grid1Cls}"><label class="${labelClass(pkUnderline)}">Underline</label><input type="checkbox" class="regex-underline-checkbox" data-rule-index="${index}" ${underlineVal ? 'checked' : ''}>${syncBtn(pkUnderline)}</div>`;
+                    regexBlockBody += `<div style="margin-top:6px"><label style="font-size:12px;font-weight:600;display:block;margin-bottom:4px">Padding (px)</label></div>`;
+                    regexBlockBody += `<div class="${grid1Cls}"><label class="${labelClass(pkPaddingTop)}">Top</label><input type="number" class="regex-padding-top-input" data-rule-index="${index}" placeholder="0" value="${padTopVal !== undefined && padTopVal !== '' ? padTopVal : ''}" min="0" step="1" style="font-size:12px;padding:4px">${syncBtn(pkPaddingTop)}</div>`;
+                    regexBlockBody += `<div class="${grid1Cls}"><label class="${labelClass(pkPaddingBottom)}">Bottom</label><input type="number" class="regex-padding-bottom-input" data-rule-index="${index}" placeholder="0" value="${padBottomVal !== undefined && padBottomVal !== '' ? padBottomVal : ''}" min="0" step="1" style="font-size:12px;padding:4px">${syncBtn(pkPaddingBottom)}</div>`;
+                    regexBlockBody += `<div class="${grid1Cls}"><label class="${labelClass(pkPaddingLeft)}">Left</label><input type="number" class="regex-padding-left-input" data-rule-index="${index}" placeholder="0" value="${padLeftVal !== undefined && padLeftVal !== '' ? padLeftVal : ''}" min="0" step="1" style="font-size:12px;padding:4px">${syncBtn(pkPaddingLeft)}</div>`;
+                    regexBlockBody += `<div class="${grid1Cls}"><label class="${labelClass(pkPaddingRight)}">Right</label><input type="number" class="regex-padding-right-input" data-rule-index="${index}" placeholder="0" value="${padRightVal !== undefined && padRightVal !== '' ? padRightVal : ''}" min="0" step="1" style="font-size:12px;padding:4px">${syncBtn(pkPaddingRight)}</div>`;
+                    regexBlockBody += `</div>`;
                 });
-                h += `</div>`;
-                h += `<button type="button" class="add-regex-rule-btn">+ Add Regex Rule</button>`;
-                h += `</div>`;
+                regexBlockBody += `</div>`;
+                regexBlockBody += `<button type="button" class="add-regex-rule-btn">+ Add Regex Rule</button>`;
+                regexSectionHtml = propFeatureBlock('Regole regex', { checked: regexPanelEnabled, checkboxClass: 'regex-rules-panel-cb' }, regexBlockBody);
             }
 
             // border
         const showBorderVal = valueFor('props.showBorder'); const borderColorVal = valueFor('props.borderColor'); const borderWidthVal = valueFor('props.borderWidth');
-        h += `<hr><div class="${grid1Cls}"><label class="${labelClass('props.showBorder')}">Show Border</label><input type="checkbox" data-prop="props.showBorder" ${showBorderVal?'checked':''}>${syncBtn('props.showBorder')}</div>`;
-        h += `<div class="${grid1Cls}"><label class="${labelClass('props.borderColor')}">Border Color</label><input type="color" data-prop="props.borderColor" value="${borderColorVal||'#000000'}">${syncBtn('props.borderColor')}</div>`;
-        h += `<div class="${grid1Cls}"><label class="${labelClass('props.borderWidth')}">Border Width</label><input type="number" step="0.1" data-prop="props.borderWidth" value="${borderWidthVal!==undefined?borderWidthVal:1}" min="0">${syncBtn('props.borderWidth')}</div>`;
+        let borderBody = `<div class="prop-feature-row-color"><label>Colore</label><input type="color" data-prop="props.borderColor" value="${borderColorVal||'#000000'}">${syncBtn('props.borderColor')}</div>`;
+        borderBody += `<div class="${grid1Cls}"><label class="${labelClass('props.borderWidth')}">Spessore</label><input type="number" step="0.1" data-prop="props.borderWidth" value="${borderWidthVal!==undefined?borderWidthVal:1}" min="0">${syncBtn('props.borderWidth')}</div>`;
             if(showBorderVal){
                 const btVal = valueFor('props.borderTop'); const brVal = valueFor('props.borderRight'); const bbVal = valueFor('props.borderBottom'); const blVal = valueFor('props.borderLeft');
-                h += `<div style="margin-top:8px"><label style="font-size:12px;font-weight:600;display:block;margin-bottom:6px">Border Sides:</label><div class="prop-border-sides">`;
-                h += `<label class="${labelClass('props.borderTop')}"><input type="checkbox" data-prop="props.borderTop" ${btVal!==false?'checked':''}> Top</label>${syncBtn('props.borderTop')}<label class="${labelClass('props.borderRight')}"><input type="checkbox" data-prop="props.borderRight" ${brVal!==false?'checked':''}> Right</label>${syncBtn('props.borderRight')}`;
-                h += `<label class="${labelClass('props.borderBottom')}"><input type="checkbox" data-prop="props.borderBottom" ${bbVal!==false?'checked':''}> Bottom</label>${syncBtn('props.borderBottom')}<label class="${labelClass('props.borderLeft')}"><input type="checkbox" data-prop="props.borderLeft" ${blVal!==false?'checked':''}> Left</label>${syncBtn('props.borderLeft')}`;
-                h += `</div></div>`;
+                borderBody += `<div><label style="font-size:12px;font-weight:600;display:block;margin-bottom:6px">Lati</label><div class="prop-border-sides">`;
+                borderBody += `<label class="${labelClass('props.borderTop')}"><input type="checkbox" data-prop="props.borderTop" ${btVal!==false?'checked':''}> Top</label>${syncBtn('props.borderTop')}<label class="${labelClass('props.borderRight')}"><input type="checkbox" data-prop="props.borderRight" ${brVal!==false?'checked':''}> Right</label>${syncBtn('props.borderRight')}`;
+                borderBody += `<label class="${labelClass('props.borderBottom')}"><input type="checkbox" data-prop="props.borderBottom" ${bbVal!==false?'checked':''}> Bottom</label>${syncBtn('props.borderBottom')}<label class="${labelClass('props.borderLeft')}"><input type="checkbox" data-prop="props.borderLeft" ${blVal!==false?'checked':''}> Left</label>${syncBtn('props.borderLeft')}`;
+                borderBody += `</div></div>`;
             }
             if(showBorderVal || el.type === 'box'){
                 const brTL = valueFor('props.borderRadiusTopLeft'); const brTR = valueFor('props.borderRadiusTopRight'); const brBL = valueFor('props.borderRadiusBottomLeft'); const brBR = valueFor('props.borderRadiusBottomRight');
-                h += `<div style="margin-top:8px"><label style="font-size:12px;font-weight:600;display:block;margin-bottom:6px">Border Radius (px):</label><div class="prop-border-radius-grid">`;
-                h += `<div class="prop-border-radius-cell"><label class="${labelClass('props.borderRadiusTopLeft')}">↖ Top Left</label><input type="number" data-prop="props.borderRadiusTopLeft" value="${Number(brTL||0)}" min="0" step="0.1">${syncBtn('props.borderRadiusTopLeft')}</div>`;
-                h += `<div class="prop-border-radius-cell"><label class="${labelClass('props.borderRadiusTopRight')}">↗ Top Right</label><input type="number" data-prop="props.borderRadiusTopRight" value="${Number(brTR||0)}" min="0" step="0.1">${syncBtn('props.borderRadiusTopRight')}</div>`;
-                h += `<div class="prop-border-radius-cell"><label class="${labelClass('props.borderRadiusBottomLeft')}">↙ Bottom Left</label><input type="number" data-prop="props.borderRadiusBottomLeft" value="${Number(brBL||0)}" min="0" step="0.1">${syncBtn('props.borderRadiusBottomLeft')}</div>`;
-                h += `<div class="prop-border-radius-cell"><label class="${labelClass('props.borderRadiusBottomRight')}">↘ Bottom Right</label><input type="number" data-prop="props.borderRadiusBottomRight" value="${Number(brBR||0)}" min="0" step="0.1">${syncBtn('props.borderRadiusBottomRight')}</div>`;
-                h += `</div></div>`;
+                borderBody += `<div><label style="font-size:12px;font-weight:600;display:block;margin-bottom:6px">Angoli (px)</label><div class="prop-border-radius-grid">`;
+                borderBody += `<div class="prop-border-radius-cell"><label class="${labelClass('props.borderRadiusTopLeft')}">↖ Top Left</label><input type="number" data-prop="props.borderRadiusTopLeft" value="${Number(brTL||0)}" min="0" step="0.1">${syncBtn('props.borderRadiusTopLeft')}</div>`;
+                borderBody += `<div class="prop-border-radius-cell"><label class="${labelClass('props.borderRadiusTopRight')}">↗ Top Right</label><input type="number" data-prop="props.borderRadiusTopRight" value="${Number(brTR||0)}" min="0" step="0.1">${syncBtn('props.borderRadiusTopRight')}</div>`;
+                borderBody += `<div class="prop-border-radius-cell"><label class="${labelClass('props.borderRadiusBottomLeft')}">↙ Bottom Left</label><input type="number" data-prop="props.borderRadiusBottomLeft" value="${Number(brBL||0)}" min="0" step="0.1">${syncBtn('props.borderRadiusBottomLeft')}</div>`;
+                borderBody += `<div class="prop-border-radius-cell"><label class="${labelClass('props.borderRadiusBottomRight')}">↘ Bottom Right</label><input type="number" data-prop="props.borderRadiusBottomRight" value="${Number(brBR||0)}" min="0" step="0.1">${syncBtn('props.borderRadiusBottomRight')}</div>`;
+                borderBody += `</div></div>`;
             }
-        if(el.type!=='box') h += `<hr><div class="${grid1Cls}"><label class="${labelClass('props.color')}">Color</label><input type="color" data-prop="props.color" value="${valueFor('props.color')||'#000000'}">${syncBtn('props.color')}</div>`;
+        h += propFeatureBlock('Bordo', { checked: !!showBorderVal, dataProp: 'props.showBorder', syncHtml: syncBtn('props.showBorder') }, borderBody);
+        if(el.type!=='box' && el.type!=='text' && el.type!=='data') h += `<hr><div class="${grid1Cls}"><label class="${labelClass('props.color')}">Colore</label><input type="color" data-prop="props.color" value="${valueFor('props.color')||'#000000'}">${syncBtn('props.color')}</div>`;
             if(el.type==='text' || el.type==='data' || el.type==='image'){
                 const hasBg = el.props.backgroundColor && el.props.backgroundColor!=='transparent';
                 const bgHex = (hasBg && /^#[0-9A-Fa-f]{6}$/.test(String(el.props.backgroundColor||''))) ? String(el.props.backgroundColor) : '#ffffff';
-                h += `<hr><div class="prop-block"><div class="prop-block-title">Sfondo</div><label class="prop-block-check"><input type="checkbox" class="enable-background-cb" ${hasBg?'checked':''}> Abilita sfondo</label><div class="${grid1Cls}" style="margin-top:6px"><label>Colore</label><input type="color" class="background-color-input" data-prop="props.backgroundColor" value="${bgHex}" ${!hasBg?'disabled':''}></div></div>`;
+                h += propFeatureBlock('Sfondo', { checked: hasBg, checkboxClass: 'enable-background-cb' },
+                    `<div class="prop-feature-row-color"><label>Colore</label><input type="color" class="background-color-input" data-prop="props.backgroundColor" value="${bgHex}"></div>`);
             }
             if(el.type==='text' || el.type==='data' || el.type==='image'){
                 const outlineW = Math.max(0, Number(valueFor('props.textOutlineWidth'))||0);
@@ -4190,14 +4259,15 @@ document.addEventListener('DOMContentLoaded', ()=>{
                 const outline2Color = /^#[0-9A-Fa-f]{6}$/.test(String(outline2ColorRaw)) ? String(outline2ColorRaw) : '#ffffff';
                 const outlineEnabled = !!valueFor('props.textOutlineEnabled');
                 const outline2Enabled = !!valueFor('props.textOutline2Enabled');
-                const outlineBlockTitle = el.type==='image' ? 'Contorno' : 'Contorno Testo';
-                h += `<hr><div class="${grid1Cls}"><label class="${labelClass('props.textOutlineEnabled')}">${outlineBlockTitle}</label><input type="checkbox" data-prop="props.textOutlineEnabled" ${outlineEnabled?'checked':''}>${syncBtn('props.textOutlineEnabled')}</div>`;
-                h += `<div class="${grid1Cls}"><label class="${labelClass('props.textOutlineWidth')}">Spessore</label><div style="display:flex;align-items:center;gap:4px"><input type="number" data-prop="props.textOutlineWidth" value="${outlineW}" min="0" max="20" step="0.1" ${!outlineEnabled?'disabled':''} style="width:56px"><span style="font-size:13px">px</span></div>${syncBtn('props.textOutlineWidth')}</div>`;
-                h += `<div class="${grid1Cls}"><label class="${labelClass('props.textOutlineColor')}">Colore</label><input type="color" data-prop="props.textOutlineColor" value="${outlineColor}" ${!outlineEnabled?'disabled':''}>${syncBtn('props.textOutlineColor')}</div>`;
-                h += `<div class="${grid1Cls}" style="margin-top:8px"><label class="${labelClass('props.textOutline2Enabled')}">Contorno secondario (ombra)</label><input type="checkbox" data-prop="props.textOutline2Enabled" ${outline2Enabled?'checked':''} ${!outlineEnabled?'disabled':''}>${syncBtn('props.textOutline2Enabled')}</div>`;
-                h += `<div class="${grid1Cls}"><label class="${labelClass('props.textOutline2Width')}">Spessore 2</label><div style="display:flex;align-items:center;gap:4px"><input type="number" data-prop="props.textOutline2Width" value="${outline2W}" min="0" max="20" step="0.1" ${!outlineEnabled||!outline2Enabled?'disabled':''} style="width:56px"><span style="font-size:13px">px</span></div>${syncBtn('props.textOutline2Width')}</div>`;
-                h += `<div class="${grid1Cls}"><label class="${labelClass('props.textOutline2Color')}">Colore 2</label><input type="color" data-prop="props.textOutline2Color" value="${outline2Color}" ${!outlineEnabled||!outline2Enabled?'disabled':''}>${syncBtn('props.textOutline2Color')}</div>`;
+                const outlineBlockTitle = el.type==='image' ? 'Contorno' : 'Contorno testo';
+                let outlineBody = `<div class="prop-feature-row-num"><label>Spessore</label><input type="number" data-prop="props.textOutlineWidth" value="${outlineW}" min="0" max="20" step="0.1"><span>px</span>${syncBtn('props.textOutlineWidth')}</div>`;
+                outlineBody += `<div class="prop-feature-row-color"><label>Colore</label><input type="color" data-prop="props.textOutlineColor" value="${outlineColor}">${syncBtn('props.textOutlineColor')}</div>`;
+                const shadowBody = `<div class="prop-feature-row-num"><label>Spessore</label><input type="number" data-prop="props.textOutline2Width" value="${outline2W}" min="0" max="20" step="0.1"><span>px</span>${syncBtn('props.textOutline2Width')}</div>` +
+                    `<div class="prop-feature-row-color"><label>Colore</label><input type="color" data-prop="props.textOutline2Color" value="${outline2Color}">${syncBtn('props.textOutline2Color')}</div>`;
+                outlineBody += `<div class="prop-feature-nested">${propFeatureBlock('Ombra secondaria', { checked: outline2Enabled, dataProp: 'props.textOutline2Enabled', syncHtml: syncBtn('props.textOutline2Enabled'), disabled: !outlineEnabled }, shadowBody)}</div>`;
+                h += propFeatureBlock(outlineBlockTitle, { checked: outlineEnabled, dataProp: 'props.textOutlineEnabled', syncHtml: syncBtn('props.textOutlineEnabled') }, outlineBody);
             }
+        if(regexSectionHtml) h += regexSectionHtml;
         h += `<hr><button id="btn-delete">Delete Element</button>`;
         pp.innerHTML = h;
             
@@ -4512,17 +4582,27 @@ document.addEventListener('DOMContentLoaded', ()=>{
             if(el.type === 'text' || el.type === 'data' || el.type === 'image'){
                 const enableBgCb = pp.querySelector('.enable-background-cb');
                 const bgInput = pp.querySelector('.background-color-input');
-                if(enableBgCb && bgInput){
+                if(enableBgCb){
                     enableBgCb.addEventListener('change', function(){
+                        const body = this.closest('.prop-feature') && this.closest('.prop-feature').querySelector(':scope > .prop-feature-body');
                         pushBeforeChange();
                         if(this.checked){
-                            el.props.backgroundColor = bgInput.value || '#ffffff';
-                            bgInput.disabled = false;
+                            el.props.backgroundColor = (bgInput && bgInput.value) ? bgInput.value : '#ffffff';
+                            if(body) body.hidden = false;
                         } else {
                             el.props.backgroundColor = 'transparent';
-                            bgInput.disabled = true;
+                            if(body) body.hidden = true;
                         }
                         render(); saveCurrentDesign(); updateProps();
+                    });
+                }
+            }
+            if(el.type === 'text' || el.type === 'data'){
+                const regexPanelCb = pp.querySelector('.regex-rules-panel-cb');
+                if(regexPanelCb){
+                    regexPanelCb.addEventListener('change', function(){
+                        const body = this.closest('.prop-feature') && this.closest('.prop-feature').querySelector(':scope > .prop-feature-body');
+                        if(body) body.hidden = !this.checked;
                     });
                 }
             }
@@ -4546,24 +4626,6 @@ document.addEventListener('DOMContentLoaded', ()=>{
                     dtCustomInput.addEventListener('input', function(){
                         pushBeforeChange();
                         el.props.dateTimeFormat = this.value || 'DD/MM/YYYY';
-                        render(); saveCurrentDesign(); updateProps();
-                    });
-                }
-            }
-            // Box fill: "No fill" = transparent
-            if(el.type === 'box'){
-                const noFillCb = pp.querySelector('.no-fill-cb');
-                const fillInput = pp.querySelector('.fill-color-input');
-                if(noFillCb && fillInput){
-                    noFillCb.addEventListener('change', function(){
-                        pushBeforeChange();
-                        if(this.checked){
-                            el.props.fillColor = 'transparent';
-                            fillInput.disabled = true;
-                        } else {
-                            el.props.fillColor = fillInput.value || '#ffffff';
-                            fillInput.disabled = false;
-                        }
                         render(); saveCurrentDesign(); updateProps();
                     });
                 }
@@ -7183,7 +7245,7 @@ document.addEventListener('DOMContentLoaded', ()=>{
                             d.style.fontSize = '0';
                             break;
                         case 'box':
-                            d.style.backgroundColor = el.props.fillColor || 'transparent';
+                            d.style.backgroundColor = boxFillBackgroundCss(el.props);
                             break;
                         case 'qr': {
                             const effectiveSequenceIndex = waveContext && waveContext.waveSequenceIndex !== undefined ? waveContext.waveSequenceIndex : sequenceIndex;
@@ -7796,7 +7858,7 @@ document.addEventListener('DOMContentLoaded', ()=>{
                             d.style.fontSize = '0';
                             break;
                         case 'box':
-                            d.style.backgroundColor = el.props.fillColor || 'transparent';
+                            d.style.backgroundColor = boxFillBackgroundCss(el.props);
                             break;
                         case 'qr': {
                             const effectiveSequenceIndex = waveContext && waveContext.waveSequenceIndex !== undefined ? waveContext.waveSequenceIndex : sequenceIndex;
@@ -8359,7 +8421,7 @@ document.addEventListener('DOMContentLoaded', ()=>{
                         d.style.border = 'none';
                         break;
                     case 'box':
-                        d.style.backgroundColor = el.props.fillColor || 'transparent';
+                        d.style.backgroundColor = boxFillBackgroundCss(el.props);
                         break;
                     case 'qr': {
                         const effectiveSequenceIndex = waveContext && waveContext.waveSequenceIndex !== undefined ? waveContext.waveSequenceIndex : sequenceIndex;
@@ -9313,7 +9375,7 @@ document.addEventListener('DOMContentLoaded', ()=>{
             const [o,k] = p.split('.');
             if(!el[o]) el[o] = {};
                 if(['fontSize','lineHeight','letterSpacing','decimals','thickness','borderWidth','rotation','paddingTop','paddingRight','paddingBottom','paddingLeft','marginTop','marginRight','marginBottom','marginLeft','textOutlineWidth','textOutline2Width','imageOpacity','x','y','width','height','borderRadiusTopLeft','borderRadiusTopRight','borderRadiusBottomRight','borderRadiusBottomLeft'].includes(k)) el[o][k] = Number(v);
-                else if(['showBorder','displayValue','asPercent','borderTop','borderRight','borderBottom','borderLeft','textOutlineEnabled','textOutline2Enabled'].includes(k)) el[o][k] = !!v;
+                else if(['showBorder','fillEnabled','displayValue','asPercent','borderTop','borderRight','borderBottom','borderLeft','textOutlineEnabled','textOutline2Enabled'].includes(k)) el[o][k] = !!v;
                 else if(k === 'fontWeight'){
                     // Handle fontWeight: can be number (100-900) or string ('normal', 'bold')
                     const numVal = Number(v);
@@ -9509,7 +9571,7 @@ document.addEventListener('DOMContentLoaded', ()=>{
                     const [o,k] = keyPath.split('.');
                     if(!el[o]) el[o] = {};
                         if(['fontSize','lineHeight','letterSpacing','decimals','thickness','borderWidth','rotation','paddingTop','paddingRight','paddingBottom','paddingLeft','marginTop','marginRight','marginBottom','marginLeft','textOutlineWidth','textOutline2Width','x','y','width','height'].includes(k)) el[o][k] = Number(value);
-                        else if(['showBorder','displayValue','asPercent','borderTop','borderRight','borderBottom','borderLeft','textOutlineEnabled','textOutline2Enabled'].includes(k)) el[o][k] = !!value;
+                        else if(['showBorder','fillEnabled','displayValue','asPercent','borderTop','borderRight','borderBottom','borderLeft','textOutlineEnabled','textOutline2Enabled'].includes(k)) el[o][k] = !!value;
                         else if(k === 'fontWeight'){
                             // Handle fontWeight: can be number (100-900) or string ('normal', 'bold')
                             const numVal = Number(value);
@@ -9665,7 +9727,7 @@ document.addEventListener('DOMContentLoaded', ()=>{
             }
         }
         
-        const needsOutlinePanelRefresh = prop === 'props.textOutlineEnabled' || prop === 'props.textOutline2Enabled';
+        const needsOutlinePanelRefresh = prop === 'props.textOutlineEnabled' || prop === 'props.textOutline2Enabled' || prop === 'props.showBorder' || prop === 'props.fillEnabled';
         
         // Testo: solo salvataggio; render su blur (vedi listener blur)
         if(isDeferredTextInput){
@@ -10226,10 +10288,16 @@ document.addEventListener('DOMContentLoaded', ()=>{
         const bwToggle = document.getElementById('bw-mode-toggle');
         const bwOverlay = document.getElementById('bw-preview-overlay');
         const canvasWrapper = document.getElementById('canvas-wrapper');
+        function updateBwControlsBodyVisibility(){
+            const bwBody = document.getElementById('bw-controls-body');
+            if(bwBody) bwBody.hidden = !bwModeEnabled;
+        }
         if(bwToggle){
             bwToggle.checked = bwModeEnabled;
+            updateBwControlsBodyVisibility();
             bwToggle.addEventListener('change', (e)=>{
                 bwModeEnabled = e.target.checked;
+                updateBwControlsBodyVisibility();
                 if(!bwModeEnabled){
                     if(bwOverlay) bwOverlay.classList.remove('bw-preview-visible');
                     if(canvasWrapper) canvasWrapper.classList.remove('bw-preview-active');
@@ -10256,6 +10324,7 @@ document.addEventListener('DOMContentLoaded', ()=>{
             if(sel) sel.value = bwDithering;
             if(hsize) hsize.value = String(bwHalftoneSize);
             if(dpi) dpi.value = bwPreviewDpi;
+            updateBwControlsBodyVisibility();
         }
         function attachBwControl(id, getVal, setState, updateLabel){
             const el = document.getElementById(id);
@@ -10640,6 +10709,7 @@ document.addEventListener('DOMContentLoaded', ()=>{
                         if(typeof p.halftoneSize === 'number' && p.halftoneSize >= 2 && p.halftoneSize <= 16) bwHalftoneSize = p.halftoneSize;
                         if(typeof p.previewDpi === 'number' && p.previewDpi >= 72 && p.previewDpi <= 300) bwPreviewDpi = p.previewDpi;
                     }
+                    if(typeof syncBwControlsFromState === 'function') syncBwControlsFromState();
                     ensureLegacyMasterThreadsSyncedProps();
                     // Restore current profile, design and canvas if saved
                     if(parsed.currentProfile && profiles[parsed.currentProfile]){
