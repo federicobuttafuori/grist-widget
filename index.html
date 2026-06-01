@@ -1666,8 +1666,6 @@ document.addEventListener('DOMContentLoaded', ()=>{
         base.props.textOutlineColor = base.props.textOutlineColor || '#000000';
         if(!savedPropHas('textOutlineEnabled')){
             base.props.textOutlineEnabled = (Number(base.props.textOutlineWidth) || 0) > 0;
-        } else if(!base.props.textOutlineEnabled && (Number(base.props.textOutlineWidth) || 0) > 0){
-            base.props.textOutlineEnabled = true;
         } else {
             base.props.textOutlineEnabled = !!base.props.textOutlineEnabled;
         }
@@ -1675,8 +1673,6 @@ document.addEventListener('DOMContentLoaded', ()=>{
         base.props.textOutline2Color = base.props.textOutline2Color || '#ffffff';
         if(!savedPropHas('textOutline2Enabled')){
             base.props.textOutline2Enabled = (Number(base.props.textOutline2Width) || 0) > 0;
-        } else if(!base.props.textOutline2Enabled && (Number(base.props.textOutline2Width) || 0) > 0){
-            base.props.textOutline2Enabled = true;
         } else {
             base.props.textOutline2Enabled = !!base.props.textOutline2Enabled;
         }
@@ -1739,8 +1735,6 @@ document.addEventListener('DOMContentLoaded', ()=>{
             const hadFill = !!(base.props.fillColor && base.props.fillColor !== 'transparent');
             if(!savedPropHas('fillEnabled')){
                 base.props.fillEnabled = hadFill;
-            } else if(!base.props.fillEnabled && hadFill){
-                base.props.fillEnabled = true;
             } else {
                 base.props.fillEnabled = !!base.props.fillEnabled;
             }
@@ -1755,8 +1749,6 @@ document.addEventListener('DOMContentLoaded', ()=>{
             const shouldEnableRegex = inferRegexRulesEnabled(base.props.regexRules);
             if(!savedPropHas('regexRulesEnabled')){
                 base.props.regexRulesEnabled = shouldEnableRegex;
-            } else if(!base.props.regexRulesEnabled && shouldEnableRegex){
-                base.props.regexRulesEnabled = true;
             } else {
                 base.props.regexRulesEnabled = !!base.props.regexRulesEnabled;
             }
@@ -3300,10 +3292,27 @@ document.addEventListener('DOMContentLoaded', ()=>{
         defs.appendChild(filter);
         return id;
     }
+    function clearSvgOutlineFromElement(target){
+        if(!target) return;
+        target.style.filter = '';
+        target.style.webkitFilter = '';
+        if(target.querySelectorAll){
+            target.querySelectorAll('span').forEach(function(s){
+                s.style.filter = '';
+                s.style.webkitFilter = '';
+            });
+        }
+    }
     function applySvgOutlineToTextContainer(el, span){
-        if(!el.props.textOutlineEnabled || (Number(el.props.textOutlineWidth) || 0) <= 0) return;
+        if(!el.props.textOutlineEnabled || (Number(el.props.textOutlineWidth) || 0) <= 0){
+            clearSvgOutlineFromElement(span);
+            return;
+        }
         const fid = ensureOutlineSvgFilter(el);
-        if(!fid) return;
+        if(!fid){
+            clearSvgOutlineFromElement(span);
+            return;
+        }
         const u = 'url(#' + fid + ')';
         span.style.filter = u;
         span.style.webkitPrintColorAdjust = 'exact';
@@ -3315,9 +3324,15 @@ document.addEventListener('DOMContentLoaded', ()=>{
         });
     }
     function applySvgOutlineToImage(el, img){
-        if(!el.props.textOutlineEnabled || (Number(el.props.textOutlineWidth) || 0) <= 0) return;
+        if(!el.props.textOutlineEnabled || (Number(el.props.textOutlineWidth) || 0) <= 0){
+            clearSvgOutlineFromElement(img);
+            return;
+        }
         const fid = ensureOutlineSvgFilter(el);
-        if(!fid) return;
+        if(!fid){
+            clearSvgOutlineFromElement(img);
+            return;
+        }
         img.style.filter = 'url(#' + fid + ')';
         img.style.webkitPrintColorAdjust = 'exact';
         img.style.printColorAdjust = 'exact';
