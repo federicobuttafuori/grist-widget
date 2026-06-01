@@ -94,6 +94,8 @@
         .prop-aspect-link-btn{width:28px;height:28px;padding:0;border:1px solid #ccc;border-radius:4px;cursor:pointer;font-size:14px;line-height:1;display:inline-flex;align-items:center;justify-content:center;background:#f5f5f5;flex-shrink:0}
         .prop-aspect-link-btn:hover{background:#e8e8e8}
         .prop-aspect-link-btn.active{color:#1565c0;border-color:#1565c0;background:#e8f0fe}
+        .prop-rotate-90-btn{width:28px;height:28px;padding:0;border:1px solid #ccc;border-radius:4px;cursor:pointer;font-size:16px;line-height:1;display:inline-flex;align-items:center;justify-content:center;background:#f5f5f5;flex-shrink:0;color:#333}
+        .prop-rotate-90-btn:hover{background:#e8e8e8;border-color:#aaa}
         #properties-panel{font-size:14px}
         .prop-border-sides{display:grid;grid-template-columns:1fr 26px 1fr 26px;gap:8px;align-items:center;margin-top:8px}
         .prop-border-sides label{font-size:12px;font-weight:normal;display:flex;align-items:center;gap:4px;min-width:0}
@@ -2730,6 +2732,74 @@ document.addEventListener('DOMContentLoaded', ()=>{
             return imageData;
     }
 
+        // Misura testo già renderizzato (regex, italic, padding inline, ecc.) tramite clone off-screen.
+        let overflowMeasureHost = null;
+        function ensureOverflowMeasureHost(){
+            if(!overflowMeasureHost){
+                overflowMeasureHost = document.createElement('div');
+                overflowMeasureHost.id = 'overflow-measure-host';
+                overflowMeasureHost.setAttribute('aria-hidden', 'true');
+                overflowMeasureHost.style.cssText = 'position:absolute;left:-100000px;top:0;overflow:visible;visibility:hidden;pointer-events:none;';
+                document.body.appendChild(overflowMeasureHost);
+            }
+            return overflowMeasureHost;
+        }
+        function copySpanForMeasure(from, to){
+            to.innerHTML = from.innerHTML;
+            to.style.fontFamily = from.style.fontFamily;
+            to.style.fontSize = from.style.fontSize;
+            to.style.fontWeight = from.style.fontWeight;
+            to.style.fontStyle = from.style.fontStyle;
+            to.style.lineHeight = from.style.lineHeight;
+            to.style.letterSpacing = from.style.letterSpacing;
+            to.style.textDecoration = from.style.textDecoration;
+            to.style.color = from.style.color;
+            to.style.display = 'block';
+            to.style.position = 'static';
+            to.style.visibility = 'visible';
+            to.style.margin = '0';
+            to.style.border = 'none';
+            to.style.padding = '0';
+            to.style.transform = '';
+            to.style.transformOrigin = '';
+            to.style.maxWidth = 'none';
+        }
+        function measureFormattedSpan(span, options){
+            const opts = options || {};
+            const host = ensureOverflowMeasureHost();
+            host.innerHTML = '';
+            const clone = document.createElement('div');
+            copySpanForMeasure(span, clone);
+            if(opts.singleLine){
+                clone.style.whiteSpace = 'nowrap';
+                clone.style.width = 'auto';
+                clone.style.wordWrap = 'normal';
+            } else {
+                clone.style.whiteSpace = span.style.whiteSpace || 'pre-wrap';
+                clone.style.wordWrap = span.style.wordWrap || 'break-word';
+                if(opts.widthPx != null && opts.widthPx > 0){
+                    clone.style.width = opts.widthPx + 'px';
+                    clone.style.maxWidth = opts.widthPx + 'px';
+                }
+            }
+            host.appendChild(clone);
+            const size = { width: Math.ceil(clone.scrollWidth), height: Math.ceil(clone.scrollHeight) };
+            host.innerHTML = '';
+            return size;
+        }
+        function textOverflowTransformOrigin(el, axis){
+            const ta = el.props.textAlign || 'left';
+            const va = el.props.valign || 'top';
+            let x = 'left', y = 'top';
+            if(ta === 'center') x = 'center';
+            else if(ta === 'right') x = 'right';
+            if(va === 'middle') y = 'center';
+            else if(va === 'bottom') y = 'bottom';
+            if(axis === 'x') return `${x} center`;
+            if(axis === 'y') return `center ${y}`;
+            return `${x} ${y}`;
+        }
+
         // Helper function to apply text overflow handling
         function applyTextOverflow(span, el, containerWidth, containerHeight, isPrintMode){
             const overflowMode = el.props.textOverflow || 'clip';
@@ -2737,6 +2807,8 @@ document.addEventListener('DOMContentLoaded', ()=>{
             
             // Get the parent container (d element)
             const container = span.parentElement;
+            span.style.transform = '';
+            span.style.transformOrigin = '';
             
             if(overflowMode === 'squeeze'){
                 // Horizontal squeeze: compress text horizontally when it's too wide
@@ -2764,43 +2836,14 @@ document.addEventListener('DOMContentLoaded', ()=>{
                 
                 // For print mode, execute synchronously; for normal mode, use requestAnimationFrame
                 const executeSqueeze = () => {
-                    // Create a measurement div to check overflow
-                    const measureDiv = document.createElement('div');
-                    measureDiv.textContent = span.textContent;
-                    measureDiv.style.position = 'absolute';
-                    measureDiv.style.visibility = 'hidden';
-                    measureDiv.style.whiteSpace = 'nowrap';
-                    measureDiv.style.width = 'auto';
-                    measureDiv.style.height = 'auto';
-                    measureDiv.style.overflow = 'visible';
-                    measureDiv.style.maxWidth = 'none';
-                    measureDiv.style.padding = '0';
-                    measureDiv.style.margin = '0';
-                    measureDiv.style.border = 'none';
-                    // Copy all relevant styles from span
-                    measureDiv.style.fontFamily = span.style.fontFamily || el.props.fontFamily || 'Arial, sans-serif';
-                    measureDiv.style.fontSize = span.style.fontSize || (el.props.fontSize || 16) + 'px';
-                    measureDiv.style.fontWeight = span.style.fontWeight || el.props.fontWeight || 'normal';
-                    measureDiv.style.lineHeight = span.style.lineHeight || el.props.lineHeight || '1.2';
-                    measureDiv.style.letterSpacing = span.style.letterSpacing || formatLetterSpacingPx(el.props.letterSpacing);
-                    document.body.appendChild(measureDiv);
-                    
-                    // Measure text width
-                    const textWidth = Math.max(measureDiv.scrollWidth, measureDiv.offsetWidth);
-                    document.body.removeChild(measureDiv);
+                    const textWidth = measureFormattedSpan(span, { singleLine: true }).width;
                     
                     if(textWidth > availableWidth){
                         // Calculate scale factor
                         const scaleX = Math.max(0.1, (availableWidth / textWidth));
                         // Apply horizontal squeeze with transform-origin based on text alignment
-                        const textAlign = el.props.textAlign || 'left';
-                        let transformOrigin = 'left center';
-                        if(textAlign === 'center') transformOrigin = 'center center';
-                        else if(textAlign === 'right') transformOrigin = 'right center';
-                        
-                        // Apply scaleX (rotation is handled by parent container)
                         span.style.transform = `scaleX(${scaleX})`;
-                        span.style.transformOrigin = transformOrigin;
+                        span.style.transformOrigin = textOverflowTransformOrigin(el, 'x');
                         
                         // Ensure span can show all compressed text
                         span.style.width = 'auto';
@@ -2850,10 +2893,8 @@ document.addEventListener('DOMContentLoaded', ()=>{
             
             // Function to apply auto-scale
             const executeAutoScale = () => {
-                // Get the span width
                 let spanWidth;
                 if(isPrintMode){
-                    // In print mode, calculate from containerWidth minus padding/border
                     const paddingLeft = (Number(el.props.paddingLeft) || 0) * PIXELS_PER_CM;
                     const paddingRight = (Number(el.props.paddingRight) || 0) * PIXELS_PER_CM;
                     const borderLeft = (el.props.borderLeft !== false) ? borderWidth : 0;
@@ -2863,51 +2904,16 @@ document.addEventListener('DOMContentLoaded', ()=>{
                     spanWidth = span.offsetWidth || containerWidth;
                 }
                 
-                if(spanWidth <= 0) return;
+                if(spanWidth <= 0 || availableHeight <= 0) return;
                 
-                // Get the actual height of the span
-                const spanHeight = span.scrollHeight || 0;
-                const spanClientHeight = span.clientHeight || span.offsetHeight || 0;
+                const measured = measureFormattedSpan(span, { widthPx: spanWidth, singleLine: false });
+                if(measured.height <= availableHeight) return;
                 
-                // Check if there's bottom overflow
-                const hasBottomOverflow = spanHeight > spanClientHeight || spanHeight > availableHeight;
-                
-                if(!hasBottomOverflow) return; // No overflow, keep default behavior
-                
-                // Text overflows at bottom - reduce font size
-                let fontSize = Number(el.props.fontSize) || 16;
-                const minFontSize = 6;
-                
-                // Create a measurement div with same styles and wrapping
-                const measureDiv = document.createElement('div');
-                measureDiv.textContent = span.textContent;
-                measureDiv.style.position = 'absolute';
-                measureDiv.style.visibility = 'hidden';
-                measureDiv.style.width = spanWidth + 'px';
-                measureDiv.style.height = 'auto';
-                measureDiv.style.overflow = 'visible';
-                measureDiv.style.maxHeight = 'none';
-                measureDiv.style.padding = '0';
-                measureDiv.style.margin = '0';
-                measureDiv.style.border = 'none';
-                // Copy all relevant styles from span
-                measureDiv.style.fontFamily = span.style.fontFamily || el.props.fontFamily || 'Arial, sans-serif';
-                measureDiv.style.fontWeight = span.style.fontWeight || el.props.fontWeight || 'normal';
-                measureDiv.style.lineHeight = span.style.lineHeight || el.props.lineHeight || '1.2';
-                measureDiv.style.letterSpacing = span.style.letterSpacing || formatLetterSpacingPx(el.props.letterSpacing);
-                measureDiv.style.whiteSpace = span.style.whiteSpace || 'pre-wrap';
-                measureDiv.style.wordWrap = span.style.wordWrap || 'break-word';
-                document.body.appendChild(measureDiv);
-                
-                // Reduce font size until text fits within available height
-                while(measureDiv.scrollHeight > availableHeight && fontSize > minFontSize){
-                    fontSize -= 0.5;
-                    measureDiv.style.fontSize = fontSize + 'px';
-                }
-                
-                // Apply the calculated font size
-                span.style.fontSize = fontSize + 'px';
-                document.body.removeChild(measureDiv);
+                const scale = Math.max(0.1, availableHeight / measured.height);
+                span.style.transform = `scale(${scale})`;
+                span.style.transformOrigin = textOverflowTransformOrigin(el);
+                span.style.overflow = 'visible';
+                if(container) container.style.overflow = 'visible';
             };
             
             // Check if text overflows at the bottom (after natural wrapping)
@@ -4038,6 +4044,33 @@ document.addEventListener('DOMContentLoaded', ()=>{
         scope.querySelectorAll('textarea.auto-grow-textarea').forEach(bindAutoGrowTextarea);
     }
 
+    function propRotationFieldHtml(gridCls, labelCls, propKey, val, syncHtml){
+        const v = val !== undefined && val !== null && val !== '' ? val : 0;
+        return `<div class="${gridCls}"><label class="${labelCls}">Rotation°</label><div style="display:flex;align-items:center;gap:8px;min-width:0"><input type="number" step="1" data-prop="${propKey}" value="${v}" style="flex:1;min-width:0"><button type="button" class="prop-rotate-90-btn" title="+90° (Shift: −90°)">↻</button></div>${syncHtml || ''}</div>`;
+    }
+    function bindRotationNudgeButtons(scope, getElements){
+        if(!scope) return;
+        scope.querySelectorAll('.prop-rotate-90-btn').forEach(btn => {
+            btn.addEventListener('click', function(ev){
+                ev.preventDefault();
+                ev.stopPropagation();
+                const delta = ev.shiftKey ? -90 : 90;
+                const row = btn.closest('.prop-grid');
+                const input = row && row.querySelector('input[data-prop*="rotation"]');
+                const targets = getElements().filter(e => e && e.props);
+                if(!targets.length) return;
+                pushBeforeChange();
+                targets.forEach(target => {
+                    target.props.rotation = (Number(target.props.rotation) || 0) + delta;
+                });
+                if(input && targets.length === 1) input.value = targets[0].props.rotation;
+                render();
+                saveCurrentDesign();
+                updateProps();
+            });
+        });
+    }
+
     function singlePropsPanel(el){
         const thread = el.masterThreadId ? getMasterThread(el.masterThreadId) : null;
         function valueFor(pk){
@@ -4158,7 +4191,7 @@ document.addEventListener('DOMContentLoaded', ()=>{
 
         if(el.type==='line'){
                 h += `<label>Thickness (px)</label><input type="number" step="1" data-prop="props.thickness" value="${el.props.thickness!==undefined?el.props.thickness:2}" min="0">`;
-                h += `<hr><div class="prop-grid"><label>Rotation°</label><input type="number" step="1" data-prop="props.rotation" value="${el.props.rotation||0}"><label></label></div>`;
+                h += `<hr>${propRotationFieldHtml('prop-grid', '', 'props.rotation', el.props.rotation||0, '<label></label>')}`;
         }
 
         if(el.type==='box'){
@@ -4182,7 +4215,7 @@ document.addEventListener('DOMContentLoaded', ()=>{
                 const mT = valueFor('props.marginTop'), mR = valueFor('props.marginRight'), mB = valueFor('props.marginBottom'), mL = valueFor('props.marginLeft');
                 h += `<hr><div style="margin-top:8px"><label style="font-size:12px;display:block;margin-bottom:6px">Margini (cm)</label><div class="${grid1Cls}"><label>Su</label><input type="number" step="0.01" data-prop="props.marginTop" value="${Number(mT||0).toFixed(2)}" min="0"><label>Destra</label><input type="number" step="0.01" data-prop="props.marginRight" value="${Number(mR||0).toFixed(2)}" min="0"><label>Giu</label><input type="number" step="0.01" data-prop="props.marginBottom" value="${Number(mB||0).toFixed(2)}" min="0"><label>Sinistra</label><input type="number" step="0.01" data-prop="props.marginLeft" value="${Number(mL||0).toFixed(2)}" min="0"></div></div>`;
                 const rotImgVal = valueFor('props.rotation');
-                h += `<hr><div class="${grid1Cls}"><label class="${labelClass('props.rotation')}">Rotation°</label><input type="number" step="1" data-prop="props.rotation" value="${rotImgVal || 0}">${syncBtn('props.rotation')}</div>`;
+                h += `<hr>${propRotationFieldHtml(grid1Cls, labelClass('props.rotation'), 'props.rotation', rotImgVal || 0, syncBtn('props.rotation'))}`;
             }
 
             if(el.type==='text' || el.type==='data'){
@@ -4198,7 +4231,7 @@ document.addEventListener('DOMContentLoaded', ()=>{
                 h += `<div class="${grid1Cls}"><label class="${labelClass('props.textAlign')}">H. Align</label><select data-prop="props.textAlign"><option value="left" ${taVal==='left'?'selected':''}>Left</option><option value="center" ${taVal==='center'?'selected':''}>Center</option><option value="right" ${taVal==='right'?'selected':''}>Right</option></select>${syncBtn('props.textAlign')}</div>`;
                 h += `<div class="${grid1Cls}"><label class="${labelClass('props.valign')}">V. Align</label><select data-prop="props.valign"><option value="top" ${vaVal==='top'?'selected':''}>Top</option><option value="middle" ${vaVal==='middle'?'selected':''}>Middle</option><option value="bottom" ${vaVal==='bottom'?'selected':''}>Bottom</option></select>${syncBtn('props.valign')}</div>`;
                 h += `<div class="${grid1Cls}"><label class="${labelClass('props.textOverflow')}">Overflow</label><select data-prop="props.textOverflow"><option value="clip" ${(overflowVal||'clip')==='clip'?'selected':''}>Clip (default)</option><option value="auto-scale" ${overflowVal==='auto-scale'?'selected':''}>Auto-scale to fit</option><option value="squeeze" ${overflowVal==='squeeze'?'selected':''}>Horizontal squeeze</option></select>${syncBtn('props.textOverflow')}</div>`;
-                h += `<div class="${grid1Cls}"><label class="${labelClass('props.rotation')}">Rotation°</label><input type="number" step="1" data-prop="props.rotation" value="${rotVal||0}">${syncBtn('props.rotation')}</div>`;
+                h += propRotationFieldHtml(grid1Cls, labelClass('props.rotation'), 'props.rotation', rotVal || 0, syncBtn('props.rotation'));
                 const ptVal = valueFor('props.paddingTop'); const prVal = valueFor('props.paddingRight'); const pbVal = valueFor('props.paddingBottom'); const plVal = valueFor('props.paddingLeft');
                 h += `<hr><div class="${grid1Cls}"><label class="${labelClass('props.paddingTop')}">Padding Top</label><input type="number" step="0.01" data-prop="props.paddingTop" value="${Number(ptVal||0).toFixed(2)}" min="0">${syncBtn('props.paddingTop')}</div>`;
                 h += `<div class="${grid1Cls}"><label class="${labelClass('props.paddingRight')}">Padding Right</label><input type="number" step="0.01" data-prop="props.paddingRight" value="${Number(prVal||0).toFixed(2)}" min="0">${syncBtn('props.paddingRight')}</div>`;
@@ -4330,6 +4363,7 @@ document.addEventListener('DOMContentLoaded', ()=>{
         h += `<hr><button id="btn-delete">Delete Element</button>`;
         pp.innerHTML = h;
             bindAutoGrowTextareas(pp);
+            bindRotationNudgeButtons(pp, () => [el]);
             
             const aspectLinkBtn = pp.querySelector('#prop-aspect-link-toggle');
             if(aspectLinkBtn){
@@ -4728,7 +4762,7 @@ document.addEventListener('DOMContentLoaded', ()=>{
             }
             h += `<div class="prop-grid"><label>Padding Top</label><input type="number" step="0.01" data-prop="multi.props.paddingTop" value="${common('props.paddingTop')}" min="0"><label>Padding Right</label><input type="number" step="0.01" data-prop="multi.props.paddingRight" value="${common('props.paddingRight')}" min="0"></div>`;
             h += `<div class="prop-grid"><label>Padding Bottom</label><input type="number" step="0.01" data-prop="multi.props.paddingBottom" value="${common('props.paddingBottom')}" min="0"><label>Padding Left</label><input type="number" step="0.01" data-prop="multi.props.paddingLeft" value="${common('props.paddingLeft')}" min="0"></div>`;
-                h += `<hr><div class="prop-grid"><label>Rotation°</label><input type="number" step="0.1" data-prop="multi.props.rotation" value="${common('props.rotation')}"><label>Show Border</label><input type="checkbox" data-prop="multi.props.showBorder" ${common('props.showBorder')?'checked':''}></div>`;
+                h += `<hr><div class="prop-grid"><label>Rotation°</label><div style="display:flex;align-items:center;gap:8px;min-width:0"><input type="number" step="1" data-prop="multi.props.rotation" value="${common('props.rotation')}" style="flex:1;min-width:0"><button type="button" class="prop-rotate-90-btn" title="+90° (Shift: −90°)">↻</button></div><label>Show Border</label><input type="checkbox" data-prop="multi.props.showBorder" ${common('props.showBorder')?'checked':''}></div>`;
             h += `<div class="prop-grid"><label>Border Color</label><input type="color" data-prop="multi.props.borderColor" value="${common('props.borderColor')||'#000000'}"><label>Border Width</label><input type="number" step="0.1" data-prop="multi.props.borderWidth" value="${common('props.borderWidth')}" min="0"></div>`;
             if(common('props.showBorder')){
                 h += `<div class="prop-grid" style="margin-top:8px"><label style="font-size:12px">Border Sides:</label><div style="display:grid;grid-template-columns:1fr 1fr;gap:4px"><label style="font-size:12px;font-weight:normal;display:flex;align-items:center;gap:4px"><input type="checkbox" data-prop="multi.props.borderTop" ${common('props.borderTop')!==false?'checked':''}>Top</label><label style="font-size:12px;font-weight:normal;display:flex;align-items:center;gap:4px"><input type="checkbox" data-prop="multi.props.borderRight" ${common('props.borderRight')!==false?'checked':''}>Right</label><label style="font-size:12px;font-weight:normal;display:flex;align-items:center;gap:4px"><input type="checkbox" data-prop="multi.props.borderBottom" ${common('props.borderBottom')!==false?'checked':''}>Bottom</label><label style="font-size:12px;font-weight:normal;display:flex;align-items:center;gap:4px"><input type="checkbox" data-prop="multi.props.borderLeft" ${common('props.borderLeft')!==false?'checked':''}>Left</label></div></div>`;
@@ -4743,6 +4777,7 @@ document.addEventListener('DOMContentLoaded', ()=>{
             }
         h += `<hr><button id="btn-delete">Delete Selected</button>`;
         pp.innerHTML = h;
+            bindRotationNudgeButtons(pp, () => elems);
             
             const multiAspectBtn = pp.querySelector('#multi-prop-aspect-link-toggle');
             if(multiAspectBtn && elems.length){
